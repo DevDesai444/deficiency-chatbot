@@ -8,7 +8,12 @@ import sqlite3
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
+import structlog
+
 from config import get_settings
+
+log = structlog.get_logger()
 
 _DB_PATH = "data/defpredict.db"
 
@@ -18,6 +23,62 @@ def _get_conn() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
+
+# ---------------------------------------------------------------------------
+# Databricks SQL Statement Execution API helpers
+# ---------------------------------------------------------------------------
+
+def _sql_client() -> httpx.Client:
+    s = get_settings()
+    return httpx.Client(
+        base_url=s.databricks_host,
+        headers={"Authorization": f"Bearer {s.databricks_token}"},
+        timeout=50.0,
+    )
+
+
+def _run_sql(statement: str) -> dict:
+    s = get_settings()
+    with _sql_client() as client:
+        resp = client.post(
+            "/api/2.0/sql/statements",
+            json={
+                "warehouse_id": s.databricks_warehouse_id,
+                "statement": statement,
+                "wait_timeout": "50s",
+            },
+        )
+    data = resp.json()
+    state = data.get("status", {}).get("state", "")
+    if state != "SUCCEEDED":
+        err = data.get("status", {}).get("error", {}).get("message", "unknown error")
+        log.error("databricks_sql_failed", statement=statement[:200], error=err)
+        raise RuntimeError(f"Databricks SQL error: {err}")
+    return data
+
+
+def _table(name: str) -> str:
+    s = get_settings()
+    return f"{s.databricks_catalog}.{s.databricks_schema}.{name}"
+
+
+def _escape(val: Any) -> str:
+    if val is None:
+        return "NULL"
+    s = str(val).replace("'", "''").replace("\\", "\\\\")
+    return f"'{s}'"
+
+
+def _rows_from_result(data: dict) -> list[dict]:
+    manifest = data.get("manifest", {})
+    columns = [c["name"] for c in manifest.get("schema", {}).get("columns", [])]
+    raw = data.get("result", {}).get("data_array", [])
+    return [dict(zip(columns, row, strict=True)) for row in raw]
+
+
+# ---------------------------------------------------------------------------
+# Public API — auto-dispatches to SQLite or Databricks
+# ---------------------------------------------------------------------------
 
 def create_job(job_id: str, document_name: str) -> None:
     s = get_settings()
@@ -119,19 +180,73 @@ def query_deficiencies(filters: dict[str, str] | None = None, limit: int = 50) -
     return [dict(r) for r in rows]
 
 
-# --- Databricks stubs (require DATABRICKS_HOST + DATABRICKS_TOKEN) ---
+# ---------------------------------------------------------------------------
+# Databricks implementations via SQL Statement Execution API
+# ---------------------------------------------------------------------------
 
 def _create_job_databricks(job_id: str, document_name: str) -> None:
-    raise NotImplementedError("Databricks Delta write not yet configured — set ENVIRONMENT=local")
+    now = datetime.now(UTC).isoformat()
+    table = _table("analysis_jobs")
+    stmt = (
+        f"INSERT INTO {table} (job_id, document_name, status, created_at) "
+        f"VALUES ({_escape(job_id)}, {_escape(document_name)}, 'accepted', {_escape(now)})"
+    )
+    _run_sql(stmt)
+
 
 def _update_job_databricks(job_id: str, status: str, **extra: Any) -> None:
-    raise NotImplementedError("Databricks Delta write not yet configured")
+    sets = [f"status = {_escape(status)}"]
+
+    if status in ("complete", "error"):
+        sets.append(f"completed_at = {_escape(datetime.now(UTC).isoformat())}")
+
+    for key in ("intermediate_report", "flaw_report", "recommendations"):
+        if key in extra:
+            val = json.dumps(extra[key]) if extra[key] is not None else None
+            sets.append(f"{key} = {_escape(val)}")
+
+    table = _table("analysis_jobs")
+    stmt = f"UPDATE {table} SET {', '.join(sets)} WHERE job_id = {_escape(job_id)}"
+    _run_sql(stmt)
+
 
 def _get_job_databricks(job_id: str) -> dict | None:
-    raise NotImplementedError("Databricks Delta read not yet configured")
+    table = _table("analysis_jobs")
+    stmt = f"SELECT * FROM {table} WHERE job_id = {_escape(job_id)}"
+    data = _run_sql(stmt)
+    rows = _rows_from_result(data)
+    if not rows:
+        return None
+    result = rows[0]
+    for json_col in ("intermediate_report", "flaw_report", "recommendations"):
+        if result.get(json_col):
+            result[json_col] = json.loads(result[json_col])
+    return result
 
-def _log_event_databricks(job_id: str, layer: str, event_type: str, agent_name: str, message: str) -> None:
-    raise NotImplementedError("Databricks Delta write not yet configured")
 
-def _query_deficiencies_databricks(filters: dict[str, str] | None, limit: int) -> list[dict]:
-    raise NotImplementedError("Databricks Delta read not yet configured")
+def _log_event_databricks(
+    job_id: str, layer: str, event_type: str, agent_name: str, message: str,
+) -> None:
+    now = datetime.now(UTC).isoformat()
+    table = _table("agent_events")
+    stmt = (
+        f"INSERT INTO {table} (job_id, event_timestamp, layer, event_type, agent_name, message) "
+        f"VALUES ({_escape(job_id)}, {_escape(now)}, {_escape(layer)}, "
+        f"{_escape(event_type)}, {_escape(agent_name)}, {_escape(message)})"
+    )
+    _run_sql(stmt)
+
+
+def _query_deficiencies_databricks(
+    filters: dict[str, str] | None, limit: int,
+) -> list[dict]:
+    table = _table("deficiency_kb")
+    stmt = f"SELECT * FROM {table}"
+    if filters:
+        clauses = []
+        for key, val in filters.items():
+            clauses.append(f"{key} LIKE {_escape(f'%{val}%')}")
+        stmt += " WHERE " + " AND ".join(clauses)
+    stmt += f" LIMIT {limit}"
+    data = _run_sql(stmt)
+    return _rows_from_result(data)

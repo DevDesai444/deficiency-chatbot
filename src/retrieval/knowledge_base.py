@@ -11,7 +11,7 @@ def find_similar_deficiencies(
     top_k: int = 5,
 ) -> list[SimilarDeficiency]:
     query_vec = embed_query(query_text)
-    raw_results = search_similar(query_vec, top_k=top_k)
+    raw_results = search_similar(query_vec, query_text=query_text, top_k=top_k)
 
     return [
         SimilarDeficiency(

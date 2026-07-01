@@ -11,9 +11,9 @@ class Settings(BaseSettings):
     # databricks
     databricks_host: str = ""
     databricks_token: str = ""
-    databricks_warehouse_path: str = ""
+    databricks_warehouse_id: str = ""
     databricks_catalog: str = "defpredict"
-    databricks_schema: str = "default"
+    databricks_schema: str = "main"
 
     # model serving -- OpenAI-compatible for both local (Ollama) and Databricks
     llm_base_url: str = "http://localhost:11434/v1"
