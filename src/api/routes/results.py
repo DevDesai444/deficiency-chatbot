@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from databricks.delta import get_job
 
 router = APIRouter(prefix="/api")
 
@@ -9,10 +13,19 @@ router = APIRouter(prefix="/api")
 class JobResult(BaseModel):
     job_id: str
     status: str
+    recommendations: dict[str, Any] | None = None
     error: str | None = None
 
 
 @router.get("/results/{job_id}", response_model=JobResult)
 async def get_results(job_id: str) -> JobResult:
-    # TODO: Phase 6 — look up job status from store, return recommendations if complete
-    raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    return JobResult(
+        job_id=job_id,
+        status=job["status"],
+        recommendations=job.get("recommendations"),
+        error=None,
+    )

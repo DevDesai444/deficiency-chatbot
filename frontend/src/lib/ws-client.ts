@@ -20,10 +20,12 @@ export function useAgentStream(jobId: string | null) {
 
     ws.onmessage = (msg) => {
       try {
-        const event: AgentEvent = JSON.parse(msg.data);
-        setEvents((prev) => [...prev, event]);
+        const data = JSON.parse(msg.data);
+        if (data.layer && data.event_type) {
+          setEvents((prev) => [...prev, data as AgentEvent]);
+        }
       } catch {
-        // non-JSON heartbeat — ignore
+        // ignore malformed messages
       }
     };
 
