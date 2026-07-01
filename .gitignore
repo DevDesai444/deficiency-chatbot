@@ -1,0 +1,60 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.python-version
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Env / secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Data — never commit corpus or built artifacts
+data/*
+!data/README.md
+*.bin
+*.db
+*.sqlite
+*.faiss
+
+# Model checkpoints / weights
+checkpoints/
+weights/
+*.gguf
+*.safetensors
+
+# Logs
+logs/
+*.log
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+.vercel
+
+# uv
+uv.lock
