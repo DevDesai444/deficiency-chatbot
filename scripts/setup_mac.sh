@@ -10,18 +10,6 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
-step "Checking Docker"
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Installing Docker Desktop (cask)..."
-  brew install --cask docker
-  echo "Open Docker.app once to grant permissions, then re-run this script."
-  exit 0
-fi
-if ! docker info >/dev/null 2>&1; then
-  echo "Docker is installed but the daemon isn't running. Start Docker.app, then re-run."
-  exit 1
-fi
-
 step "Checking Ollama"
 if ! command -v ollama >/dev/null 2>&1; then
   brew install ollama
@@ -33,8 +21,8 @@ if ! pgrep -x ollama >/dev/null; then
   sleep 2
 fi
 
-step "Pulling qwen2.5:7b-instruct (~5GB, one-time)"
-ollama pull qwen2.5:7b-instruct
+step "Pulling mistral (~4GB, one-time)"
+ollama pull mistral
 
 step "Syncing Python deps with uv"
 if ! command -v uv >/dev/null 2>&1; then
@@ -42,13 +30,22 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 uv sync
 
+step "Checking Node.js"
+if ! command -v node >/dev/null 2>&1; then
+  brew install node
+fi
+
+step "Installing frontend deps"
+(cd frontend && npm install)
+
 step "Done"
 cat <<'EOF'
 
 Next:
   cp .env.example .env          # then edit
-  make neo4j-up                 # bring up Neo4j on :7474 / :7687
-  make api                      # FastAPI on :8000
+  uv run python notebooks/seed_data.py    # seed knowledge base
+  uv run python notebooks/build_index.py  # build FAISS index
+  make dev                       # API on :8000 + frontend on :3000
   curl http://localhost:8000/health
 
 EOF
