@@ -20,6 +20,7 @@ class TestHealth:
         data = r.json()
         assert data["status"] in ("ok", "degraded")
         assert "environment" in data
+        assert "data_store" in data
 
 
 class TestUpload:

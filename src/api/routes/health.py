@@ -12,6 +12,7 @@ router = APIRouter()
 class HealthStatus(BaseModel):
     status: str
     llm: str
+    data_store: str
     environment: str
 
 
@@ -24,9 +25,35 @@ def _check_llm() -> str:
         return f"down: {type(e).__name__}"
 
 
+def _check_data_store() -> str:
+    s = get_settings()
+    if not s.is_databricks:
+        return "sqlite"
+    try:
+        from databricks.delta import _run_sql
+
+        _run_sql("SELECT 1")
+        return "up"
+    except Exception as e:
+        return f"down: {type(e).__name__}"
+
+
 @router.get("/health", response_model=HealthStatus)
 def health() -> HealthStatus:
     s = get_settings()
     llm_status = _check_llm()
-    overall = "ok" if llm_status == "up" else "degraded"
-    return HealthStatus(status=overall, llm=llm_status, environment=s.environment)
+    data_status = _check_data_store()
+
+    if llm_status == "up" and data_status in ("up", "sqlite"):
+        overall = "ok"
+    elif data_status.startswith("down"):
+        overall = "degraded"
+    else:
+        overall = "degraded"
+
+    return HealthStatus(
+        status=overall,
+        llm=llm_status,
+        data_store=data_status,
+        environment=s.environment,
+    )
