@@ -20,12 +20,12 @@ def _make_model_client() -> OpenAIChatCompletionClient:
     s = get_settings()
     if s.is_databricks:
         return OpenAIChatCompletionClient(
-            model=s.llm_model,
+            model=s.resolved_llm_model,
             base_url=f"{s.databricks_host}/serving-endpoints",
             api_key=s.databricks_token,
         )
     return OpenAIChatCompletionClient(
-        model=s.llm_model,
+        model=s.resolved_llm_model,
         base_url=s.llm_base_url,
         api_key="not-needed",
     )

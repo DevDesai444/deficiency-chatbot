@@ -47,7 +47,7 @@ def chat_completion(
     for attempt in range(_MAX_RETRIES):
         try:
             response = client.chat.completions.create(
-                model=model or s.llm_model,
+                model=model or s.resolved_llm_model,
                 messages=messages,
                 temperature=temperature if temperature is not None else s.llm_temperature,
                 max_tokens=max_tokens,

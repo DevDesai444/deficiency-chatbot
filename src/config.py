@@ -50,12 +50,18 @@ class Settings(BaseSettings):
         return self.environment == "databricks"
 
     @property
+    def resolved_llm_model(self) -> str:
+        if self.is_databricks and self.llm_model.startswith("mistral"):
+            return "databricks-meta-llama-3-1-8b-instruct"
+        return self.llm_model
+
+    @property
     def suggestor_endpoint(self) -> str:
-        return self.suggestor_model or self.llm_model
+        return self.suggestor_model or self.resolved_llm_model
 
     @property
     def evaluator_endpoint(self) -> str:
-        return self.evaluator_model or self.llm_model
+        return self.evaluator_model or self.resolved_llm_model
 
 
 @lru_cache

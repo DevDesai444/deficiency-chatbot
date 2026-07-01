@@ -48,6 +48,7 @@ logs/
 # Editor
 .idea/
 .vscode/
+.claude/
 *.swp
 
 # Node / Next.js
