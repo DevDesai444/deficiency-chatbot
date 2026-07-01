@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from autogen import ConversableAgent
+from autogen_agentchat.agents import AssistantAgent
+from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 from llm.prompts import EXTRACTION_AGENT, EXTRACTION_MODERATOR
 from schemas.documents import ChunkGroup
@@ -8,35 +9,29 @@ from schemas.documents import ChunkGroup
 
 def make_extraction_agent(
     group: ChunkGroup,
-    llm_config: dict,
-) -> ConversableAgent:
+    model_client: OpenAIChatCompletionClient,
+) -> AssistantAgent:
     section_summary = "\n".join(
         f"- {s.heading}: {len(s.text)} chars, {len(s.tables)} tables"
         for s in group.sections
     )
 
-    return ConversableAgent(
+    return AssistantAgent(
         name=f"Extractor_{group.group_id}",
+        model_client=model_client,
         system_message=EXTRACTION_AGENT,
-        llm_config=llm_config,
-        human_input_mode="NEVER",
         description=f"Extraction agent for sections: {section_summary}",
-        default_auto_reply="",
-        max_consecutive_auto_reply=2,
-        code_execution_config=False,
     )
 
 
-def make_extraction_moderator(llm_config: dict) -> ConversableAgent:
-    return ConversableAgent(
+def make_extraction_moderator(
+    model_client: OpenAIChatCompletionClient,
+) -> AssistantAgent:
+    return AssistantAgent(
         name="Extraction_Moderator",
+        model_client=model_client,
         system_message=EXTRACTION_MODERATOR,
-        llm_config=llm_config,
-        human_input_mode="NEVER",
         description="Moderator that consolidates extraction findings",
-        default_auto_reply="",
-        max_consecutive_auto_reply=2,
-        code_execution_config=False,
     )
 
 

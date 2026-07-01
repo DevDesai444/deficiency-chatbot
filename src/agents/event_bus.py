@@ -2,28 +2,34 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import threading
 from collections import defaultdict
 
 from schemas.events import AgentEvent
 
 _queues: dict[str, list[asyncio.Queue[AgentEvent]]] = defaultdict(list)
+_lock = threading.Lock()
 
 
 def subscribe(job_id: str) -> asyncio.Queue[AgentEvent]:
     q: asyncio.Queue[AgentEvent] = asyncio.Queue()
-    _queues[job_id].append(q)
+    with _lock:
+        _queues[job_id].append(q)
     return q
 
 
 def unsubscribe(job_id: str, q: asyncio.Queue[AgentEvent]) -> None:
-    if job_id in _queues:
-        _queues[job_id] = [existing for existing in _queues[job_id] if existing is not q]
-        if not _queues[job_id]:
-            del _queues[job_id]
+    with _lock:
+        if job_id in _queues:
+            _queues[job_id] = [existing for existing in _queues[job_id] if existing is not q]
+            if not _queues[job_id]:
+                del _queues[job_id]
 
 
 def emit(event: AgentEvent) -> None:
-    for q in _queues.get(event.job_id, []):
+    with _lock:
+        listeners = list(_queues.get(event.job_id, []))
+    for q in listeners:
         with contextlib.suppress(asyncio.QueueFull):
             q.put_nowait(event)
 
@@ -42,4 +48,10 @@ def emit_sync(
         agent_name=agent_name,
         message=message,
     )
-    emit(event)
+
+    # If called from a background thread, schedule via the running loop
+    try:
+        loop = asyncio.get_running_loop()
+        loop.call_soon_threadsafe(emit, event)
+    except RuntimeError:
+        emit(event)

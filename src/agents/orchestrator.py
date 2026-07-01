@@ -13,17 +13,16 @@ from parse.pdf import extract_pdf
 from parse.section_splitter import classify_document, group_sections, split_document
 from schemas.corrections import RecommendationSet
 
-log = structlog.get_logger()
-
 
 def run_pipeline(pdf_path: str, job_id: str) -> RecommendationSet:
+    log = structlog.get_logger().bind(job_id=job_id)
     start = time.time()
     emit_sync(job_id, "extraction", "agent_spawned", "Orchestrator", "Starting analysis pipeline")
 
     try:
         create_job(job_id, pdf_path)
     except Exception:
-        log.warning("job_creation_failed", job_id=job_id)
+        log.warning("job_creation_failed")
 
     update_job_status(job_id, "extracting")
 
@@ -34,7 +33,6 @@ def run_pipeline(pdf_path: str, job_id: str) -> RecommendationSet:
 
     log.info(
         "parsed_document",
-        job_id=job_id,
         pages=doc.page_count,
         sections=len(sections),
         groups=len(groups),
@@ -84,7 +82,6 @@ def run_pipeline(pdf_path: str, job_id: str) -> RecommendationSet:
 
     log.info(
         "pipeline_complete",
-        job_id=job_id,
         flaws_found=result.flaws_found,
         recommendations=len(result.recommendations),
         seconds=round(elapsed, 1),
