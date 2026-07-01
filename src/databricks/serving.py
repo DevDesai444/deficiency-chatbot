@@ -11,6 +11,8 @@ from config import get_settings
 _DB_MODELS = {
     "llama-8b": "databricks-meta-llama-3-1-8b-instruct",
     "llama-70b": "databricks-meta-llama-3-3-70b-instruct",
+    "suggestor": "defpredict-suggestor",
+    "evaluator": "defpredict-evaluator",
 }
 
 

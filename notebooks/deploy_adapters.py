@@ -3,7 +3,8 @@ Register fine-tuned LoRA adapters with MLflow and deploy
 to Databricks Model Serving endpoints.
 
 Prerequisites:
-    - Adapters saved to data/adapters/{suggestor,evaluator}/
+    - Adapters saved to data/adapters/{suggestor,evaluator}/ (local)
+      or /Volumes/defpredict/main/artifacts/adapters/{role}/ (Databricks)
     - Databricks workspace with Model Serving enabled
     - DATABRICKS_HOST and DATABRICKS_TOKEN set
 
@@ -15,114 +16,112 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
-ADAPTER_DIR = Path("data/adapters")
+LOCAL_ADAPTER_DIR = Path("data/adapters")
+VOLUME_ADAPTER_DIR = "/Volumes/defpredict/main/artifacts/adapters"
 BASE_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
+
+
+def _adapter_path(role: str) -> str:
+    volume = Path(f"{VOLUME_ADAPTER_DIR}/{role}")
+    local = LOCAL_ADAPTER_DIR / role
+    if volume.exists():
+        return str(volume)
+    if local.exists():
+        return str(local)
+    print(f"Adapter not found at {volume} or {local}")
+    print(f"Run: python notebooks/fine_tune.py --role {role}")
+    sys.exit(1)
 
 
 def register_adapter(role: str) -> str:
     import mlflow
-    from mlflow.pyfunc import PythonModel
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    adapter_path = ADAPTER_DIR / role
-    if not adapter_path.exists():
-        print(f"Adapter not found at {adapter_path}")
-        print(f"Run: python notebooks/fine_tune.py --role {role}")
-        sys.exit(1)
+    adapter_path = _adapter_path(role)
+    on_databricks = "DATABRICKS_RUNTIME_VERSION" in os.environ
 
-    model_name = f"defpredict-{role}"
+    if on_databricks:
+        mlflow.set_registry_uri("databricks-uc")
+        model_name = f"defpredict.main.defpredict_{role}"
+    else:
+        model_name = f"defpredict-{role}"
 
-    class LoRAAdapter(PythonModel):
-        def load_context(self, context):
-            import torch
-            from peft import PeftModel
-            from transformers import AutoModelForCausalLM, AutoTokenizer
+    print(f"Loading base model: {BASE_MODEL}")
+    base = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL,
+        torch_dtype=torch.bfloat16,
+        device_map={"": 0} if torch.cuda.is_available() else "cpu",
+    )
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
 
-            base = AutoModelForCausalLM.from_pretrained(
-                BASE_MODEL,
-                torch_dtype=torch.float16,
-                device_map="auto",
-            )
-            self.model = PeftModel.from_pretrained(base, context.artifacts["adapter_dir"])
-            self.tokenizer = AutoTokenizer.from_pretrained(context.artifacts["adapter_dir"])
-            self.model.eval()
+    print(f"Applying LoRA adapter from: {adapter_path}")
+    model = PeftModel.from_pretrained(base, adapter_path)
 
-        def predict(self, context, model_input):
-            import torch
-
-            messages = model_input.to_dict("records")
-            prompts = []
-            for row in messages:
-                prompt = row.get("prompt", "")
-                prompts.append(prompt)
-
-            results = []
-            for prompt in prompts:
-                inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-                with torch.no_grad():
-                    outputs = self.model.generate(
-                        **inputs,
-                        max_new_tokens=1024,
-                        temperature=0.3,
-                        do_sample=True,
-                    )
-                text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-                results.append(text[len(prompt):])
-            return results
+    print("Merging adapter into base model")
+    merged = model.merge_and_unload()
 
     with mlflow.start_run(run_name=f"register-{role}-adapter"):
-        model_info = mlflow.pyfunc.log_model(
-            artifact_path="model",
-            python_model=LoRAAdapter(),
-            artifacts={"adapter_dir": str(adapter_path)},
+        model_info = mlflow.transformers.log_model(
+            transformers_model={"model": merged, "tokenizer": tokenizer},
+            artifact_path=role,
             registered_model_name=model_name,
-            pip_requirements=[
-                "torch>=2.3",
-                "transformers>=4.42",
-                "peft>=0.11",
-                "accelerate>=0.30",
-            ],
+            task="llm/v1/chat",
         )
 
     print(f"Registered {model_name} — URI: {model_info.model_uri}")
+    del merged, model, base
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     return model_info.model_uri
 
 
 def deploy_endpoint(role: str, model_uri: str) -> None:
-    from databricks.sdk import WorkspaceClient
-    from databricks.sdk.service.serving import (
-        EndpointCoreConfigInput,
-        ServedEntityInput,
-    )
+    import httpx
 
-    w = WorkspaceClient()
+    host = os.environ.get("DATABRICKS_HOST", "")
+    token = os.environ.get("DATABRICKS_TOKEN", "")
+    if not host or not token:
+        print("DATABRICKS_HOST and DATABRICKS_TOKEN required for deployment")
+        sys.exit(1)
+
+    on_databricks = "DATABRICKS_RUNTIME_VERSION" in os.environ
     endpoint_name = f"defpredict-{role}"
-    model_name = f"defpredict-{role}"
+    entity_name = f"defpredict.main.defpredict_{role}" if on_databricks else f"defpredict-{role}"
 
-    entity = ServedEntityInput(
-        entity_name=model_name,
-        entity_version="1",
-        workload_size="Small",
-        scale_to_zero_enabled=True,
-    )
+    payload = {
+        "name": endpoint_name,
+        "config": {
+            "served_entities": [{
+                "entity_name": entity_name,
+                "entity_version": "1",
+                "workload_size": "Small",
+                "scale_to_zero_enabled": True,
+            }],
+        },
+    }
 
-    try:
-        w.serving_endpoints.create(
-            name=endpoint_name,
-            config=EndpointCoreConfigInput(served_entities=[entity]),
-        )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = httpx.post(f"{host}/api/2.0/serving-endpoints", headers=headers, json=payload, timeout=30.0)
+    if r.status_code == 200:
         print(f"Created endpoint: {endpoint_name}")
-    except Exception as e:
-        if "already exists" in str(e).lower():
-            w.serving_endpoints.update_config(
-                name=endpoint_name,
-                served_entities=[entity],
-            )
-            print(f"Updated endpoint: {endpoint_name}")
-        else:
-            raise
+    elif "already exists" in r.text.lower():
+        r2 = httpx.put(
+            f"{host}/api/2.0/serving-endpoints/{endpoint_name}/config",
+            headers=headers,
+            json=payload["config"],
+            timeout=30.0,
+        )
+        print(f"Updated endpoint: {endpoint_name} (HTTP {r2.status_code})")
+    else:
+        print(f"Failed: HTTP {r.status_code}: {r.text[:500]}")
+        sys.exit(1)
 
 
 def main() -> None:
