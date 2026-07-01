@@ -101,6 +101,7 @@ def deploy_endpoint(role: str, model_uri: str) -> None:
                 "entity_name": entity_name,
                 "entity_version": "1",
                 "workload_size": "Small",
+                "workload_type": "GPU_SMALL",
                 "scale_to_zero_enabled": True,
             }],
         },

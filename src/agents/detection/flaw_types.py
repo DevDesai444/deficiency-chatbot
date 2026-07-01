@@ -1,7 +1,9 @@
-"""Maps CTD section types to relevant deficiency categories for dynamic agent routing."""
-from __future__ import annotations
+"""Reference catalog of known deficiency categories.
 
-from schemas.documents import CTDSection
+The LLM dynamically selects which categories are relevant for each document —
+this catalog provides the vocabulary, not the routing logic.
+"""
+from __future__ import annotations
 
 FLAW_TYPE_DEFINITIONS: dict[str, str] = {
     "Specification/CoA": "Incomplete specifications, missing acceptance criteria, CoA discrepancies",
@@ -19,46 +21,9 @@ FLAW_TYPE_DEFINITIONS: dict[str, str] = {
     "Elemental Impurities": "Missing elemental impurity risk assessment or data",
 }
 
-SECTION_TO_FLAW_TYPES: dict[CTDSection, list[str]] = {
-    CTDSection.S_4_1_SPECIFICATION: [
-        "Specification/CoA", "Impurities", "Characterization",
-    ],
-    CTDSection.S_4_2_ANALYTICAL_PROCEDURES: [
-        "Method/Validation", "Specification/CoA",
-    ],
-    CTDSection.S_4_3_VALIDATION: [
-        "Method/Validation", "Specification/CoA", "Impurities",
-    ],
-    CTDSection.S_4_4_BATCH_ANALYSES: [
-        "Batch Data", "Specification/CoA", "Impurities",
-    ],
-    CTDSection.S_7_STABILITY: [
-        "Stability", "Specification/CoA", "Container/Closure",
-    ],
-    CTDSection.P_2_DEVELOPMENT: [
-        "Development Report", "Excipients", "Dissolution",
-    ],
-    CTDSection.P_3_MANUFACTURE: [
-        "Manufacturing Process", "Batch Data",
-    ],
-    CTDSection.P_4_1_SPECIFICATION: [
-        "Specification/CoA", "Dissolution", "Impurities",
-    ],
-    CTDSection.P_4_3_VALIDATION: [
-        "Method/Validation", "Dissolution",
-    ],
-    CTDSection.P_6_CONTAINER_CLOSURE: [
-        "Container/Closure", "Elemental Impurities",
-    ],
-    CTDSection.P_7_STABILITY: [
-        "Stability", "Container/Closure", "Dissolution",
-    ],
-}
 
-DEFAULT_FLAW_TYPES = [
-    "Specification/CoA", "Method/Validation", "Impurities", "Stability",
-]
-
-
-def get_relevant_flaw_types(section: CTDSection) -> list[str]:
-    return SECTION_TO_FLAW_TYPES.get(section, DEFAULT_FLAW_TYPES)
+def format_flaw_catalog() -> str:
+    lines = []
+    for name, desc in FLAW_TYPE_DEFINITIONS.items():
+        lines.append(f"- {name}: {desc}")
+    return "\n".join(lines)

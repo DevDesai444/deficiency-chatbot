@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from autogen_agentchat.conditions import MaxMessageTermination
+from autogen_agentchat.conditions import TextMentionTermination
 from autogen_agentchat.teams import RoundRobinGroupChat
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
@@ -19,19 +19,31 @@ from schemas.documents import (
     SectionSummary,
 )
 
+_MODEL_INFO = {
+    "vision": False,
+    "function_calling": False,
+    "json_output": True,
+    "family": "unknown",
+}
 
-def _make_model_client() -> OpenAIChatCompletionClient:
+_MAX_TURNS_BACKSTOP = 30
+
+
+def _make_model_client(model: str | None = None) -> OpenAIChatCompletionClient:
     s = get_settings()
+    resolved = model or s.resolved_llm_model
     if s.is_databricks:
         return OpenAIChatCompletionClient(
-            model=s.resolved_llm_model,
+            model=resolved,
             base_url=f"{s.databricks_host}/serving-endpoints",
             api_key=s.databricks_token,
+            model_info=_MODEL_INFO,
         )
     return OpenAIChatCompletionClient(
-        model=s.resolved_llm_model,
+        model=resolved,
         base_url=s.llm_base_url,
         api_key="not-needed",
+        model_info=_MODEL_INFO,
     )
 
 
@@ -54,10 +66,11 @@ async def _run_extraction_async(
 
     all_agents = [a for a, _ in agents] + [moderator]
 
-    termination = MaxMessageTermination(max_messages=len(agents) + 3)
+    termination = TextMentionTermination("EXTRACTION_COMPLETE")
     team = RoundRobinGroupChat(
         participants=all_agents,
         termination_condition=termination,
+        max_turns=_MAX_TURNS_BACKSTOP,
     )
 
     initial_prompts = []
@@ -68,18 +81,21 @@ async def _run_extraction_async(
     combined_prompt = (
         f"Document: {document_name} (Type: {document_type})\n\n"
         "Each extraction agent should analyze their assigned sections and report findings.\n"
-        "Then the moderator should consolidate into a single intermediate report.\n\n"
+        "Review other agents' findings for cross-section dependencies.\n"
+        "The moderator will consolidate when all agents have converged.\n\n"
         + "\n\n---\n\n".join(initial_prompts)
     )
 
     result = await team.run(task=combined_prompt)
 
     consensus_notes = ""
+    msg_count = 0
     for msg in result.messages:
         sender = getattr(msg, "source", "")
         content = getattr(msg, "content", "")
         if isinstance(content, str) and content:
             emit_sync(job_id, "extraction", "agent_message", sender, content[:200])
+            msg_count += 1
             if sender == moderator.name:
                 consensus_notes = content
 
@@ -93,7 +109,10 @@ async def _run_extraction_async(
                 )
             )
 
-    emit_sync(job_id, "extraction", "layer_complete", "", f"Extracted {len(summaries)} sections")
+    emit_sync(
+        job_id, "extraction", "layer_complete", "",
+        f"Extracted {len(summaries)} sections in {msg_count} messages",
+    )
 
     return IntermediateReport(
         document_name=document_name,

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import json
+
+from agents.detection.flaw_types import FLAW_TYPE_DEFINITIONS, format_flaw_catalog
 from llm.client import chat_completion
-from llm.prompts import DOCUMENT_CLASSIFIER
+from llm.prompts import DOCUMENT_CLASSIFIER, FLAW_TYPE_SELECTOR
 from parse.section_splitter import detect_ctd_section
-from schemas.documents import CTDSection
+from schemas.documents import CTDSection, IntermediateReport
 
 
 def classify_document_type(text_excerpt: str) -> tuple[CTDSection, str]:
-    """Use LLM to classify the document's CTD section and type."""
     rule_based = detect_ctd_section(text_excerpt)
     if rule_based != CTDSection.UNKNOWN:
         return rule_based, _section_to_label(rule_based)
@@ -26,6 +28,38 @@ def classify_document_type(text_excerpt: str) -> tuple[CTDSection, str]:
 
     section = detect_ctd_section(section_code)
     return section, doc_type
+
+
+def select_flaw_types(report: IntermediateReport) -> list[str]:
+    """Ask the LLM which flaw categories to investigate for this document."""
+    report_summary = (
+        f"Document: {report.document_name}\n"
+        f"Type: {report.document_type}\n"
+        f"Sections: {', '.join(s.summary for s in report.sections)}\n"
+        f"Consensus notes: {report.consensus_notes[:2000]}"
+    )
+
+    response = chat_completion(
+        messages=[
+            {
+                "role": "system",
+                "content": FLAW_TYPE_SELECTOR.format(flaw_catalog=format_flaw_catalog()),
+            },
+            {"role": "user", "content": report_summary},
+        ],
+        max_tokens=300,
+    )
+
+    try:
+        start = response.index("[")
+        end = response.rindex("]") + 1
+        selected = json.loads(response[start:end])
+        if isinstance(selected, list) and all(isinstance(s, str) for s in selected):
+            return selected
+    except (ValueError, json.JSONDecodeError):
+        pass
+
+    return list(FLAW_TYPE_DEFINITIONS.keys())[:4]
 
 
 def _section_to_label(section: CTDSection) -> str:

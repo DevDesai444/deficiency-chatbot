@@ -56,6 +56,12 @@ class Settings(BaseSettings):
         return self.llm_model
 
     @property
+    def moderator_model(self) -> str:
+        if self.is_databricks:
+            return "databricks-meta-llama-3-3-70b-instruct"
+        return self.resolved_llm_model
+
+    @property
     def suggestor_endpoint(self) -> str:
         return self.suggestor_model or self.resolved_llm_model
 
