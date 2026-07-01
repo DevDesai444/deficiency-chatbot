@@ -106,15 +106,64 @@ def _search_faiss(query_embedding: np.ndarray | None, top_k: int) -> list[dict]:
 
 
 def _search_databricks(query_text: str, top_k: int) -> list[dict]:
-    """SQL-based text search against Databricks Delta table.
-
-    Searches deficiency_text and deficiency_response columns for keyword overlap.
-    When a Vector Search endpoint is configured, this would use the VS API instead.
-    """
     s = get_settings()
     if s.vector_search_endpoint:
         return _search_vector_endpoint(query_text, top_k)
+    return _search_embeddings_table(query_text, top_k)
 
+
+def _search_embeddings_table(query_text: str, top_k: int) -> list[dict]:
+    """Cosine similarity search using pre-computed embeddings stored on Databricks."""
+    from retrieval.vector_search import embed_query as _embed
+
+    query_emb = _embed(query_text)
+
+    emb_table = _table("deficiency_embeddings")
+    kb_table = _table("deficiency_kb")
+
+    emb_data = _run_sql(f"SELECT record_id, embedding FROM {emb_table}")
+    emb_rows = _rows_from_result(emb_data)
+
+    if not emb_rows:
+        return _search_text_fallback(query_text, top_k)
+
+    import json as _json
+
+    ids = []
+    embeddings = []
+    for r in emb_rows:
+        ids.append(int(r["record_id"]))
+        embeddings.append(_json.loads(r["embedding"]))
+
+    emb_matrix = np.array(embeddings, dtype=np.float32)
+    q = query_emb.reshape(1, -1).astype(np.float32)
+
+    q_norm = q / (np.linalg.norm(q) + 1e-9)
+    e_norm = emb_matrix / (np.linalg.norm(emb_matrix, axis=1, keepdims=True) + 1e-9)
+    scores = (e_norm @ q_norm.T).flatten()
+
+    top_indices = np.argsort(scores)[::-1][:top_k]
+
+    top_ids = [ids[i] for i in top_indices]
+    top_scores = [float(scores[i]) for i in top_indices]
+
+    id_list = ", ".join(str(i) for i in top_ids)
+    kb_data = _run_sql(f"SELECT * FROM {kb_table} WHERE id IN ({id_list})")
+    kb_rows = _rows_from_result(kb_data)
+
+    id_to_row = {int(r.get("id", 0)): r for r in kb_rows}
+    results = []
+    for rid, score in zip(top_ids, top_scores, strict=True):
+        if rid in id_to_row:
+            row = id_to_row[rid]
+            row["similarity_score"] = score
+            results.append(row)
+
+    return results
+
+
+def _search_text_fallback(query_text: str, top_k: int) -> list[dict]:
+    """SQL LIKE fallback when no embeddings are available."""
     table = _table("deficiency_kb")
     keywords = [w.strip() for w in query_text.split() if len(w.strip()) > 3]
 
