@@ -45,13 +45,18 @@ class Settings(BaseSettings):
     max_inner_loops: int = 3
     max_outer_loops: int = 1
 
+    # structured output (defense-in-depth for LLM JSON parsing)
+    structured_output_strict: bool = True
+    structured_output_max_repair_calls: int = 1
+    max_tokens_ceiling: int = 8000
+
     @property
     def is_databricks(self) -> bool:
         return self.environment == "databricks"
 
     @property
     def resolved_llm_model(self) -> str:
-        if self.is_databricks and self.llm_model.startswith("mistral"):
+        if self.is_databricks:
             return "databricks-meta-llama-3-1-8b-instruct"
         return self.llm_model
 

@@ -30,6 +30,7 @@ coverage.xml
 # Data — never commit corpus or built artifacts
 data/*
 !data/README.md
+Sample Data/
 *.bin
 *.db
 *.sqlite

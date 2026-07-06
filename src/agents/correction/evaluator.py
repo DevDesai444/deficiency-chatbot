@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 
 from config import get_settings
-from llm.client import chat_completion
 from llm.prompts import EVALUATOR
-from schemas.corrections import Correction, Evaluation, Verdict
+from llm.structured import structured_call
+from schemas.corrections import Correction, Evaluation, EvaluationOutput, Verdict
 
 
 def evaluate_corrections(
@@ -21,42 +21,33 @@ def evaluate_corrections(
     user_message = (
         f"## Original Flaw Summary\n\n{flaw_report_summary}\n\n"
         f"## Proposed Recommendations\n\n{corrections_json}\n\n"
-        "Evaluate these recommendations. Respond with:\n"
-        "1. VERDICT: PASS, MINOR_REVISION, or DEEPER_REVIEW\n"
-        "2. FEEDBACK: specific issues to fix (if not PASS)\n"
+        "Return a JSON object with two fields:\n"
+        "  verdict: one of `pass`, `minor_revision`, `deeper_review`\n"
+        "  feedback: specific issues to fix (empty string if verdict is pass)"
     )
 
-    response = chat_completion(
+    result, failure = structured_call(
         messages=[
             {"role": "system", "content": EVALUATOR},
             {"role": "user", "content": user_message},
         ],
+        model_cls=EvaluationOutput,
         model=s.evaluator_endpoint,
         max_tokens=2048,
+        repair_context="Evaluator judging whether regulatory-deficiency recommendations pass, need minor revision, or need deeper review.",
     )
 
-    return _parse_evaluation(response, len(corrections))
+    if result is not None:
+        return Evaluation(
+            verdict=result.verdict,
+            feedback=result.feedback if result.verdict != Verdict.PASS else "",
+            corrections_reviewed=len(corrections),
+        )
 
-
-def _parse_evaluation(response: str, num_corrections: int) -> Evaluation:
-    upper = response.upper()
-
-    if "DEEPER_REVIEW" in upper:
-        verdict = Verdict.DEEPER_REVIEW
-    elif "MINOR_REVISION" in upper:
-        verdict = Verdict.MINOR_REVISION
-    else:
-        verdict = Verdict.PASS
-
-    feedback = response
-    for marker in ["FEEDBACK:", "feedback:"]:
-        idx = response.find(marker)
-        if idx >= 0:
-            feedback = response[idx + len(marker):].strip()
-            break
-
+    # Even after L5, the moderator couldn't produce valid output — default to MINOR_REVISION
+    # so the correction loop retries rather than accepting untrusted output as PASS.
     return Evaluation(
-        verdict=verdict,
-        feedback=feedback if verdict != Verdict.PASS else "",
-        corrections_reviewed=num_corrections,
+        verdict=Verdict.MINOR_REVISION,
+        feedback=f"Evaluator parse failure: {failure.validation_error if failure else 'unknown'}. Please regenerate cleanly.",
+        corrections_reviewed=len(corrections),
     )

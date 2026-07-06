@@ -34,7 +34,7 @@ from transformers import (
 )
 from trl import SFTTrainer
 
-BASE_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
+BASE_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 DATA_DIR = Path("data/finetune")
 ADAPTER_DIR = Path("data/adapters")
 
@@ -108,19 +108,13 @@ def apply_lora(model) -> None:
     return model
 
 
+_tokenizer_ref = None
+
+
 def formatting_func(example: dict) -> str:
-    messages = example["messages"]
-    parts = []
-    for msg in messages:
-        role = msg["role"]
-        content = msg["content"]
-        if role == "system":
-            parts.append(f"<s>[INST] {content}\n\n")
-        elif role == "user":
-            parts.append(f"{content} [/INST]")
-        elif role == "assistant":
-            parts.append(f" {content}</s>")
-    return "".join(parts)
+    return _tokenizer_ref.apply_chat_template(
+        example["messages"], tokenize=False, add_generation_prompt=False,
+    )
 
 
 def main() -> None:
@@ -147,6 +141,9 @@ def main() -> None:
 
     model, tokenizer = load_model_and_tokenizer(args.base_model, device_cfg["use_4bit"])
     model = apply_lora(model)
+
+    global _tokenizer_ref
+    _tokenizer_ref = tokenizer
 
     output_dir = ADAPTER_DIR / args.role
     output_dir.mkdir(parents=True, exist_ok=True)

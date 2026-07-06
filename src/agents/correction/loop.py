@@ -6,7 +6,7 @@ from agents.correction.evaluator import evaluate_corrections
 from agents.correction.suggestor import generate_corrections
 from agents.event_bus import emit_sync
 from config import get_settings
-from schemas.corrections import RecommendationSet, Verdict
+from schemas.corrections import ParseFailed, RecommendationSet, Verdict
 from schemas.flaws import FlawReport
 
 log = structlog.get_logger()
@@ -19,6 +19,7 @@ def run_correction_loop(
     s = get_settings()
     inner_count = 0
     outer_count = 0
+    all_parse_failures: list[ParseFailed] = []
 
     if not flaw_report.flaws_found:
         emit_sync(job_id, "correction", "layer_complete", "", "No flaws to correct")
@@ -30,7 +31,13 @@ def run_correction_loop(
 
     emit_sync(job_id, "correction", "agent_spawned", "Suggestor", "Generating recommendations")
 
-    corrections = generate_corrections(flaw_report)
+    corrections, failures = generate_corrections(flaw_report)
+    all_parse_failures.extend(failures)
+    if failures:
+        emit_sync(
+            job_id, "correction", "parse_repair", "Suggestor",
+            f"Suggestor emitted {len(failures)} unparseable response(s); triggering retry",
+        )
     best_corrections = corrections
 
     for outer in range(s.max_outer_loops + 1):
@@ -38,6 +45,23 @@ def run_correction_loop(
 
         for inner in range(s.max_inner_loops):
             inner_count = inner + 1
+
+            # If suggestor failed to produce ANY parseable corrections, feed the
+            # validation error back as previous_feedback and retry the suggestor.
+            if not corrections and failures:
+                feedback = "Your previous output failed schema validation:\n" + "\n".join(
+                    f"[{f.layer}] {f.validation_error or f.reason}" for f in failures
+                )
+                emit_sync(
+                    job_id, "correction", "loop_iteration", "Suggestor",
+                    f"Regenerating after parse failure (inner loop {inner_count})",
+                )
+                corrections, failures = generate_corrections(flaw_report, feedback)
+                all_parse_failures.extend(failures)
+                best_corrections = corrections
+                if not corrections:
+                    continue
+
             emit_sync(
                 job_id, "correction", "loop_iteration", "Evaluator",
                 f"Evaluating (inner loop {inner_count})",
@@ -50,6 +74,7 @@ def run_correction_loop(
                 return RecommendationSet(
                     job_id=job_id,
                     recommendations=corrections,
+                    parse_failures=all_parse_failures,
                     flaws_found=True,
                     inner_loop_count=inner_count,
                     outer_loop_count=outer_count,
@@ -60,7 +85,8 @@ def run_correction_loop(
                     job_id, "correction", "loop_iteration", "Suggestor",
                     f"Revising based on feedback (inner loop {inner_count})",
                 )
-                corrections = generate_corrections(flaw_report, evaluation.feedback)
+                corrections, failures = generate_corrections(flaw_report, evaluation.feedback)
+                all_parse_failures.extend(failures)
                 best_corrections = corrections
                 continue
 
@@ -82,6 +108,7 @@ def run_correction_loop(
     return RecommendationSet(
         job_id=job_id,
         recommendations=best_corrections,
+        parse_failures=all_parse_failures,
         flaws_found=True,
         inner_loop_count=inner_count,
         outer_loop_count=outer_count,

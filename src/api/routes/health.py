@@ -19,7 +19,13 @@ class HealthStatus(BaseModel):
 def _check_llm() -> str:
     s = get_settings()
     try:
-        r = httpx.get(f"{s.llm_base_url}/models", timeout=3.0)
+        headers = {}
+        if s.is_databricks:
+            headers["Authorization"] = f"Bearer {s.databricks_token}"
+            url = f"{s.databricks_host}/api/2.0/serving-endpoints"
+        else:
+            url = f"{s.llm_base_url}/models"
+        r = httpx.get(url, headers=headers, timeout=5.0)
         return "up" if r.status_code == 200 else f"down: HTTP {r.status_code}"
     except Exception as e:
         return f"down: {type(e).__name__}"

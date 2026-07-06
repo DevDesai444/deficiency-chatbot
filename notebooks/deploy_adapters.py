@@ -22,7 +22,7 @@ from pathlib import Path
 
 LOCAL_ADAPTER_DIR = Path("data/adapters")
 VOLUME_ADAPTER_DIR = "/Volumes/defpredict/main/artifacts/adapters"
-BASE_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
+BASE_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 
 
 def _adapter_path(role: str) -> str:
@@ -100,8 +100,8 @@ def deploy_endpoint(role: str, model_uri: str) -> None:
             "served_entities": [{
                 "entity_name": entity_name,
                 "entity_version": "1",
-                "workload_size": "Small",
-                "workload_type": "GPU_SMALL",
+                "min_provisioned_throughput": 0,
+                "max_provisioned_throughput": 200,
                 "scale_to_zero_enabled": True,
             }],
         },

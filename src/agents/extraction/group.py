@@ -28,6 +28,10 @@ _MODEL_INFO = {
 
 _MAX_TURNS_BACKSTOP = 30
 
+# Llama 3.1 context = 131,072 tokens. Reserve ~30k for system prompts, output, and
+# accumulated conversation. Budget = 100k tokens ≈ 400k chars input.
+_EXTRACTION_PROMPT_CHAR_BUDGET = 400_000
+
 
 def _make_model_client(model: str | None = None) -> OpenAIChatCompletionClient:
     s = get_settings()

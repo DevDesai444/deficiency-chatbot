@@ -83,6 +83,30 @@ _INTERNAL_SECTION_RE = re.compile(
     re.MULTILINE,
 )
 
+# Strip trailing TOC dot-leaders and page numbers ("Introduction ...... 4")
+_TOC_TAIL_RE = re.compile(r"[\s\.]{3,}\d*\s*$")
+
+# Reject titles that are actually data rows (numbers, units, chromatogram values).
+# A real heading starts with a capital letter or word; a data row starts with digits/decimals.
+_DATA_ROW_RE = re.compile(r"^[\d\.\-\+\s×xX%μµ]")
+
+
+def _is_probable_heading(num: str, title: str) -> bool:
+    if len(num.split(".")) > 4 or not title:
+        return False
+    if len(title) > 150 or len(title) < 3:
+        return False
+    if _DATA_ROW_RE.match(title):
+        return False
+    # Must contain at least one alphabetic character
+    if not any(c.isalpha() for c in title):
+        return False
+    # Heading titles usually start with a capital letter or a known lead word
+    first_alpha = next((c for c in title if c.isalpha()), "")
+    if first_alpha and not first_alpha.isupper():
+        return False
+    return True
+
 
 def _split_by_internal_sections(
     pages: list[PageContent],
@@ -96,11 +120,19 @@ def _split_by_internal_sections(
         all_tables.extend(p.tables)
 
     headings: list[tuple[int, str, str]] = []
+    seen_nums: set[str] = set()
     for match in _INTERNAL_SECTION_RE.finditer(full_text):
         num = match.group(1)
-        title = match.group(2).strip()
-        if len(num.split(".")) <= 4 and len(title) < 150:
-            headings.append((match.start(), num, title))
+        title = _TOC_TAIL_RE.sub("", match.group(2)).strip()
+        if not _is_probable_heading(num, title):
+            continue
+        # Deduplicate: TOC entry + first body occurrence share the same number.
+        # Keep the LATER (body) occurrence so we get the real section text, not the TOC.
+        if num in seen_nums:
+            # Replace the earlier hit (TOC) with this later one (body)
+            headings = [h for h in headings if h[1] != num]
+        seen_nums.add(num)
+        headings.append((match.start(), num, title))
 
     if not headings:
         return [

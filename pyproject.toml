@@ -23,6 +23,7 @@ dependencies = [
     "autogen-ext[openai]>=0.4",
     # llm
     "openai>=1.40",
+    "json-repair>=0.30",
     # embedding
     "sentence-transformers>=3.0",
     # databricks
