@@ -147,6 +147,24 @@ def _split_by_internal_sections(
         ]
 
     sections: list[ParsedSection] = []
+
+    # Capture pre-heading content as the primary section. In CMC spec/method docs,
+    # the actual test parameters and limits often live before any numbered heading
+    # (which typically first appears in change-history or reference tables).
+    preamble_end = headings[0][0]
+    preamble_text = full_text[:preamble_end].strip()
+    if len(preamble_text) > 200:
+        sections.append(
+            ParsedSection(
+                section_id=ctd_section,
+                heading=f"{ctd_section.value} Main Specification",
+                text=preamble_text,
+                tables=[],
+                page_start=pages[0].page_number,
+                page_end=pages[-1].page_number,
+            )
+        )
+
     for i, (start_pos, num, title) in enumerate(headings):
         end_pos = headings[i + 1][0] if i + 1 < len(headings) else len(full_text)
         section_text = full_text[start_pos:end_pos].strip()
@@ -168,9 +186,14 @@ def _split_by_internal_sections(
             )
         )
 
+    # Unmatched tables go to the preamble section (which owns the pre-heading text
+    # and its associated tables). Falls back to the last section if no preamble.
     leftover_tables = [t for t in all_tables if not any(t in s.tables for s in sections)]
     if leftover_tables and sections:
-        sections[-1].tables.extend(leftover_tables)
+        if len(preamble_text) > 200:
+            sections[0].tables.extend(leftover_tables)
+        else:
+            sections[-1].tables.extend(leftover_tables)
 
     return sections
 
