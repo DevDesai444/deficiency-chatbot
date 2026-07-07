@@ -1,0 +1,29 @@
+command:
+  - uvicorn
+  - api.main:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8000"
+
+env:
+  - name: PYTHONPATH
+    value: src
+  - name: ENVIRONMENT
+    value: databricks
+  - name: DATABRICKS_HOST
+    valueFrom: databricks-host
+  - name: DATABRICKS_TOKEN
+    valueFrom: databricks-token
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: databricks-warehouse-id
+  - name: DATABRICKS_CATALOG
+    value: defpredict
+  - name: DATABRICKS_SCHEMA
+    value: main
+  - name: SUGGESTOR_MODEL
+    value: defpredict-suggestor
+  - name: EVALUATOR_MODEL
+    value: defpredict-evaluator
+  - name: FRONTEND_URL
+    valueFrom: frontend-url
