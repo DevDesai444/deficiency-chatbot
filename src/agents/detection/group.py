@@ -6,6 +6,7 @@ import json
 from autogen_agentchat.conditions import TextMentionTermination
 from autogen_agentchat.teams import SelectorGroupChat
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+from json_repair import repair_json
 
 from agents.detection.agent import make_flaw_agent, make_flaw_moderator
 from agents.detection.classifier import select_flaw_types
@@ -13,6 +14,7 @@ from agents.event_bus import emit_sync
 from config import get_settings
 from llm.client import chat_completion
 from llm.prompts import FINDING_EXTRACTOR, SELECTOR_PROMPT
+from llm.structured import _extract_json_blob
 from retrieval.knowledge_base import get_deficiencies_by_type
 from schemas.documents import CTDSection, IntermediateReport
 from schemas.flaws import FlawCategory, FlawFinding, FlawReport, Severity
@@ -58,6 +60,73 @@ def _build_context_for_flaw_type(flaw_type: str) -> str:
     return "\n".join(lines)
 
 
+def _find_balanced_array(text: str) -> str:
+    """Return the first bracket-balanced ``[...]`` span in ``text``.
+
+    Walks the string tracking nesting depth so we do not fall for prose that
+    contains a second bracket pair (``[{...}]. See also: [refs]``). Respects
+    string literals so brackets inside a JSON string do not throw off the
+    counter. Returns ``""`` when no balanced span is found.
+    """
+    depth = 0
+    start = -1
+    in_string = False
+    escape = False
+    for i, ch in enumerate(text):
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+            continue
+        if ch == "[":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "]":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    return text[start:i + 1]
+    return ""
+
+
+def _extract_json_array(response: str) -> str:
+    """Prefer the first bracket-balanced JSON array in ``response``.
+
+    Falls back to :func:`_extract_json_blob` when no balanced array is present.
+    ``_extract_json_blob`` tries ``{}`` before ``[]`` and uses greedy
+    ``find``/``rfind``, so prose like ``Findings: [{...}]. See also: [refs]``
+    would either yield the inner object or swallow the trailing bracket pair.
+    """
+    if not response:
+        return ""
+
+    stripped = response.strip()
+
+    # If wrapped in a markdown fence, defer to the shared blob extractor first —
+    # it handles language tags and closing fences.
+    if "```" in stripped:
+        blob = _extract_json_blob(stripped)
+        balanced = _find_balanced_array(blob)
+        if balanced:
+            return balanced
+        if blob.startswith("["):
+            return blob
+        return blob
+
+    balanced = _find_balanced_array(stripped)
+    if balanced:
+        return balanced
+
+    return _extract_json_blob(stripped)
+
+
 def _extract_structured_findings(
     consensus_summary: str,
     document_section: CTDSection,
@@ -78,11 +147,18 @@ def _extract_structured_findings(
         max_tokens=2000,
     )
 
+    extracted = _extract_json_array(response)
+    if not extracted:
+        return []
     try:
-        start = response.index("[")
-        end = response.rindex("]") + 1
-        raw_findings = json.loads(response[start:end])
-    except (ValueError, json.JSONDecodeError):
+        raw_findings = json.loads(extracted)
+    except json.JSONDecodeError:
+        try:
+            repaired = repair_json(extracted)
+            raw_findings = json.loads(repaired) if isinstance(repaired, str) else repaired
+        except Exception:
+            return []
+    if not isinstance(raw_findings, list):
         return []
 
     findings = []
