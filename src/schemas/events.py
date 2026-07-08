@@ -12,6 +12,7 @@ EventType = Literal[
     "consensus_reached",
     "layer_complete",
     "loop_iteration",
+    "parse_repair",
     "pipeline_complete",
     "error",
 ]

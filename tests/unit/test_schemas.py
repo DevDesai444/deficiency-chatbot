@@ -1,9 +1,14 @@
 """Unit tests for Pydantic schema validation."""
 from __future__ import annotations
 
+from typing import get_args
+
+import pytest
+from pydantic import ValidationError
+
 from schemas.corrections import Correction, Evaluation, RecommendationSet, Verdict
 from schemas.documents import ChunkGroup, CTDSection, ParsedSection
-from schemas.events import AgentEvent
+from schemas.events import AgentEvent, EventType
 from schemas.flaws import FlawCategory, FlawFinding, FlawReport, Severity
 
 
@@ -76,6 +81,31 @@ class TestAgentEvent:
         assert d["layer"] == "detection"
         e2 = AgentEvent(**d)
         assert e2 == e
+
+    def test_agent_event_accepts_parse_repair_event_type(self):
+        event = AgentEvent(
+            job_id="x",
+            layer="correction",
+            event_type="parse_repair",
+        )
+        assert event.event_type == "parse_repair"
+
+    def test_agent_event_rejects_unknown_event_type(self):
+        with pytest.raises(ValidationError):
+            AgentEvent(
+                job_id="x",
+                layer="correction",
+                event_type="totally_bogus",
+            )
+
+    @pytest.mark.parametrize("event_type", list(get_args(EventType)))
+    def test_all_documented_event_types_construct(self, event_type):
+        event = AgentEvent(
+            job_id="x",
+            layer="correction",
+            event_type=event_type,
+        )
+        assert event.event_type == event_type
 
 
 class TestParsedSection:
