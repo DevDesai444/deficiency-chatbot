@@ -9,12 +9,18 @@ from autogen_ext.models.openai import OpenAIChatCompletionClient
 from agents.event_bus import emit_sync
 from agents.extraction.agent import (
     build_extraction_prompt,
+    build_structured_extraction_prompt,
     make_extraction_agent,
     make_extraction_moderator,
 )
+from agents.extraction.anchor import filter_anchored
 from config import get_settings
+from llm.prompts import STRUCTURED_EXTRACTOR
+from llm.structured import structured_call
 from schemas.documents import (
     ChunkGroup,
+    ExtractionFinding,
+    GroupExtract,
     IntermediateReport,
     SectionSummary,
 )
@@ -49,6 +55,22 @@ def _make_model_client(model: str | None = None) -> OpenAIChatCompletionClient:
         api_key="not-needed",
         model_info=_MODEL_INFO,
     )
+
+
+def _build_transcript(messages: list) -> str:
+    """The agents' discussion, without the echoed task.
+
+    The task message restates every section verbatim; leaving it in would let the
+    source text crowd out the discussion the transcript exists to carry.
+    """
+    parts = []
+    for msg in messages:
+        source = getattr(msg, "source", "")
+        content = getattr(msg, "content", "")
+        if source == "user" or not isinstance(content, str) or not content:
+            continue
+        parts.append(f"[{source}] {content}")
+    return "\n\n".join(parts)
 
 
 async def _run_extraction_async(
@@ -103,15 +125,63 @@ async def _run_extraction_async(
             if sender == moderator.name:
                 consensus_notes = content
 
+    transcript = _build_transcript(result.messages)
+
     summaries: list[SectionSummary] = []
+    findings: list[ExtractionFinding] = []
+    dropped_total = 0
+
     for group in groups:
-        for section in group.sections:
+        extract, failure = await asyncio.to_thread(
+            structured_call,
+            messages=[
+                {"role": "system", "content": STRUCTURED_EXTRACTOR},
+                {
+                    "role": "user",
+                    "content": build_structured_extraction_prompt(group, transcript),
+                },
+            ],
+            model_cls=GroupExtract,
+            temperature=0.0,
+            max_tokens=4096,
+            repair_context=f"Extraction of {group.group_id}",
+        )
+        if failure is not None:
+            emit_sync(job_id, "extraction", "parse_repair", group.group_id, failure.reason)
+
+        by_index = {s.section_index: s for s in (extract.sections if extract else [])}
+        for index, section in enumerate(group.sections):
+            extracted = by_index.get(index)
+            kept_values, kept_findings, dropped = filter_anchored(extracted, section)
+            dropped_total += dropped
             summaries.append(
                 SectionSummary(
                     section_id=section.section_id,
-                    summary=section.heading,
+                    summary=(
+                        extracted.summary
+                        if extracted and extracted.summary
+                        else section.heading
+                    ),
+                    key_values=kept_values,
+                    page_start=section.page_start,
+                    page_end=section.page_end,
                 )
             )
+            findings.extend(
+                ExtractionFinding(
+                    section_id=section.section_id,
+                    finding=f.finding,
+                    evidence=f.evidence,
+                    agent_name=f"Extractor_{group.group_id}",
+                )
+                for f in kept_findings
+            )
+
+    if dropped_total:
+        emit_sync(
+            job_id, "extraction", "evidence_dropped", "",
+            f"Dropped {dropped_total} items not found in the source text",
+        )
 
     emit_sync(
         job_id, "extraction", "layer_complete", "",
@@ -122,7 +192,7 @@ async def _run_extraction_async(
         document_name=document_name,
         document_type=document_type,
         sections=summaries,
-        findings=[],
+        findings=findings,
         consensus_notes=consensus_notes,
     )
 

@@ -68,6 +68,39 @@ class SectionSummary(BaseModel):
     section_id: CTDSection
     summary: str
     key_values: dict[str, str] = Field(default_factory=dict)
+    page_start: int = 0
+    page_end: int = 0
+
+
+class KeyValue(BaseModel):
+    label: str
+    value: str
+
+
+class ExtractionFindingOut(BaseModel):
+    finding: str
+    evidence: str = ""
+
+
+class SectionExtract(BaseModel):
+    """One section as returned by the extractor. Wire-only — never persisted.
+
+    key_values is a list rather than a dict: schema_for_databricks forces
+    additionalProperties=false on every object, which leaves a dict[str, str]
+    with no legal keys and makes it silently unfillable under strict decoding.
+
+    section_index is the section's position in the group, not its CTDSection.
+    Several sections in one group routinely share a CTDSection (UNKNOWN is the
+    default), so the enum cannot address a section unambiguously.
+    """
+    section_index: int
+    summary: str
+    key_values: list[KeyValue] = Field(default_factory=list)
+    findings: list[ExtractionFindingOut] = Field(default_factory=list)
+
+
+class GroupExtract(BaseModel):
+    sections: list[SectionExtract] = Field(default_factory=list)
 
 
 class IntermediateReport(BaseModel):

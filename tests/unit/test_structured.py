@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from llm.structured import _extract_json_blob, parse_structured, schema_for_databricks
 from schemas.corrections import Correction, CorrectionList, EvaluationOutput
+from schemas.documents import GroupExtract
 
 
 class Simple(BaseModel):
@@ -91,6 +92,30 @@ def test_parse_correction_list_from_markdown_wrapped_response():
     c = result.corrections[0]
     assert isinstance(c, Correction)
     assert c.suggestion.startswith("Provide reference")
+
+
+def test_dict_field_is_unfillable_under_strict():
+    """Why wire schemas use list[KeyValue] and never dict[str, str].
+
+    Forcing additionalProperties=false on a dict-typed field leaves it with no
+    legal keys, so strict decoding can only ever produce {} — a silent zero that
+    is indistinguishable from a document that genuinely had nothing to report.
+    """
+    class DictHolder(BaseModel):
+        key_values: dict[str, str] = Field(default_factory=dict)
+
+    prop = schema_for_databricks(DictHolder)["properties"]["key_values"]
+    assert prop["type"] == "object"
+    assert prop["additionalProperties"] is False
+    assert "properties" not in prop
+
+
+def test_group_extract_key_values_is_fillable_under_strict():
+    schema = schema_for_databricks(GroupExtract)
+    section = schema["$defs"]["SectionExtract"]
+    key_values = section["properties"]["key_values"]
+    assert key_values["type"] == "array"
+    assert schema["$defs"]["KeyValue"]["properties"].keys() == {"label", "value"}
 
 
 def test_parse_evaluation_output_from_verbose_response():

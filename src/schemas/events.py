@@ -13,6 +13,7 @@ EventType = Literal[
     "layer_complete",
     "loop_iteration",
     "parse_repair",
+    "evidence_dropped",
     "pipeline_complete",
     "error",
 ]

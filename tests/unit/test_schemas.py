@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from schemas.corrections import Correction, Evaluation, RecommendationSet, Verdict
-from schemas.documents import ChunkGroup, CTDSection, ParsedSection
+from schemas.documents import ChunkGroup, CTDSection, ParsedSection, SectionSummary
 from schemas.events import AgentEvent, EventType
 from schemas.flaws import FlawCategory, FlawFinding, FlawReport, Severity
 
@@ -35,6 +35,16 @@ class TestFlawSchemas:
     def test_flaw_report_empty(self):
         r = FlawReport(flaws_found=False, findings=[], consensus_summary="Clean")
         assert len(r.findings) == 0
+
+    def test_flaw_finding_new_fields_default_empty(self):
+        f = FlawFinding(
+            category=FlawCategory.SPEC_MISMATCH,
+            section_id="3.2.S.4.1",
+            description="Test description",
+        )
+        assert f.numeric_claims == []
+        assert f.guidance_refs == []
+        assert f.table_ref == ""
 
 
 class TestCorrectionSchemas:
@@ -90,6 +100,9 @@ class TestAgentEvent:
         )
         assert event.event_type == "parse_repair"
 
+    def test_evidence_dropped_is_valid_event_type(self):
+        assert "evidence_dropped" in get_args(EventType)
+
     def test_agent_event_rejects_unknown_event_type(self):
         with pytest.raises(ValidationError):
             AgentEvent(
@@ -117,6 +130,11 @@ class TestParsedSection:
             page_range=(1, 5),
         )
         assert s.tables == []
+
+    def test_section_summary_pages_default_zero(self):
+        s = SectionSummary(section_id=CTDSection.S_4_1_SPECIFICATION, summary="Spec")
+        assert (s.page_start, s.page_end) == (0, 0)
+        assert s.key_values == {}
 
     def test_chunk_group(self):
         sections = [
