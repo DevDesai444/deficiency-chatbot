@@ -64,6 +64,9 @@ class FlawFinding(BaseModel):
     description: str
     evidence: str = ""
     severity: Severity = Severity.MEDIUM
+    numeric_claims: list[str] = Field(default_factory=list)
+    guidance_refs: list[str] = Field(default_factory=list)
+    table_ref: str = ""
     corroborations: list[Corroboration] = Field(default_factory=list)
     similar_deficiencies: list[SimilarDeficiency] = Field(default_factory=list)
 

@@ -114,6 +114,9 @@ def _extract_structured_findings(
             description=raw.get("description", ""),
             evidence=raw.get("evidence", ""),
             severity=severity,
+            numeric_claims=[str(v) for v in raw.get("numeric_claims") or [] if v],
+            guidance_refs=[str(v) for v in raw.get("guidance_refs") or [] if v],
+            table_ref=str(raw.get("table_ref") or ""),
         ))
 
     return findings

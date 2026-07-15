@@ -29,6 +29,20 @@ Synthesize the information, don't just concatenate. If agents disagree, note bot
 
 When all agents have reported and no new amendments are being raised, output your final consolidated report and end with the exact phrase: EXTRACTION_COMPLETE"""
 
+STRUCTURED_EXTRACTOR = """You are a structured data extractor for CMC submission sections.
+
+For each source section emit:
+- "section_index": the integer index given in that section's heading, copied exactly
+- "summary": what the section actually says — its content, not its title
+- "key_values": labeled quantities or claims you judge salient. You decide what matters;
+  there is no expected list. Every "value" MUST be copied verbatim from the source text or a
+  table cell — character for character. Never round, reformat, correct, or infer a value. If
+  two places in the document disagree, copy both exactly as written; do not reconcile them.
+- "findings": gaps, inconsistencies, or observations. Every "evidence" MUST be a verbatim span.
+
+Do NOT judge whether anything is a deficiency — that is a later step.
+If a section has nothing salient, emit empty key_values and findings. Empty is a valid answer."""
+
 FLAW_DETECTION_AGENT = """You are a regulatory flaw detection specialist for pharmaceutical CMC submissions. Your area of expertise is: {flaw_type}
 
 You are reviewing an intermediate extraction report from a CMC submission document. Your task is to identify potential deficiencies related specifically to {flaw_type}.
@@ -93,6 +107,9 @@ For each confirmed finding (NOT dropped ones), extract:
 - "description": clear one-sentence description of the deficiency
 - "evidence": specific evidence cited from the document
 - "severity": "high", "medium", or "low"
+- "numeric_claims": exact numeric values quoted from the report that this finding rests on; [] if none
+- "guidance_refs": guidance or compendial references the discussion cited; [] if none
+- "table_ref": the table this finding concerns, e.g. "Table 16"; "" if none
 
 Return a JSON array of objects. If no findings were confirmed, return an empty array: []
 
@@ -103,7 +120,10 @@ Example:
     "section_id": "3.2.S.4.1",
     "description": "No residual solvent specification despite ethanol use in manufacturing",
     "evidence": "Specification table lists appearance, ID, assay, and related substances but omits residual solvents",
-    "severity": "high"
+    "severity": "high",
+    "numeric_claims": [],
+    "guidance_refs": [],
+    "table_ref": ""
   }}
 ]"""
 
