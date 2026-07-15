@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import json
 
+import structlog
+
 from agents.detection.flaw_types import FLAW_TYPE_DEFINITIONS, format_flaw_catalog
+from agents.event_bus import emit_sync
 from llm.client import chat_completion
 from llm.prompts import DOCUMENT_CLASSIFIER, FLAW_TYPE_SELECTOR
 from parse.section_splitter import detect_ctd_section
 from schemas.documents import CTDSection, IntermediateReport
+
+log = structlog.get_logger()
 
 
 def classify_document_type(text_excerpt: str) -> tuple[CTDSection, str]:
@@ -30,7 +35,27 @@ def classify_document_type(text_excerpt: str) -> tuple[CTDSection, str]:
     return section, doc_type
 
 
-def select_flaw_types(report: IntermediateReport) -> list[str]:
+def _clean_selection(selected: object) -> list[str]:
+    """Drop only structurally unusable entries from the LLM's picks, preserving order.
+
+    FLAW_TYPE_SELECTOR invites categories outside the catalog, so a name absent from
+    FLAW_TYPE_DEFINITIONS is a valid answer — make_flaw_agent falls back to the raw
+    name. Duplicates go because SelectorGroupChat participants must be uniquely named.
+    """
+    if not isinstance(selected, list):
+        return []
+
+    cleaned: list[str] = []
+    for entry in selected:
+        if not isinstance(entry, str):
+            continue
+        name = entry.strip()
+        if name and name not in cleaned:
+            cleaned.append(name)
+    return cleaned
+
+
+def select_flaw_types(report: IntermediateReport, job_id: str = "") -> list[str]:
     """Ask the LLM which flaw categories to investigate for this document."""
     report_summary = (
         f"Document: {report.document_name}\n"
@@ -54,12 +79,27 @@ def select_flaw_types(report: IntermediateReport) -> list[str]:
         start = response.index("[")
         end = response.rindex("]") + 1
         selected = json.loads(response[start:end])
-        if isinstance(selected, list) and all(isinstance(s, str) for s in selected):
-            return selected
     except (ValueError, json.JSONDecodeError):
-        pass
+        selected = None
 
-    return list(FLAW_TYPE_DEFINITIONS.keys())[:4]
+    cleaned = _clean_selection(selected)
+    if cleaned:
+        return cleaned
+
+    # An unusable selection means every specialist looks. Picking a dict-ordered
+    # subset would be this module inventing routing the LLM declined to supply.
+    fallback = list(FLAW_TYPE_DEFINITIONS.keys())
+    log.warning(
+        "flaw_type_selection_fallback",
+        response=response[:200],
+        count=len(fallback),
+    )
+    if job_id:
+        emit_sync(
+            job_id, "detection", "parse_repair", "",
+            f"Flaw category selection unusable — checking all {len(fallback)} categories",
+        )
+    return fallback
 
 
 def _section_to_label(section: CTDSection) -> str:

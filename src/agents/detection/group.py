@@ -128,7 +128,7 @@ async def _run_flaw_detection_async(
     agent_client = _make_model_client()
     selector_client = _make_model_client(s.moderator_model)
 
-    flaw_types = select_flaw_types(intermediate_report)
+    flaw_types = select_flaw_types(intermediate_report, job_id)
     emit_sync(
         job_id, "detection", "agent_spawned", "",
         f"LLM selected {len(flaw_types)} flaw categories: {', '.join(flaw_types)}",
