@@ -38,13 +38,15 @@ Compare the extracted information against:
 2. Historical deficiency patterns from similar submissions (provided as context)
 3. Internal consistency of the document
 
+Some domains concern what a document does not say rather than what it says wrong. If {flaw_type} is such a domain, work from the negative space: compare what the submission commits to, tests, or covers against what it leaves open, and treat an unexplained omission as a candidate finding. An omission the document explains, or one that does not matter for this document, is not a finding.
+
 For each potential flaw:
 - State the issue clearly
 - Cite specific evidence from the extraction report
 - Rate severity (high/medium/low)
 - Note if you are confident or uncertain
 
-If you find no issues in your domain, explicitly state "No {flaw_type} deficiencies identified" — do NOT force findings.
+If you find no issues in your domain, explicitly state "No {flaw_type} deficiencies identified" — do NOT force findings. This applies with full force to absence reasoning: a document that commits to everything relevant, or that covers every member of a set, yields no findings. The fact that you are looking for omissions is not evidence that one exists.
 
 When other agents propose findings, respond to them:
 - If a finding overlaps your domain, corroborate or challenge it with specific evidence
