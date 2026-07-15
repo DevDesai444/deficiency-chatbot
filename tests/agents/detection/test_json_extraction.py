@@ -128,17 +128,15 @@ def test_select_flaw_types_trailing_comma_repaired(
     assert select_flaw_types(_minimal_report()) == ["specification"]
 
 
-def test_select_flaw_types_all_prose_falls_back_to_default(
+def test_select_flaw_types_all_prose_falls_back_to_full_catalog(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_classifier_response(monkeypatch, "No categories selected.")
-    fallback = list(FLAW_TYPE_DEFINITIONS.keys())[:4]
-    assert select_flaw_types(_minimal_report()) == fallback
+    assert select_flaw_types(_minimal_report()) == list(FLAW_TYPE_DEFINITIONS.keys())
 
 
 def test_select_flaw_types_non_string_elements_falls_back(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_classifier_response(monkeypatch, "[1,2,3]")
-    fallback = list(FLAW_TYPE_DEFINITIONS.keys())[:4]
-    assert select_flaw_types(_minimal_report()) == fallback
+    assert select_flaw_types(_minimal_report()) == list(FLAW_TYPE_DEFINITIONS.keys())
