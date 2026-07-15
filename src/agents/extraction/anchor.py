@@ -16,8 +16,13 @@ from schemas.documents import ExtractionFindingOut, ParsedSection, SectionExtrac
 
 log = structlog.get_logger()
 
-# Tolerance for OCR drift on string identity only — never an acceptance criterion.
+# Tolerance for rendering drift on string identity only — never an acceptance criterion.
 _NEAR_MATCH_RATIO = 0.92
+
+# Ratio dilution scales with span length, so a long quote carrying one wrong digit
+# still clears the threshold. Digits get no tolerance: a drifted letter is noise, a
+# drifted digit is a different value.
+_DIGIT_RUN_RE = re.compile(r"\d[\d.,]*")
 
 _PUNCT_FOLD = {
     "‘": "'", "’": "'", "“": '"', "”": '"',
@@ -57,11 +62,17 @@ def is_anchored(span: str, sources: list[str]) -> bool:
     haystacks = [normalize(s) for s in sources]
     if any(needle in h for h in haystacks):
         return True
+
+    # Every numeric run must survive the exact-substring test above. Fuzzy matching
+    # is for rendering drift in prose; it cannot adjudicate a quantity.
+    if _DIGIT_RUN_RE.search(needle):
+        return False
+
     # Window the haystack so a length mismatch cannot depress the ratio.
     for haystack in haystacks:
         if not haystack:
             continue
-        step = max(len(needle) // 2, 1)
+        step = max(len(needle) // 4, 1)
         for i in range(0, max(len(haystack) - len(needle), 0) + 1, step):
             window = haystack[i:i + len(needle)]
             if SequenceMatcher(None, needle, window).ratio() >= _NEAR_MATCH_RATIO:

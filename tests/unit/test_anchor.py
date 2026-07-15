@@ -68,6 +68,29 @@ class TestIsAnchored:
     def test_table_title_anchors(self, section):
         assert is_anchored("Table 16", section_sources(section))
 
+    @pytest.mark.parametrize(
+        "corrupted",
+        [
+            "The AET was calculated as 32.727 ug/g for the drug product.",
+            "The AET was calculated as 99.727 ug/g for the drug product.",
+            "The AET was calculated as 22.727 mg/g for the drug product.",
+            "The AET was calculated as 2.727 ug/g for the drug product.",
+        ],
+    )
+    def test_long_span_with_altered_digits_rejected(self, section, corrupted):
+        """Ratio dilution lets a long quote carry a wrong digit past the threshold.
+
+        These score above _NEAR_MATCH_RATIO against the source; only the digit guard
+        rejects them. A wrong digit is a different value, not rendering drift.
+        """
+        assert not is_anchored(corrupted, section_sources(section))
+
+    def test_long_span_exact_still_anchors(self, section):
+        assert is_anchored(
+            "The AET was calculated as 22.727 ug/g for the drug product.",
+            section_sources(section),
+        )
+
     def test_value_split_across_cells_anchors_via_joined_row(self):
         s = ParsedSection(
             heading="Results",
