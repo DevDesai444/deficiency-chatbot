@@ -9,7 +9,7 @@ from autogen_ext.models.openai import OpenAIChatCompletionClient
 from json_repair import repair_json
 
 from agents.detection.agent import make_flaw_agent, make_flaw_moderator
-from agents.detection.classifier import select_flaw_types
+from agents.detection.classifier import describe_document, select_flaw_types
 from agents.event_bus import emit_sync
 from config import get_settings
 from llm.client import chat_completion
@@ -251,6 +251,9 @@ async def _run_flaw_detection_async(
             context_blocks.append(ctx)
 
     prompt = (
+        f"## Document Under Review\n\n{describe_document(document_section)}\n\n"
+        "Judge every candidate finding against what this document is for. Material that "
+        "belongs to a different CTD section is not missing from this one.\n\n"
         f"## Intermediate Extraction Report\n\n{report_text}\n\n"
         + "\n".join(context_blocks)
         + "\n\nEach flaw detection agent: review this report for deficiencies in your domain. "

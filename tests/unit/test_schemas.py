@@ -155,3 +155,32 @@ class TestParsedSection:
         ]
         g = ChunkGroup(group_id="g1", sections=sections)
         assert len(g.sections) == 1
+
+
+class TestCorrectionFieldGuidance:
+    """Field descriptions are the only place the shape of a Correction reaches the model.
+
+    They are carried into the strict json_schema sent to the endpoint. No prompt states
+    what `explanation` should contain, so dropping a description silently returns the
+    field to the empty-string default the endpoint emits to satisfy strict decoding.
+    """
+
+    def test_descriptions_reach_the_strict_schema(self):
+        from llm.structured import schema_for_databricks
+        from schemas.corrections import CorrectionList
+
+        props = schema_for_databricks(CorrectionList)["$defs"]["Correction"]["properties"]
+        for field in ("suggestion", "explanation", "references"):
+            assert props[field].get("description")
+
+    def test_references_permit_empty_rather_than_demand_a_citation(self):
+        from schemas.corrections import CorrectionList
+
+        desc = CorrectionList.model_json_schema()["$defs"]["Correction"]["properties"]
+        assert "empty" in desc["references"]["description"].lower()
+
+    def test_explanation_is_not_told_to_cite_from_memory(self):
+        from schemas.corrections import CorrectionList
+
+        desc = CorrectionList.model_json_schema()["$defs"]["Correction"]["properties"]
+        assert "memory" in desc["explanation"]["description"].lower()

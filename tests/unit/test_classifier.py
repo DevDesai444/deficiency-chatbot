@@ -4,7 +4,7 @@ import pytest
 
 from agents.detection import classifier
 from agents.detection.flaw_types import FLAW_TYPE_DEFINITIONS
-from schemas.documents import IntermediateReport
+from schemas.documents import CTDSection, IntermediateReport
 
 
 @pytest.fixture
@@ -101,3 +101,34 @@ def test_fallback_without_job_id_does_not_emit(report, stub_llm, captured_events
     stub_llm("[]")
     assert len(classifier.select_flaw_types(report)) == len(FLAW_TYPE_DEFINITIONS)
     assert captured_events == []
+
+
+class TestDescribeDocument:
+    """The scope guard in FLAW_DETECTION_AGENT cannot fire on a bare CTD code."""
+
+    def test_names_the_subject_for_substance_sections(self):
+        described = classifier.describe_document(CTDSection.S_4_1_SPECIFICATION)
+        assert "3.2.S.4.1" in described
+        assert "Raw Material Specification" in described
+        assert "drug substance" in described
+
+    def test_names_the_subject_for_product_sections(self):
+        assert "drug product" in classifier.describe_document(CTDSection.P_7_STABILITY)
+
+    def test_unknown_section_is_stated_not_guessed(self):
+        described = classifier.describe_document(CTDSection.UNKNOWN)
+        assert "unidentified" in described
+        assert "drug substance" not in described
+        assert "drug product" not in described
+
+    def test_falls_back_to_the_code_when_unlabelled(self):
+        # Every enum member must describe without raising, labelled or not.
+        for section in CTDSection:
+            assert classifier.describe_document(section)
+
+    def test_states_identity_without_prescribing_content(self):
+        """A glossary, not a rulebook — it says what the document is, never what belongs in it."""
+        for section in CTDSection:
+            described = classifier.describe_document(section).lower()
+            for rule_word in ("must", "shall", "should", "require"):
+                assert rule_word not in described

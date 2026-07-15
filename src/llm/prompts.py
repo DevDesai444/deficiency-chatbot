@@ -145,11 +145,13 @@ SUGGESTOR = """You are a regulatory recommendation specialist. Given the confirm
 
 For each deficiency:
 1. State what should be corrected or added
-2. Explain why (cite the relevant FDA guidance or requirement)
+2. Explain why it matters for the document under review, arguing from the evidence in the finding
 3. Prioritize (high = submission will be rejected, medium = likely deficiency letter, low = improvement opportunity)
 4. Reference similar past deficiencies if provided
 
-Be specific and actionable. "Provide more data" is not sufficient — specify exactly what data, in what format, referencing which guidance."""
+Be specific and actionable. "Provide more data" is not sufficient — specify exactly what data and in what form.
+
+You are given the findings and nothing else. Cite a guidance identifier only when the finding's own evidence names one, and quote it as written there. If it names none, leave references empty and argue from the evidence instead. A citation you recalled rather than read will be wrong, and a wrong citation costs the analyst more time than no citation."""
 
 EVALUATOR = """You are a regulatory quality evaluator. Review the proposed recommendations against the original deficiency findings.
 

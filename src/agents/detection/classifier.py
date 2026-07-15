@@ -19,7 +19,7 @@ log = structlog.get_logger()
 def classify_document_type(text_excerpt: str) -> tuple[CTDSection, str]:
     rule_based = detect_ctd_section(text_excerpt)
     if rule_based != CTDSection.UNKNOWN:
-        return rule_based, _section_to_label(rule_based)
+        return rule_based, section_label(rule_based)
 
     response = chat_completion(
         messages=[
@@ -171,7 +171,27 @@ def select_flaw_types(report: IntermediateReport, job_id: str = "") -> list[str]
     return fallback
 
 
-def _section_to_label(section: CTDSection) -> str:
+def describe_document(section: CTDSection) -> str:
+    """Name the document in words the model can reason about.
+
+    A bare "3.2.S.4.1" in the report JSON is a code an 8B does not reliably decode,
+    which leaves the scope guard in FLAW_DETECTION_AGENT unable to fire — it cannot
+    judge what "does not matter for this document" without knowing what the document
+    is. Substance/product follows from CTD numbering, not from any requirement. This
+    states what the document IS; it never states what belongs in it.
+    """
+    if section is CTDSection.UNKNOWN:
+        return "unidentified CTD section"
+    if section.value.startswith("3.2.S"):
+        subject = "drug substance"
+    elif section.value.startswith("3.2.P"):
+        subject = "drug product"
+    else:
+        subject = "regional or appendix material"
+    return f"{section.value} — {section_label(section)} ({subject})"
+
+
+def section_label(section: CTDSection) -> str:
     labels = {
         CTDSection.S_4_1_SPECIFICATION: "Raw Material Specification",
         CTDSection.S_4_2_ANALYTICAL_PROCEDURES: "Analytical Procedures",

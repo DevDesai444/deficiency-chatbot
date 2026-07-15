@@ -14,11 +14,35 @@ class Verdict(StrEnum):
 
 
 class Correction(BaseModel):
+    """A recommendation the analyst can act on.
+
+    Field descriptions reach the model: they are carried into the strict json_schema
+    sent to the endpoint, and are the only place the shape of `explanation` is stated.
+    """
+
     flaw_category: FlawCategory
-    suggestion: str
-    explanation: str
+    suggestion: str = Field(
+        description=(
+            "What to add or correct, specific enough to act on without rereading the "
+            "finding. Name the data, section, or document."
+        )
+    )
+    explanation: str = Field(
+        description=(
+            "Why this matters for the document under review, argued from the evidence "
+            "in the finding. Never restate the suggestion. Never fill this from memory: "
+            "if the finding carries no evidence, say what would need to be checked."
+        )
+    )
     priority: Severity = Severity.MEDIUM
-    references: list[str] = Field(default_factory=list)
+    references: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Guidance named in the finding's own evidence, quoted as it appears there. "
+            "Empty is the correct answer when the evidence names none — a citation "
+            "recalled from memory rather than read is worse than no citation."
+        ),
+    )
 
 
 class CorrectionList(BaseModel):
