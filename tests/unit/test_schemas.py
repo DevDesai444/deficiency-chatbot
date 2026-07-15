@@ -46,6 +46,14 @@ class TestFlawSchemas:
         assert f.guidance_refs == []
         assert f.table_ref == ""
 
+    @pytest.mark.parametrize("value", ["commitment_missing", "coverage_gap"])
+    def test_flaw_category_roundtrips_absence_values(self, value):
+        assert FlawCategory(value).value == value
+        f = FlawFinding(category=value, section_id="3.2.P.6", description="d")
+        dumped = f.model_dump()
+        assert dumped["category"] == value
+        assert FlawFinding(**dumped).category == FlawCategory(value)
+
 
 class TestCorrectionSchemas:
     def test_correction_defaults(self):

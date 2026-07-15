@@ -36,6 +36,8 @@ class FlawCategory(StrEnum):
     EXCIPIENT_COMPATIBILITY = "excipient_compatibility"
     POLYMORPHIC_FORM = "polymorphic_form"
     PARTICLE_SIZE = "particle_size"
+    COMMITMENT_MISSING = "commitment_missing"
+    COVERAGE_GAP = "coverage_gap"
     GENERAL_CMC = "general_cmc"
 
 

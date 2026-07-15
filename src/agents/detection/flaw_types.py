@@ -19,6 +19,9 @@ FLAW_TYPE_DEFINITIONS: dict[str, str] = {
     "Excipients": "Excipient compatibility issues, missing functional characterization",
     "Reference Standards": "Missing reference standard characterization or certificates",
     "Elemental Impurities": "Missing elemental impurity risk assessment or data",
+    # Appended, not inserted: classifier.py's no-JSON fallback slices the first four keys.
+    "Commitments/Undertakings": "Forward-looking commitments the submission makes or leaves open — ongoing monitoring, post-approval reporting, follow-up studies",
+    "Coverage Gaps": "An analysis applied to some members of a set but silently omitted for others, with no stated justification for the omission",
 }
 
 
