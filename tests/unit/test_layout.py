@@ -113,5 +113,30 @@ def test_key_value_block_not_merged_into_grid():
     assert pairs.get("Vial") == "1"
 
 
+def test_colonless_key_value_detected_without_regressing_grid():
+    # CoA-style colon-less pairs (label cell + value cell) above a numeric grid.
+    kv = [_cell("Lot number", 60, 40, half_width=40), _cell("L00036941", 200, 40),
+          _cell("Molecular Formula", 60, 60, half_width=55), _cell("C18H24O2", 200, 60)]
+    grid = _peak_table_regions()   # y >= 100, a real numeric grid
+    _, tables = reconstruct_ocr_page(kv + grid, page=34)
+    kinds = sorted(t.kind for t in tables)
+    assert kinds == ["grid", "key_value"]
+    kv_table = next(t for t in tables if t.kind == "key_value")
+    pairs = {p.label: p.value for p in kv_table.pairs}
+    assert pairs == {"Lot number": "L00036941", "Molecular Formula": "C18H24O2"}
+
+
+def test_data_row_with_text_cells_stays_grid():
+    # "7 Estradiol 12.0 Missing" must NOT become key-value (single-word cells aren't labels).
+    rows = [
+        [_cell("Peak", 40, 100), _cell("RT", 120, 100), _cell("Area", 190, 100), _cell("Note", 260, 100)],
+        [_cell("7", 40, 116), _cell("Estradiol", 120, 116), _cell("12.0", 190, 116), _cell("Missing", 260, 116)],
+        [_cell("8", 40, 132), _cell("Estrone", 120, 132), _cell("16.8", 190, 132), _cell("Missing", 260, 132)],
+    ]
+    regions = [c for row in rows for c in row]
+    _, tables = reconstruct_ocr_page(regions, page=38)
+    assert [t.kind for t in tables] == ["grid"]
+
+
 def test_empty_input_is_safe():
     assert reconstruct_ocr_page([], page=1) == ([], [])

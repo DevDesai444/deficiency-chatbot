@@ -53,6 +53,19 @@ _CAPTION_MAX = 200     # a preceding prose line this short can title a table
 # "5:43:14" or a numeric cell is NOT mistaken for a label).
 _LABEL_RE = re.compile(r"^[A-Za-z][^:]{0,40}:")
 
+# A colon-less form-field label -- a short MULTI-word Title-Case-ish phrase with no value
+# in it, so CoA pairs like "Lot number  L00036941" / "Molecular Formula  C18H24O2" are
+# recognised as key-value. Requiring >=2 words keeps single tokens (compound names,
+# "Missing") from being mistaken for labels and flipping data rows into key-value.
+_COLONLESS_LABEL_RE = re.compile(r"^[A-Z][A-Za-z]+(?:\s+[A-Za-z]+){1,4}$")
+_VALUEISH_RE = re.compile(r"[0-9<>≤≥%]|^[A-Z]{1,5}[-\d]")
+
+
+def _cell_is_label(cell: str) -> bool:
+    if _LABEL_RE.match(cell):
+        return True
+    return bool(_COLONLESS_LABEL_RE.match(cell)) and not _VALUEISH_RE.search(cell)
+
 
 @dataclass
 class OCRRegion:
@@ -268,12 +281,19 @@ def _cluster_columns(regions: list[OCRRegion], unit: float) -> list[float]:
 
 
 def _row_is_kv(line: _RegionLine) -> bool:
-    """A row is key-value when a large fraction of its cells are "Label:" cells."""
+    """A row is key-value if it is a label/value pair.
+
+    A clean 2-cell row counts via a colon OR a colon-less form-field label, so CoA pairs
+    ("Lot number  L00036941") are caught. Wider rows count only via colons -- otherwise a
+    table header of multi-word column names would look like a key-value row.
+    """
     cells = [r.text.strip() for r in line.regions if r.text.strip()]
     if not cells:
         return False
-    labels = sum(1 for c in cells if _LABEL_RE.match(c))
-    return labels / len(cells) >= _KV_LABEL_FRACTION
+    if len(cells) == 2 and _cell_is_label(cells[0]) and not _cell_is_label(cells[1]):
+        return True
+    colon_labels = sum(1 for c in cells if _LABEL_RE.match(c))
+    return colon_labels / len(cells) >= _KV_LABEL_FRACTION
 
 
 def _segment_run(run: list[_RegionLine], unit: float) -> list[list[_RegionLine]]:
@@ -307,13 +327,16 @@ def _build_key_value(segment: list[_RegionLine], page: int) -> ExtractedTable | 
         i = 0
         while i < len(cells):
             cell = cells[i]
-            if _LABEL_RE.match(cell):
+            if _LABEL_RE.match(cell):                                  # "Label: value"
                 label, _, tail = cell.partition(":")
                 value = tail.strip()
-                if not value and i + 1 < len(cells) and not _LABEL_RE.match(cells[i + 1]):
+                if not value and i + 1 < len(cells) and not _cell_is_label(cells[i + 1]):
                     value = cells[i + 1]
                     i += 1
                 pairs.append(TablePair(label=label.strip(), value=value))
+            elif _cell_is_label(cell) and i + 1 < len(cells) and not _cell_is_label(cells[i + 1]):
+                pairs.append(TablePair(label=cell, value=cells[i + 1]))  # colon-less "Label  value"
+                i += 1
             i += 1
     if len(pairs) < 2:
         return None

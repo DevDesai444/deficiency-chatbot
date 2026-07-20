@@ -3,8 +3,7 @@ import os
 import pytest
 
 from parse.pdf import extract_pdf
-from parse.section_splitter import classify_document, group_sections, split_document
-from schemas.documents import CTDSection
+from parse.section_splitter import group_sections, split_document
 
 SAMPLE_DIR = os.environ.get(
     "SAMPLE_DATA_DIR",
@@ -23,66 +22,56 @@ skip_if_no_samples = pytest.mark.skipif(
 class TestSpecPDF:
     def test_extract_pages(self):
         doc = extract_pdf(SPEC_PDF)
-        assert doc.page_count == 13
-        assert len(doc.pages) == 13
-        assert doc.filename == "32s41-Specification.pdf"
+        assert doc["page_count"] == 13
+        assert len(doc["pages"]) == 13
+        assert doc["filename"] == "32s41-Specification.pdf"
+
+    def test_extract_returns_json(self):
+        doc = extract_pdf(SPEC_PDF)
+        assert set(doc.keys()) == {"filename", "page_count", "toc", "pages"}
+        page = doc["pages"][0]
+        assert {"blocks", "tables", "figures", "source", "is_scanned"} <= set(page.keys())
 
     def test_has_toc(self):
         doc = extract_pdf(SPEC_PDF)
-        assert len(doc.toc) > 0
-
-    def test_classify_as_s41(self):
-        doc = extract_pdf(SPEC_PDF)
-        section = classify_document(doc)
-        assert section == CTDSection.S_4_1_SPECIFICATION
+        assert len(doc["toc"]) > 0
 
     def test_tables_found(self):
         doc = extract_pdf(SPEC_PDF)
-        total_tables = sum(len(p.tables) for p in doc.pages)
-        assert total_tables > 0
+        assert sum(len(p["tables"]) for p in doc["pages"]) > 0
 
-    def test_split_produces_sections(self):
-        doc = extract_pdf(SPEC_PDF)
-        sections = split_document(doc)
+    def test_split_produces_section_dicts(self):
+        sections = split_document(extract_pdf(SPEC_PDF))
         assert len(sections) >= 1
-        assert all(s.section_id == CTDSection.S_4_1_SPECIFICATION for s in sections)
+        assert all(isinstance(s, dict) and "heading" in s for s in sections)
 
     def test_group_sections(self):
-        doc = extract_pdf(SPEC_PDF)
-        sections = split_document(doc)
+        sections = split_document(extract_pdf(SPEC_PDF))
         groups = group_sections(sections, max_sections_per_group=3)
         assert len(groups) >= 1
-        assert all(len(g.sections) <= 3 for g in groups)
+        assert all(len(g["sections"]) <= 3 for g in groups)
 
 
 @skip_if_no_samples
 class TestValidationPDF:
     def test_extract_pages(self):
         doc = extract_pdf(VALIDATION_PDF)
-        assert doc.page_count == 55
-        assert len(doc.pages) == 55
+        assert doc["page_count"] == 55
+        assert len(doc["pages"]) == 55
 
     def test_has_rich_toc(self):
         doc = extract_pdf(VALIDATION_PDF)
-        assert len(doc.toc) > 5
-
-    def test_classify_as_s43(self):
-        doc = extract_pdf(VALIDATION_PDF)
-        section = classify_document(doc)
-        assert section == CTDSection.S_4_3_VALIDATION
+        assert len(doc["toc"]) > 5
 
     def test_tables_found(self):
         doc = extract_pdf(VALIDATION_PDF)
-        total_tables = sum(len(p.tables) for p in doc.pages)
-        assert total_tables >= 10
+        assert sum(len(p["tables"]) for p in doc["pages"]) >= 10
 
     def test_split_produces_multiple_sections(self):
-        doc = extract_pdf(VALIDATION_PDF)
-        sections = split_document(doc)
+        sections = split_document(extract_pdf(VALIDATION_PDF))
         assert len(sections) > 3
 
     def test_sections_have_text(self):
-        doc = extract_pdf(VALIDATION_PDF)
-        sections = split_document(doc)
+        sections = split_document(extract_pdf(VALIDATION_PDF))
         for s in sections:
-            assert len(s.text) > 0
+            assert len(s["text"]) > 0

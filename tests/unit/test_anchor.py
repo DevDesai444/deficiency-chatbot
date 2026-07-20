@@ -10,32 +10,24 @@ from agents.extraction.anchor import (
     section_sources,
 )
 from schemas.documents import (
-    CTDSection,
-    ExtractedTable,
     ExtractionFindingOut,
     KeyValue,
-    ParsedSection,
     SectionExtract,
 )
 
 
 @pytest.fixture
 def section():
-    return ParsedSection(
-        section_id=CTDSection.P_6_CONTAINER_CLOSURE,
-        heading="Extractables and Leachables",
-        text="The AET was calculated as 22.727 ug/g for the drug product.",
-        tables=[
-            ExtractedTable(
-                title="Table 16",
-                headers=["Compound", "Result"],
-                rows=[["2-Butanone", "8.72 ug/g"]],
-                page=16,
-            )
-        ],
-        page_start=14,
-        page_end=17,
-    )
+    return {
+        "heading": "Extractables and Leachables",
+        "text": "The AET was calculated as 22.727 ug/g for the drug product.",
+        "tables": [{
+            "kind": "grid", "title": "Table 16",
+            "headers": ["Compound", "Result"], "rows": [["2-Butanone", "8.72 ug/g"]],
+            "pairs": [], "page": 16,
+        }],
+        "figures": [], "page_start": 14, "page_end": 17,
+    }
 
 
 class TestNormalize:
@@ -92,11 +84,11 @@ class TestIsAnchored:
         )
 
     def test_value_split_across_cells_anchors_via_joined_row(self):
-        s = ParsedSection(
-            heading="Results",
-            text="",
-            tables=[ExtractedTable(headers=["Analyte", "Value"], rows=[["22.727", "ug/g"]])],
-        )
+        s = {
+            "text": "",
+            "tables": [{"kind": "grid", "title": "", "headers": ["Analyte", "Value"],
+                        "rows": [["22.727", "ug/g"]], "pairs": []}],
+        }
         assert is_anchored("22.727 | ug/g", section_sources(s))
 
 

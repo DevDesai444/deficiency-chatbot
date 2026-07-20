@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 
 import structlog
 
-from schemas.documents import ExtractionFindingOut, ParsedSection, SectionExtract
+from schemas.documents import ExtractionFindingOut, SectionExtract
 
 log = structlog.get_logger()
 
@@ -38,20 +38,26 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().casefold()
 
 
-def section_sources(section: ParsedSection) -> list[str]:
+def section_sources(section: dict) -> list[str]:
     """Every string the model was allowed to quote from, table cells included.
 
     Rows are contributed both cell-wise and joined: a quantity split across
     adjacent cells ("22.727" | "ug/g") anchors only against the joined form.
     """
-    sources = [section.text]
-    for table in section.tables:
-        sources.append(table.title)
-        sources.extend(table.headers)
-        sources.append(" | ".join(table.headers))
-        for row in table.rows:
-            sources.extend(row)
-            sources.append(" | ".join(row))
+    sources = [section.get("text", "")]
+    for table in section.get("tables", []):
+        sources.append(table.get("title", ""))
+        if table.get("kind") == "key_value":
+            for pair in table.get("pairs", []):
+                label, value = pair.get("label", ""), pair.get("value", "")
+                sources.extend([label, value, f"{label} {value}".strip()])
+        else:
+            headers = table.get("headers", [])
+            sources.extend(headers)
+            sources.append(" | ".join(headers))
+            for row in table.get("rows", []):
+                sources.extend(row)
+                sources.append(" | ".join(row))
     return [s for s in sources if s]
 
 
@@ -82,7 +88,7 @@ def is_anchored(span: str, sources: list[str]) -> bool:
 
 def filter_anchored(
     extract: SectionExtract | None,
-    section: ParsedSection,
+    section: dict,
 ) -> tuple[dict[str, str], list[ExtractionFindingOut], int]:
     """Drop key_values and findings whose quoted span is not in the source.
 
@@ -113,7 +119,7 @@ def filter_anchored(
     if dropped:
         log.info(
             "unanchored_dropped",
-            section_id=section.section_id.value,
+            heading=section.get("heading", ""),
             count=dropped,
         )
     return kept_values, kept_findings, dropped

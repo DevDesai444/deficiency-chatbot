@@ -34,22 +34,8 @@ def emit(event: AgentEvent) -> None:
             q.put_nowait(event)
 
 
-def emit_sync(
-    job_id: str,
-    layer: str,
-    event_type: str,
-    agent_name: str = "",
-    message: str = "",
-) -> None:
-    event = AgentEvent(
-        job_id=job_id,
-        layer=layer,  # type: ignore[arg-type]
-        event_type=event_type,  # type: ignore[arg-type]
-        agent_name=agent_name,
-        message=message,
-    )
-
-    # If called from a background thread, schedule via the running loop
+def emit_sync(job_id: str, layer: str, event_type: str, agent_name: str = "", message: str = "") -> None:
+    event = AgentEvent(job_id=job_id, layer=layer, event_type=event_type, agent_name=agent_name, message=message)
     try:
         loop = asyncio.get_running_loop()
         loop.call_soon_threadsafe(emit, event)
