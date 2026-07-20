@@ -1,12 +1,30 @@
+"""Cut a parsed document into CTD sections from its structured layout.
+
+The parser hands us pages of geometry-aware blocks (paragraphs that keep their lines),
+tables, and figures. This module decides section boundaries from that structure rather
+than by regex on flattened text, which is what let data rows like "6920.93 Intercept"
+masquerade as headings.
+
+Heading detection is a fallback chain:
+  1. TOC anchor -- if the PDF has a bookmark outline, match each numbered section entry
+     to its heading block. Strongest and free.
+  2. Geometry + numbering -- otherwise, a block is a heading only if it is short/isolated
+     and its number fits a real section scheme (so "6920.93" is rejected).
+
+Tables and figures attach to whichever section their position falls in, and grid tables
+that continue across a page break are stitched back into one.
+"""
 from __future__ import annotations
 
 import re
 
-from parse.pdf import PageContent, PDFDocument
+from parse.pdf import PDFDocument
 from schemas.documents import (
     ChunkGroup,
     CTDSection,
     ExtractedTable,
+    LayoutBlock,
+    LayoutFigure,
     ParsedSection,
 )
 
@@ -55,11 +73,10 @@ def _detect_from_toc(toc: list[tuple[int, str, int]]) -> CTDSection:
     return CTDSection.UNKNOWN
 
 
-def _detect_from_headers(pages: list[PageContent], sample_pages: int = 5) -> CTDSection:
+def _detect_from_headers(pages, sample_pages: int = 5) -> CTDSection:
     """Scan running headers of first few pages for CTD section."""
     for page in pages[:sample_pages]:
-        first_lines = page.text[:500]
-        section = detect_ctd_section(first_lines)
+        section = detect_ctd_section(page.text[:500])
         if section != CTDSection.UNKNOWN:
             return section
     return CTDSection.UNKNOWN
@@ -74,151 +91,253 @@ def classify_document(doc: PDFDocument) -> CTDSection:
     if section != CTDSection.UNKNOWN:
         return section
 
-    section = detect_ctd_section(doc.filename)
-    return section
+    return detect_ctd_section(doc.filename)
 
 
-_INTERNAL_SECTION_RE = re.compile(
-    r"^\s*(\d+(?:\.\d+)*)\s+(.+)",
-    re.MULTILINE,
-)
-
-# Strip trailing TOC dot-leaders and page numbers ("Introduction ...... 4")
-_TOC_TAIL_RE = re.compile(r"[\s\.]{3,}\d*\s*$")
-
-# Reject titles that are actually data rows (numbers, units, chromatogram values).
-# A real heading starts with a capital letter or word; a data row starts with digits/decimals.
+# --- heading detection -------------------------------------------------------
+# A section number, optionally followed by a trailing dot, then the title. The
+# optional "\.?" accepts the common "1. Purpose" / "3.1. Scope" heading style.
+_TOC_SECTION_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)\.?\s+(.+)")
 _DATA_ROW_RE = re.compile(r"^[\d\.\-\+\s×xX%μµ]")
 
 
-def _is_probable_heading(num: str, title: str) -> bool:
-    if len(num.split(".")) > 4 or not title:
+def _toc_section_entries(toc: list[tuple[int, str, int]]) -> list[tuple[str, str, int]]:
+    """TOC entries that are numbered sections ("1.4.2 Linearity"), not Table/Figure lists."""
+    entries = []
+    for _level, title, page in toc:
+        match = _TOC_SECTION_RE.match(title)
+        if match:
+            entries.append((match.group(1), match.group(2).strip(), page))
+    return entries
+
+
+def _match_heading_block(by_page: dict[int, list[tuple[int, LayoutBlock]]], num: str, page: int) -> int | None:
+    """Find the body-block index whose text begins with this section number, near `page`."""
+    pat = re.compile(r"^\s*" + re.escape(num) + r"\.?(?![\d.])")
+    for candidate_page in (page, page + 1, page - 1):
+        for idx, block in by_page.get(candidate_page, []):
+            if pat.match(block.text):
+                return idx
+    return None
+
+
+def _toc_anchors(doc: PDFDocument, body_blocks: list[LayoutBlock]) -> list[tuple[int, str, str]]:
+    entries = _toc_section_entries(doc.toc)
+    if not entries:
+        return []
+
+    by_page: dict[int, list[tuple[int, LayoutBlock]]] = {}
+    for idx, block in enumerate(body_blocks):
+        by_page.setdefault(block.page, []).append((idx, block))
+
+    anchors: list[tuple[int, str, str]] = []
+    seen_num: set[str] = set()
+    seen_idx: set[int] = set()
+    for num, title, page in entries:
+        if num in seen_num:
+            continue
+        idx = _match_heading_block(by_page, num, page)
+        if idx is not None and idx not in seen_idx:
+            anchors.append((idx, num, title))
+            seen_num.add(num)
+            seen_idx.add(idx)
+    anchors.sort(key=lambda a: a[0])
+    return anchors
+
+
+def _plausible_section_number(num: str) -> bool:
+    parts = num.split(".")
+    if not 1 <= len(parts) <= 4:
         return False
-    if len(title) > 150 or len(title) < 3:
-        return False
-    if _DATA_ROW_RE.match(title):
-        return False
-    # Must contain at least one alphabetic character
-    if not any(c.isalpha() for c in title):
-        return False
-    # Heading titles usually start with a capital letter or a known lead word
-    first_alpha = next((c for c in title if c.isalpha()), "")
-    if first_alpha and not first_alpha.isupper():
-        return False
+    for part in parts:
+        if not part.isdigit() or int(part) > 50:
+            return False  # 6920.93 / 281.39 are data, not section numbers
     return True
 
 
-def _split_by_internal_sections(
-    pages: list[PageContent],
-    ctd_section: CTDSection,
-) -> list[ParsedSection]:
-    """Split document body into internal numbered sections (1.x.x style)."""
-    full_text = "\n".join(p.text for p in pages)
-
-    all_tables: list[ExtractedTable] = []
-    for p in pages:
-        all_tables.extend(p.tables)
-
+def _geometry_headings(body_blocks: list[LayoutBlock]) -> list[tuple[int, str, str]]:
+    """Fallback when there is no usable TOC: numbering + geometry, rejecting data rows."""
     headings: list[tuple[int, str, str]] = []
-    seen_nums: set[str] = set()
-    for match in _INTERNAL_SECTION_RE.finditer(full_text):
-        num = match.group(1)
-        title = _TOC_TAIL_RE.sub("", match.group(2)).strip()
-        if not _is_probable_heading(num, title):
+    seen: set[str] = set()
+    for idx, block in enumerate(body_blocks):
+        if len(block.text) > 120 or len(block.lines) > 2:
+            continue  # a heading is short and not a wrapped paragraph
+        match = _TOC_SECTION_RE.match(block.text)
+        if not match:
             continue
-        # Deduplicate: TOC entry + first body occurrence share the same number.
-        # Keep the LATER (body) occurrence so we get the real section text, not the TOC.
-        if num in seen_nums:
-            # Replace the earlier hit (TOC) with this later one (body)
-            headings = [h for h in headings if h[1] != num]
-        seen_nums.add(num)
-        headings.append((match.start(), num, title))
+        num, title = match.group(1), match.group(2).strip()
+        if not _plausible_section_number(num) or num in seen:
+            continue
+        if _DATA_ROW_RE.match(title) or not any(c.isalpha() for c in title):
+            continue
+        first_alpha = next((c for c in title if c.isalpha()), "")
+        if first_alpha and not first_alpha.isupper():
+            continue
+        seen.add(num)
+        headings.append((idx, num, title))
+    return headings
 
-    if not headings:
-        return [
-            ParsedSection(
-                section_id=ctd_section,
-                heading=ctd_section.value,
-                text=full_text,
-                tables=all_tables,
-                page_start=pages[0].page_number if pages else 0,
-                page_end=pages[-1].page_number if pages else 0,
-            )
-        ]
 
-    sections: list[ParsedSection] = []
+def _find_headings(doc: PDFDocument, body_blocks: list[LayoutBlock]) -> list[tuple[int, str, str]]:
+    anchors = _toc_anchors(doc, body_blocks)
+    if len(anchors) >= 2:
+        return anchors
+    return _geometry_headings(body_blocks)
 
-    # Capture pre-heading content as the primary section. In CMC spec/method docs,
-    # the actual test parameters and limits often live before any numbered heading
-    # (which typically first appears in change-history or reference tables).
-    preamble_end = headings[0][0]
-    preamble_text = full_text[:preamble_end].strip()
-    if len(preamble_text) > 200:
-        sections.append(
-            ParsedSection(
-                section_id=ctd_section,
-                heading=f"{ctd_section.value} Main Specification",
-                text=preamble_text,
-                tables=[],
-                page_start=pages[0].page_number,
-                page_end=pages[-1].page_number,
-            )
-        )
 
-    for i, (start_pos, num, title) in enumerate(headings):
-        end_pos = headings[i + 1][0] if i + 1 < len(headings) else len(full_text)
-        section_text = full_text[start_pos:end_pos].strip()
+# --- cross-page table stitching ----------------------------------------------
+def _norm_row(cells: list[str]) -> list[str]:
+    return [c.strip().lower() for c in cells]
 
-        section_tables = [
-            t for t in all_tables
-            if title.lower() in (t.title or "").lower()
-            or num in (t.title or "")
-        ]
 
-        sections.append(
-            ParsedSection(
-                section_id=ctd_section,
-                heading=f"{num} {title}",
-                text=section_text,
-                tables=section_tables,
-                page_start=pages[0].page_number,
-                page_end=pages[-1].page_number,
-            )
-        )
+def _can_stitch(a: ExtractedTable, last_page: int, last_bbox, b: ExtractedTable, page_heights: dict[int, float]) -> bool:
+    """Whether grid `b` continues `a`, checked against a's LAST fragment (page/bbox).
 
-    # Unmatched tables go to the preamble section (which owns the pre-heading text
-    # and its associated tables). Falls back to the last section if no preamble.
-    leftover_tables = [t for t in all_tables if not any(t in s.tables for s in sections)]
-    if leftover_tables and sections:
-        if len(preamble_text) > 200:
-            sections[0].tables.extend(leftover_tables)
+    Using the last fragment (not a.bbox, which stays at the first fragment for section
+    positioning) keeps the bottom-of-page and column-alignment checks correct across a
+    3rd+ page.
+    """
+    if a.kind != "grid" or b.kind != "grid" or not last_bbox or not b.bbox:
+        return False
+    if b.page != last_page + 1 or b.title:
+        return False
+    if a.n_cols == 0 or a.n_cols != b.n_cols:
+        return False
+    if abs(last_bbox[0] - b.bbox[0]) > 20 or abs(last_bbox[2] - b.bbox[2]) > 20:
+        return False  # columns must line up
+    top_height = page_heights.get(last_page, 0.0)
+    if top_height and last_bbox[3] < top_height * 0.80:
+        return False  # the last fragment must reach the bottom of its page
+    bottom_height = page_heights.get(b.page, 0.0)
+    if bottom_height and b.bbox[1] > bottom_height * 0.30:
+        return False  # b must start at the top of its page
+    return True
+
+
+def _merge_tables(a: ExtractedTable, b: ExtractedTable) -> None:
+    if b.headers and a.headers and _norm_row(b.headers) == _norm_row(a.headers):
+        add_rows = b.rows  # B repeated the header -> drop the duplicate
+    else:
+        add_rows = ([b.headers] if b.headers else []) + b.rows  # B's first row is data
+    a.rows.extend(add_rows)
+    a.source_pages = list(a.source_pages) + list(b.source_pages or [b.page])
+    a.continues_to = True
+    a.n_rows = len(a.rows) + 1
+
+
+def _stitch_cross_page_tables(tables: list[ExtractedTable], page_heights: dict[int, float]) -> list[ExtractedTable]:
+    ordered = sorted(tables, key=lambda t: (t.page, t.bbox[1] if t.bbox else 0.0))
+    result: list[ExtractedTable] = []
+    last_frag: list[tuple[int, tuple | None]] = []  # (page, bbox) of the newest fragment merged
+    for table in ordered:
+        if result and _can_stitch(result[-1], last_frag[-1][0], last_frag[-1][1], table, page_heights):
+            _merge_tables(result[-1], table)
+            last_frag[-1] = (table.page, table.bbox)
         else:
-            sections[-1].tables.extend(leftover_tables)
+            result.append(table)
+            last_frag.append((table.page, table.bbox))
+    return result
 
-    return sections
+
+# --- assembly ----------------------------------------------------------------
+def _kept_pages(doc: PDFDocument) -> set[int]:
+    """Drop the cover/approval page 1, unless the document is tiny."""
+    if doc.page_count <= 2:
+        return {p.page_number for p in doc.pages}
+    return {p.page_number for p in doc.pages if p.page_number > 1}
 
 
-def _skip_cover_and_history(pages: list[PageContent]) -> list[PageContent]:
-    """Heuristic: skip page 1 (cover/approval) and last pages if they look like change history."""
-    if len(pages) <= 2:
-        return pages
+def _position(page: int, bbox) -> tuple[int, float]:
+    return (page, bbox[1] if bbox else 0.0)
 
-    body = pages[1:]
 
-    while len(body) > 1:
-        last_text = body[-1].text.lower()
-        if any(kw in last_text for kw in ["change history", "revision history", "version history"]):
-            body = body[:-1]
-        else:
-            break
+def _build_section(
+    ctd: CTDSection,
+    heading: str,
+    blocks: list[LayoutBlock],
+) -> ParsedSection:
+    text = "\n".join(b.text for b in blocks if b.text)
+    pages = [b.page for b in blocks]
+    return ParsedSection(
+        section_id=ctd,
+        heading=heading,
+        text=text,
+        blocks=list(blocks),
+        page_start=min(pages) if pages else 0,
+        page_end=max(pages) if pages else 0,
+    )
 
-    return body
+
+def _assign_items(items, section_starts: list[tuple[tuple[int, float], ParsedSection]], attr: str) -> None:
+    """Attach each table/figure to the last section that starts at or before its position."""
+    for item in items:
+        pos = _position(item.page, getattr(item, "bbox", None))
+        target = section_starts[0][1]
+        for start_pos, section in section_starts:
+            if start_pos <= pos:
+                target = section
+            else:
+                break
+        getattr(target, attr).append(item)
 
 
 def split_document(doc: PDFDocument) -> list[ParsedSection]:
-    ctd_section = classify_document(doc)
-    body_pages = _skip_cover_and_history(doc.pages)
-    return _split_by_internal_sections(body_pages, ctd_section)
+    ctd = classify_document(doc)
+    kept = _kept_pages(doc)
+
+    body_blocks = [
+        b
+        for page in doc.pages
+        if page.page_number in kept
+        for b in page.blocks
+        if b.role not in ("page_header", "page_footer")
+    ]
+    body_blocks.sort(key=lambda b: (b.page, b.reading_order))
+
+    page_heights = {p.page_number: p.height for p in doc.pages}
+    tables = [t for page in doc.pages if page.page_number in kept for t in page.tables]
+    figures = [f for page in doc.pages if page.page_number in kept for f in page.figures]
+    tables = _stitch_cross_page_tables(tables, page_heights)
+
+    if not body_blocks:
+        # A document with no prose (e.g. tables/figures only) must still surface them.
+        if not (tables or figures):
+            return []
+        section = ParsedSection(section_id=ctd, heading=ctd.value)
+        section.tables = list(tables)
+        section.figures = list(figures)
+        item_pages = [t.page for t in tables] + [f.page for f in figures]
+        section.page_start = min(item_pages) if item_pages else 0
+        section.page_end = max(item_pages) if item_pages else 0
+        return [section]
+
+    headings = _find_headings(doc, body_blocks)
+    if not headings:
+        section = _build_section(ctd, ctd.value, body_blocks)
+        _assign_items(tables, [(_position(body_blocks[0].page, body_blocks[0].bbox), section)], "tables")
+        _assign_items(figures, [(_position(body_blocks[0].page, body_blocks[0].bbox), section)], "figures")
+        return [section]
+
+    sections: list[ParsedSection] = []
+    section_starts: list[tuple[tuple[int, float], ParsedSection]] = []
+
+    first_idx = headings[0][0]
+    preamble = body_blocks[:first_idx]
+    if sum(len(b.text) for b in preamble) > 200:
+        pre_section = _build_section(ctd, f"{ctd.value} Main Specification", preamble)
+        sections.append(pre_section)
+        section_starts.append((_position(preamble[0].page, preamble[0].bbox), pre_section))
+
+    for i, (start, num, title) in enumerate(headings):
+        end = headings[i + 1][0] if i + 1 < len(headings) else len(body_blocks)
+        sec_blocks = body_blocks[start:end]
+        section = _build_section(ctd, f"{num} {title}", sec_blocks)
+        sections.append(section)
+        section_starts.append((_position(sec_blocks[0].page, sec_blocks[0].bbox), section))
+
+    _assign_items(tables, section_starts, "tables")
+    _assign_items(figures, section_starts, "figures")
+    return sections
 
 
 def group_sections(
