@@ -41,10 +41,14 @@ def _render_section(section: ParsedSection, label: str) -> list[str]:
     if section.tables:
         for table in section.tables:
             parts.append(f"\nTable: {table.title}")
-            if table.headers:
-                parts.append(" | ".join(table.headers))
-            for row in table.rows[:10]:
-                parts.append(" | ".join(row))
+            if table.kind == "key_value" or table.pairs:
+                for pair in table.pairs:
+                    parts.append(f"{pair.label}: {pair.value}")
+            else:
+                if table.headers:
+                    parts.append(" | ".join(table.headers))
+                for row in table.rows[:10]:
+                    parts.append(" | ".join(row))
     parts.append("")
     return parts
 
