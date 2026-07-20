@@ -1,12 +1,12 @@
 from __future__ import annotations
-
 from dataclasses import dataclass, field
 from pathlib import Path
-
 import fitz
-
+import structlog
+from parse.ocr import is_scanned_page, ocr_page
 from schemas.documents import ExtractedTable
 
+log = structlog.get_logger()
 
 @dataclass
 class PageContent:
@@ -14,14 +14,12 @@ class PageContent:
     text: str
     tables: list[ExtractedTable] = field(default_factory=list)
 
-
 @dataclass
 class PDFDocument:
     filename: str
     page_count: int
     toc: list[tuple[int, str, int]]
     pages: list[PageContent]
-
 
 def extract_tables(page: fitz.Page) -> list[ExtractedTable]:
     results: list[ExtractedTable] = []
@@ -62,9 +60,21 @@ def extract_pdf(path: str | Path) -> PDFDocument:
     toc = [(level, title, page_num) for level, title, page_num in doc.get_toc()]
 
     pages: list[PageContent] = []
+    ocr_count = 0
     for page in doc:
-        text = page.get_text("text")
         tables = extract_tables(page)
+        if is_scanned_page(page):
+            ocr_result = ocr_page(page)
+            if ocr_result is not None:
+                text, ocr_tables = ocr_result
+                # find_tables() finds nothing on a scan (the grid lines are pixels,
+                # not vectors), so these reconstructed tables are all this page has.
+                tables = tables + ocr_tables
+                ocr_count += 1
+            else:
+                text = page.get_text("text")
+        else:
+            text = page.get_text("text")
         pages.append(
             PageContent(
                 page_number=page.number + 1,
@@ -72,6 +82,9 @@ def extract_pdf(path: str | Path) -> PDFDocument:
                 tables=tables,
             )
         )
+
+    if ocr_count:
+        log.info("ocr_pages", count=ocr_count, filename=path.name)
 
     result = PDFDocument(
         filename=path.name,
