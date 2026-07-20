@@ -18,7 +18,7 @@ from config import get_settings
 from llm.prompts import STRUCTURED_EXTRACTOR
 from llm.structured import structured_call
 from schemas.documents import (
-    ChunkGroup,
+    CTDSection,
     ExtractionFinding,
     GroupExtract,
     IntermediateReport,
@@ -74,7 +74,7 @@ def _build_transcript(messages: list) -> str:
 
 
 async def _run_extraction_async(
-    groups: list[ChunkGroup],
+    groups: list[dict],
     document_name: str,
     document_type: str,
     job_id: str,
@@ -85,7 +85,7 @@ async def _run_extraction_async(
     for group in groups:
         agent = make_extraction_agent(group, model_client)
         agents.append((agent, group))
-        emit_sync(job_id, "extraction", "agent_spawned", agent.name, f"Analyzing {len(group.sections)} sections")
+        emit_sync(job_id, "extraction", "agent_spawned", agent.name, f"Analyzing {len(group['sections'])} sections")
 
     moderator = make_extraction_moderator(model_client)
     emit_sync(job_id, "extraction", "agent_spawned", moderator.name, "Moderating extraction")
@@ -144,35 +144,35 @@ async def _run_extraction_async(
             model_cls=GroupExtract,
             temperature=0.0,
             max_tokens=4096,
-            repair_context=f"Extraction of {group.group_id}",
+            repair_context=f"Extraction of {group['group_id']}",
         )
         if failure is not None:
-            emit_sync(job_id, "extraction", "parse_repair", group.group_id, failure.reason)
+            emit_sync(job_id, "extraction", "parse_repair", group["group_id"], failure.reason)
 
         by_index = {s.section_index: s for s in (extract.sections if extract else [])}
-        for index, section in enumerate(group.sections):
+        for index, section in enumerate(group["sections"]):
             extracted = by_index.get(index)
             kept_values, kept_findings, dropped = filter_anchored(extracted, section)
             dropped_total += dropped
             summaries.append(
                 SectionSummary(
-                    section_id=section.section_id,
+                    section_id=CTDSection.UNKNOWN,
                     summary=(
                         extracted.summary
                         if extracted and extracted.summary
-                        else section.heading
+                        else section["heading"]
                     ),
                     key_values=kept_values,
-                    page_start=section.page_start,
-                    page_end=section.page_end,
+                    page_start=section["page_start"],
+                    page_end=section["page_end"],
                 )
             )
             findings.extend(
                 ExtractionFinding(
-                    section_id=section.section_id,
+                    section_id=CTDSection.UNKNOWN,
                     finding=f.finding,
                     evidence=f.evidence,
-                    agent_name=f"Extractor_{group.group_id}",
+                    agent_name=f"Extractor_{group['group_id']}",
                 )
                 for f in kept_findings
             )
@@ -198,7 +198,7 @@ async def _run_extraction_async(
 
 
 def run_extraction(
-    groups: list[ChunkGroup],
+    groups: list[dict],
     document_name: str,
     document_type: str,
     job_id: str,

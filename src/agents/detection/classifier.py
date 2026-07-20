@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import structlog
 from json_repair import repair_json
@@ -10,10 +11,47 @@ from agents.event_bus import emit_sync
 from llm.client import chat_completion
 from llm.prompts import DOCUMENT_CLASSIFIER, FLAW_TYPE_SELECTOR
 from llm.structured import _extract_json_blob
-from parse.section_splitter import detect_ctd_section
 from schemas.documents import CTDSection, IntermediateReport
 
 log = structlog.get_logger()
+
+# CTD-section detection lives here (a detection-layer concern); the parse pipeline no
+# longer classifies documents.
+_CTD_PATTERNS: list[tuple[re.Pattern, CTDSection]] = [
+    (re.compile(r"3\.2\.\s*S\.4\.1\b", re.IGNORECASE), CTDSection.S_4_1_SPECIFICATION),
+    (re.compile(r"3\.2\.\s*S\.4\.2\b", re.IGNORECASE), CTDSection.S_4_2_ANALYTICAL_PROCEDURES),
+    (re.compile(r"3\.2\.\s*S\.4\.3\b", re.IGNORECASE), CTDSection.S_4_3_VALIDATION),
+    (re.compile(r"3\.2\.\s*S\.4\.4\b", re.IGNORECASE), CTDSection.S_4_4_BATCH_ANALYSES),
+    (re.compile(r"3\.2\.\s*S\.4\.5\b", re.IGNORECASE), CTDSection.S_4_5_JUSTIFICATION),
+    (re.compile(r"3\.2\.\s*S\.1\b", re.IGNORECASE), CTDSection.S_1_GENERAL),
+    (re.compile(r"3\.2\.\s*S\.2\b", re.IGNORECASE), CTDSection.S_2_MANUFACTURE),
+    (re.compile(r"3\.2\.\s*S\.3\b", re.IGNORECASE), CTDSection.S_3_CHARACTERIZATION),
+    (re.compile(r"3\.2\.\s*S\.5\b", re.IGNORECASE), CTDSection.S_5_REFERENCE_STANDARDS),
+    (re.compile(r"3\.2\.\s*S\.6\b", re.IGNORECASE), CTDSection.S_6_CONTAINER_CLOSURE),
+    (re.compile(r"3\.2\.\s*S\.7\b", re.IGNORECASE), CTDSection.S_7_STABILITY),
+    (re.compile(r"3\.2\.\s*P\.4\.1\b", re.IGNORECASE), CTDSection.P_4_1_SPECIFICATION),
+    (re.compile(r"3\.2\.\s*P\.4\.2\b", re.IGNORECASE), CTDSection.P_4_2_ANALYTICAL_PROCEDURES),
+    (re.compile(r"3\.2\.\s*P\.4\.3\b", re.IGNORECASE), CTDSection.P_4_3_VALIDATION),
+    (re.compile(r"3\.2\.\s*P\.4\.4\b", re.IGNORECASE), CTDSection.P_4_4_BATCH_ANALYSES),
+    (re.compile(r"3\.2\.\s*P\.4\.5\b", re.IGNORECASE), CTDSection.P_4_5_JUSTIFICATION),
+    (re.compile(r"3\.2\.\s*P\.1\b", re.IGNORECASE), CTDSection.P_1_DESCRIPTION),
+    (re.compile(r"3\.2\.\s*P\.2\b", re.IGNORECASE), CTDSection.P_2_DEVELOPMENT),
+    (re.compile(r"3\.2\.\s*P\.3\b", re.IGNORECASE), CTDSection.P_3_MANUFACTURE),
+    (re.compile(r"3\.2\.\s*P\.5\b", re.IGNORECASE), CTDSection.P_5_REFERENCE_STANDARDS),
+    (re.compile(r"3\.2\.\s*P\.6\b", re.IGNORECASE), CTDSection.P_6_CONTAINER_CLOSURE),
+    (re.compile(r"3\.2\.\s*P\.7\b", re.IGNORECASE), CTDSection.P_7_STABILITY),
+    (re.compile(r"3\.2\.\s*P\.8\b", re.IGNORECASE), CTDSection.P_8_APPENDICES),
+    (re.compile(r"3\.2\.\s*A\.1\b", re.IGNORECASE), CTDSection.A_FACILITIES),
+    (re.compile(r"3\.2\.\s*A\.2\b", re.IGNORECASE), CTDSection.A_ADVENTITIOUS),
+    (re.compile(r"3\.2\.\s*R\b", re.IGNORECASE), CTDSection.R_REGIONAL),
+]
+
+
+def detect_ctd_section(text: str) -> CTDSection:
+    for pattern, section in _CTD_PATTERNS:
+        if pattern.search(text):
+            return section
+    return CTDSection.UNKNOWN
 
 
 def classify_document_type(text_excerpt: str) -> tuple[CTDSection, str]:

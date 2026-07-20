@@ -8,13 +8,10 @@ import pytest
 from agents.extraction.agent import build_extraction_prompt, build_structured_extraction_prompt
 from agents.extraction.group import _build_transcript, _run_extraction_async
 from schemas.documents import (
-    ChunkGroup,
     CTDSection,
-    ExtractedTable,
     ExtractionFindingOut,
     GroupExtract,
     KeyValue,
-    ParsedSection,
     SectionExtract,
 )
 
@@ -42,33 +39,30 @@ class _Team:
 
 @pytest.fixture
 def group():
-    return ChunkGroup(
-        group_id="group_0",
-        sections=[
-            ParsedSection(
-                section_id=CTDSection.P_6_CONTAINER_CLOSURE,
-                heading="AET Derivation",
-                text="The AET was calculated as 22.727 ug/g.",
-                tables=[
-                    ExtractedTable(
-                        title="Table 16",
-                        headers=["Compound", "Result"],
-                        rows=[["2-Butanone", "8.72 ug/g"]],
-                        page=16,
-                    )
-                ],
-                page_start=14,
-                page_end=17,
-            ),
-            ParsedSection(
-                section_id=CTDSection.P_6_CONTAINER_CLOSURE,
-                heading="Leachables Summary",
-                text="No PDE was established for the identified leachable.",
-                page_start=18,
-                page_end=19,
-            ),
+    return {
+        "group_id": "group_0",
+        "sections": [
+            {
+                "heading": "AET Derivation",
+                "text": "The AET was calculated as 22.727 ug/g.",
+                "blocks": [{"role": "paragraph", "text": "The AET was calculated as 22.727 ug/g."}],
+                "tables": [{
+                    "kind": "grid", "title": "Table 16",
+                    "headers": ["Compound", "Result"], "rows": [["2-Butanone", "8.72 ug/g"]],
+                    "pairs": [], "page": 16,
+                }],
+                "figures": [],
+                "page_start": 14, "page_end": 17,
+            },
+            {
+                "heading": "Leachables Summary",
+                "text": "No PDE was established for the identified leachable.",
+                "blocks": [{"role": "paragraph", "text": "No PDE was established for the identified leachable."}],
+                "tables": [], "figures": [],
+                "page_start": 18, "page_end": 19,
+            },
         ],
-    )
+    }
 
 
 @pytest.fixture
@@ -77,7 +71,7 @@ def patched(monkeypatch, group):
     import agents.extraction.group as mod
 
     monkeypatch.setattr(mod, "_make_model_client", lambda *a, **k: object())
-    monkeypatch.setattr(mod, "make_extraction_agent", lambda g, c: _Agent(f"Extractor_{g.group_id}"))
+    monkeypatch.setattr(mod, "make_extraction_agent", lambda g, c: _Agent(f"Extractor_{g['group_id']}"))
     monkeypatch.setattr(mod, "make_extraction_moderator", lambda c: _Agent("Extraction_Moderator"))
     monkeypatch.setattr(mod, "RoundRobinGroupChat", _Team)
     monkeypatch.setattr(mod, "emit_sync", lambda *a, **k: None)
@@ -101,21 +95,15 @@ class TestPromptFidelity:
         assert "[section_index: 0]" in prompt
         assert "[section_index: 1]" in prompt
 
-    def test_plain_extraction_prompt_output_unchanged(self, group):
-        """The refactor must not disturb the existing agent-facing prompt."""
-        parts = []
-        for section in group.sections:
-            parts.append(f"## {section.heading}")
-            parts.append(section.text[:4000])
-            if section.tables:
-                for table in section.tables:
-                    parts.append(f"\nTable: {table.title}")
-                    if table.headers:
-                        parts.append(" | ".join(table.headers))
-                    for row in table.rows[:10]:
-                        parts.append(" | ".join(row))
-            parts.append("")
-        assert build_extraction_prompt(group) == "\n".join(parts)
+    def test_plain_extraction_prompt_is_structured_json(self, group):
+        """The agent-facing prompt is the section's structured JSON -- not flattened text."""
+        prompt = build_extraction_prompt(group)
+        objs = [json.loads(line) for line in prompt.splitlines() if line.strip()]
+        assert len(objs) == 2
+        assert objs[0]["heading"] == "AET Derivation"
+        assert any("22.727" in c["text"] for c in objs[0]["content"])
+        assert objs[0]["tables"][0]["rows"] == [["2-Butanone", "8.72 ug/g"]]
+        assert any("PDE" in c["text"] for c in objs[1]["content"])
 
 
 class TestTranscript:
@@ -193,7 +181,7 @@ class TestHandoffPayload:
         report = await _run_extraction_async([group], "EL_Report", "E&L", "job1")
         assert len(report.findings) == 1
         assert report.findings[0].agent_name == "Extractor_group_0"
-        assert report.findings[0].section_id == CTDSection.P_6_CONTAINER_CLOSURE
+        assert report.findings[0].section_id == CTDSection.UNKNOWN  # CTD no longer computed
 
     @pytest.mark.asyncio
     async def test_page_range_carried(self, monkeypatch, patched, group):

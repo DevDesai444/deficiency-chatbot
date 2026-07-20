@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import fitz
@@ -17,29 +16,6 @@ log = structlog.get_logger()
 _MIN_FIGURE_COVERAGE = 0.03
 _PAGE_LABEL_RE = re.compile(r"page\s+(\d+)\s+of\s+\d+", re.IGNORECASE)
 _CAPTION_RE = re.compile(r"\b(figure|appendix|table)\b", re.IGNORECASE)
-
-
-@dataclass
-class PageContent:
-    page_number: int
-    text: str
-    tables: list[ExtractedTable] = field(default_factory=list)
-    blocks: list[LayoutBlock] = field(default_factory=list)
-    figures: list[LayoutFigure] = field(default_factory=list)
-    width: float = 0.0
-    height: float = 0.0
-    rotation: int = 0
-    source: str = "pymupdf"       # "pymupdf" | "rapidocr" | "rapidocr-fallback"
-    is_scanned: bool = False
-    page_label: str = ""          # the printed "Page X of Y" label, if present
-
-
-@dataclass
-class PDFDocument:
-    filename: str
-    page_count: int
-    toc: list[tuple[int, str, int]]
-    pages: list[PageContent]
 
 
 def _rotated_bbox(bbox, page: fitz.Page) -> tuple[float, float, float, float]:
@@ -59,23 +35,47 @@ def _rotated_bbox(bbox, page: fitz.Page) -> tuple[float, float, float, float]:
 def extract_tables(page: fitz.Page) -> list[ExtractedTable]:
     results: list[ExtractedTable] = []
     finder = page.find_tables()
+    page_height = page.rect.height or 1.0
     for table in finder.tables:
         raw = table.extract()
         if not raw or len(raw) < 2:
             continue
 
-        headers = [str(cell or "").strip() for cell in raw[0]]
-        rows = [
-            [str(cell or "").strip() for cell in row]
-            for row in raw[1:]
-        ]
+        grid = [[str(cell or "").strip() for cell in row] for row in raw]
 
-        title = ""
+        # (#1) A caption inside the outer border becomes grid row 0 -- either a blank
+        # spacer row or a single-cell title spanning the table. Drop/lift it so the real
+        # header row isn't demoted into the data.
+        while len(grid) >= 3 and not any(grid[0]):
+            grid = grid[1:]
+        in_table_title = ""
+        if len(grid) >= 3 and sum(1 for c in grid[0] if c) == 1:
+            in_table_title = next(c for c in grid[0] if c)
+            grid = grid[1:]
+
+        # (#2) Drop columns empty in every row -- spurious splits from merged/nested
+        # cells (the OCR path already does this). Never removes a cell that holds text.
+        if grid and grid[0]:
+            width = len(grid[0])
+            keep = [c for c in range(width) if any((row[c] if c < len(row) else "") for row in grid)]
+            if 0 < len(keep) < width:
+                grid = [[(row[c] if c < len(row) else "") for c in keep] for row in grid]
+
+        if len(grid) < 2:
+            continue
+        headers = grid[0]
+        rows = grid[1:]
+
         bbox = table.bbox
-        above_rect = fitz.Rect(bbox[0], max(0, bbox[1] - 30), bbox[2], bbox[1])
-        above_text = page.get_text("text", clip=above_rect).strip()
-        if above_text and len(above_text) < 200:
-            title = above_text
+        # (#3) Only read the band above the table as a title when the table isn't at the
+        # very top of the page, where that band is the running header, not a caption.
+        above_text = ""
+        if bbox[1] > page_height * 0.15:
+            above_rect = fitz.Rect(bbox[0], max(0, bbox[1] - 30), bbox[2], bbox[1])
+            candidate = page.get_text("text", clip=above_rect).strip()
+            if candidate and len(candidate) < 200:
+                above_text = candidate
+        title = in_table_title or above_text
 
         results.append(
             ExtractedTable(
@@ -194,16 +194,25 @@ def _detect_page_label(text: str) -> str:
     return match.group(1) if match else ""
 
 
-def extract_pdf(path: str | Path) -> PDFDocument:
+def extract_pdf(path: str | Path) -> dict:
+    """Parse a PDF into the structured-document JSON.
+
+    Returns a plain dict (no custom datatypes) -- this IS the parsed representation the
+    rest of the pipeline flows:
+        {filename, page_count, toc:[{level,title,page}],
+         pages:[{page_number, page_label, width, height, rotation, source, is_scanned,
+                 blocks:[...], tables:[...], figures:[...]}]}
+    Blocks/tables/figures are the schema objects serialized to JSON.
+    """
     path = Path(path)
     doc = fitz.open(str(path))
 
-    toc = [(level, title, page_num) for level, title, page_num in doc.get_toc()]
+    toc = [{"level": level, "title": title, "page": page_num} for level, title, page_num in doc.get_toc()]
 
-    pages: list[PageContent] = []
+    pages: list[dict] = []
     ocr_count = 0
     for page in doc:
-        tables = extract_tables(page)
+        tables: list[ExtractedTable] = extract_tables(page)
         scanned = is_scanned_page(page)
         blocks: list[LayoutBlock] = []
         figures: list[LayoutFigure] = []
@@ -227,29 +236,23 @@ def extract_pdf(path: str | Path) -> PDFDocument:
             figures = _digital_figures(page, blocks)
 
         pages.append(
-            PageContent(
-                page_number=page.number + 1,
-                text=text,
-                tables=tables,
-                blocks=blocks,
-                figures=figures,
-                width=page.rect.width,
-                height=page.rect.height,
-                rotation=page.rotation,
-                source=source,
-                is_scanned=scanned,
-                page_label=_detect_page_label(text),
-            )
+            {
+                "page_number": page.number + 1,
+                "page_label": _detect_page_label(text),
+                "width": page.rect.width,
+                "height": page.rect.height,
+                "rotation": page.rotation,
+                "source": source,
+                "is_scanned": scanned,
+                "blocks": [b.model_dump() for b in blocks],
+                "tables": [t.model_dump() for t in tables],
+                "figures": [f.model_dump() for f in figures],
+            }
         )
 
     if ocr_count:
         log.info("ocr_pages", count=ocr_count, filename=path.name)
 
-    result = PDFDocument(
-        filename=path.name,
-        page_count=len(doc),
-        toc=toc,
-        pages=pages,
-    )
+    page_count = len(doc)
     doc.close()
-    return result
+    return {"filename": path.name, "page_count": page_count, "toc": toc, "pages": pages}

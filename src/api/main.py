@@ -11,12 +11,7 @@ app = FastAPI(title="defpredict", version="0.1.0")
 
 s = get_settings()
 allowed_origins = [o.strip() for o in s.frontend_url.split(",") if o.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["*"],allow_headers=["*"])
 
 app.include_router(health.router)
 app.include_router(upload.router)
