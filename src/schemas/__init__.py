@@ -1,48 +1,26 @@
-from schemas.corrections import Correction, Evaluation, RecommendationSet, Verdict
 from schemas.documents import (
     ChunkGroup,
     CTDSection,
     ExtractedTable,
-    ExtractionFinding,
-    ExtractionFindingOut,
-    GroupExtract,
-    IntermediateReport,
-    KeyValue,
     ParsedSection,
-    SectionExtract,
-    SectionSummary,
 )
 from schemas.events import AgentEvent
-from schemas.flaws import (
-    Corroboration,
-    FlawCategory,
-    FlawFinding,
-    FlawReport,
-    Severity,
-    SimilarDeficiency,
-)
+from schemas.faults import EvidenceClass, Fault, FaultReport, Tier
+from schemas.flaws import FlawCategory, Severity, SimilarDeficiency
+from schemas.llm import ParseFailed
 
 __all__ = [
     "AgentEvent",
     "CTDSection",
     "ChunkGroup",
-    "Corroboration",
-    "Correction",
-    "Evaluation",
+    "EvidenceClass",
     "ExtractedTable",
-    "ExtractionFinding",
-    "ExtractionFindingOut",
+    "Fault",
+    "FaultReport",
     "FlawCategory",
-    "FlawFinding",
-    "FlawReport",
-    "GroupExtract",
-    "IntermediateReport",
-    "KeyValue",
+    "ParseFailed",
     "ParsedSection",
-    "RecommendationSet",
-    "SectionExtract",
-    "SectionSummary",
     "Severity",
     "SimilarDeficiency",
-    "Verdict",
+    "Tier",
 ]

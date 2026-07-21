@@ -5,20 +5,18 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 EventType = Literal[
+    "pipeline_start",
+    "layer_start",
     "agent_spawned",
     "agent_message",
-    "consensus_start",
-    "consensus_vote",
-    "consensus_reached",
+    "selection",
+    "oracle_complete",
     "layer_complete",
-    "loop_iteration",
-    "parse_repair",
-    "evidence_dropped",
     "pipeline_complete",
     "error",
 ]
 
-LayerName = Literal["extraction", "detection", "correction"]
+LayerName = Literal["parse", "detection"]
 
 
 class AgentEvent(BaseModel):

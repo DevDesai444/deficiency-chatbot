@@ -69,11 +69,32 @@ def _escape(val: Any) -> str:
     return f"'{s}'"
 
 
+def _fetch_chunk(link: str) -> dict:
+    """Fetch one result chunk by its internal link (Databricks SQL Statement API)."""
+    with _sql_client() as client:
+        resp = client.get(link)
+        resp.raise_for_status()
+        return resp.json()
+
+
 def _rows_from_result(data: dict) -> list[dict]:
+    """Flatten a Databricks SQL result into row dicts, following chunk pagination.
+
+    A large result is split across chunks: the initial response carries only the first
+    chunk's ``data_array`` plus a ``next_chunk_internal_link``. Reading ``data_array``
+    alone silently truncates the result (e.g. 261 of 500 rows on the embeddings table),
+    so we walk the chunk links to completion.
+    """
     manifest = data.get("manifest", {})
     columns = [c["name"] for c in manifest.get("schema", {}).get("columns", [])]
-    raw = data.get("result", {}).get("data_array", [])
-    return [dict(zip(columns, row, strict=True)) for row in raw]
+    result = data.get("result", {}) or {}
+    rows = list(result.get("data_array", []) or [])
+    next_link = result.get("next_chunk_internal_link")
+    while next_link:
+        chunk = _fetch_chunk(next_link)
+        rows.extend(chunk.get("data_array", []) or [])
+        next_link = chunk.get("next_chunk_internal_link")
+    return [dict(zip(columns, row, strict=True)) for row in rows]
 
 
 # ---------------------------------------------------------------------------

@@ -3,9 +3,8 @@
 import type { AgentEvent, LayerName } from "@/types";
 
 const LAYER_LABELS: Record<LayerName, string> = {
-  extraction: "Layer 1: Extraction",
-  detection: "Layer 2: Flaw Detection",
-  correction: "Layer 3: Correction",
+  parse: "Parsing",
+  detection: "Fault Detection",
 };
 
 function LayerStatus({ completed }: { completed: boolean }) {
@@ -39,7 +38,7 @@ export function AgentActivity({ events }: AgentActivityProps) {
 
   return (
     <div className="border rounded-lg bg-gray-50 p-4 font-mono text-sm space-y-3 max-h-[500px] overflow-y-auto">
-      {(["extraction", "detection", "correction"] as LayerName[]).map(
+      {(["parse", "detection"] as LayerName[]).map(
         (layer) => {
           const layerEvents = layers.get(layer);
           if (!layerEvents) return null;

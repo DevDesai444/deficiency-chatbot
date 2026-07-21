@@ -12,7 +12,7 @@ from schemas.events import AgentEvent
 def _make_event(job_id: str = "test-job", event_type: str = "agent_spawned") -> AgentEvent:
     return AgentEvent(
         job_id=job_id,
-        layer="extraction",
+        layer="detection",
         event_type=event_type,
         agent_name="TestAgent",
         message="test",

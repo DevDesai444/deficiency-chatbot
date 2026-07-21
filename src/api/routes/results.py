@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api")
 class JobResult(BaseModel):
     job_id: str
     status: str
-    recommendations: dict[str, Any] | None = None
+    faults: dict[str, Any] | None = None
     error: str | None = None
 
 
@@ -23,9 +23,10 @@ async def get_results(job_id: str) -> JobResult:
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
+    # The detection layer's FaultReport is stored in the flaw_report column.
     return JobResult(
         job_id=job_id,
         status=job["status"],
-        recommendations=job.get("recommendations"),
+        faults=job.get("flaw_report"),
         error=None,
     )

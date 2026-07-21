@@ -104,20 +104,17 @@ def test_tables_only_document_surfaces_them():
     assert sections[0]["tables"][0]["headers"] == ["A", "B"]
 
 
-def test_render_section_feeds_structured_json():
-    """The extraction LLM receives the section as structured JSON, not flattened text."""
-    import json as _json
-
-    from agents.extraction.agent import _render_section
+def test_render_section_produces_markdown_with_values():
+    """Detection agents receive the section as markdown with tables + provenance."""
+    from agents.detection.render import render_section
 
     section = {
         "heading": "Appendix 2", "page_start": 29, "page_end": 30,
         "blocks": [{"role": "paragraph", "text": "Certificate of Analysis"}],
-        "tables": [{"kind": "key_value", "title": "CoA", "pairs": [{"label": "Purity", "value": "98.4%"}]}],
+        "tables": [{"kind": "key_value", "title": "CoA", "page": 29, "pairs": [{"label": "Purity", "value": "98.4%"}]}],
         "figures": [],
     }
-    data = _json.loads("\n".join(_render_section(section, "Appendix 2")))
-    assert data["heading"] == "Appendix 2"
-    assert data["content"][0] == {"role": "paragraph", "text": "Certificate of Analysis"}
-    assert data["tables"][0]["kind"] == "key_value"
-    assert data["tables"][0]["pairs"]["Purity"] == "98.4%"
+    md = render_section(section)
+    assert "Appendix 2" in md
+    assert "Certificate of Analysis" in md
+    assert "Purity" in md and "98.4%" in md

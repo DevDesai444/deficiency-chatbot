@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
-
-from schemas.documents import CTDSection
+from pydantic import BaseModel
 
 
 class FlawCategory(StrEnum):
@@ -36,6 +34,8 @@ class FlawCategory(StrEnum):
     EXCIPIENT_COMPATIBILITY = "excipient_compatibility"
     POLYMORPHIC_FORM = "polymorphic_form"
     PARTICLE_SIZE = "particle_size"
+    ELEMENTAL_IMPURITIES = "elemental_impurities"
+    RESIDUAL_SOLVENTS = "residual_solvents"
     COMMITMENT_MISSING = "commitment_missing"
     COVERAGE_GAP = "coverage_gap"
     GENERAL_CMC = "general_cmc"
@@ -48,35 +48,9 @@ class Severity(StrEnum):
 
 
 class SimilarDeficiency(BaseModel):
+    """A historical ANDA deficiency retrieved from the KB as precedent."""
+
     anda_number: str = ""
     product_name: str = ""
     deficiency_text: str = ""
     similarity_score: float = 0.0
-
-
-class Corroboration(BaseModel):
-    agent_name: str
-    agrees: bool
-    reasoning: str = ""
-
-
-class FlawFinding(BaseModel):
-    category: FlawCategory
-    section_id: CTDSection
-    description: str
-    evidence: str = ""
-    severity: Severity = Severity.MEDIUM
-    numeric_claims: list[str] = Field(default_factory=list)
-    guidance_refs: list[str] = Field(default_factory=list)
-    table_ref: str = ""
-    corroborations: list[Corroboration] = Field(default_factory=list)
-    similar_deficiencies: list[SimilarDeficiency] = Field(default_factory=list)
-
-
-class FlawReport(BaseModel):
-    """Layer 2 output → Layer 3 input."""
-    flaws_found: bool
-    findings: list[FlawFinding] = Field(default_factory=list)
-    consensus_summary: str = ""
-    agents_participated: list[str] = Field(default_factory=list)
-    consensus_rounds: int = 0

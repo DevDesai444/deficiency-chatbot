@@ -21,7 +21,7 @@ from pydantic import BaseModel, ValidationError
 
 from config import get_settings
 from llm.client import chat_completion_full
-from schemas.corrections import ParseFailed
+from schemas.llm import ParseFailed
 
 log = structlog.get_logger()
 

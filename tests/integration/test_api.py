@@ -70,23 +70,22 @@ class TestResults:
 
     @patch("api.routes.results.get_job")
     def test_returns_pending_job(self, mock_get, client):
-        mock_get.return_value = {"status": "extracting", "recommendations": None}
+        mock_get.return_value = {"status": "detecting", "flaw_report": None}
         r = client.get("/api/results/abc123")
         assert r.status_code == 200
         data = r.json()
-        assert data["status"] == "extracting"
-        assert data["recommendations"] is None
+        assert data["status"] == "detecting"
+        assert data["faults"] is None
 
     @patch("api.routes.results.get_job")
     def test_returns_complete_job(self, mock_get, client):
         mock_get.return_value = {
             "status": "complete",
-            "recommendations": {
+            "flaw_report": {
                 "job_id": "abc123",
-                "recommendations": [],
-                "flaws_found": False,
-                "inner_loop_count": 0,
-                "outer_loop_count": 0,
+                "faults": [],
+                "faults_found": False,
+                "domains_checked": [],
                 "analysis_seconds": 12.5,
             },
         }
@@ -94,4 +93,4 @@ class TestResults:
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "complete"
-        assert data["recommendations"]["flaws_found"] is False
+        assert data["faults"]["faults_found"] is False

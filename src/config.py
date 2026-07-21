@@ -67,6 +67,14 @@ class Settings(BaseSettings):
         return self.resolved_llm_model
 
     @property
+    def detector_model(self) -> str:
+        """Detection sub-agents run on the strong model — the 8B is too weak for the
+        domain/regulatory reasoning these agents do."""
+        if self.is_databricks:
+            return "databricks-meta-llama-3-3-70b-instruct"
+        return self.resolved_llm_model
+
+    @property
     def suggestor_endpoint(self) -> str:
         return self.suggestor_model or self.resolved_llm_model
 

@@ -1,27 +1,27 @@
 export type EventType =
   | "agent_spawned"
   | "agent_message"
-  | "consensus_start"
-  | "consensus_vote"
-  | "consensus_reached"
+  | "layer_start"
   | "layer_complete"
-  | "loop_iteration"
+  | "selection"
+  | "oracle_complete"
+  | "pipeline_start"
   | "pipeline_complete"
   | "error";
 
-export type LayerName = "extraction" | "detection" | "correction";
+export type LayerName = "parse" | "detection";
 
 export type Severity = "high" | "medium" | "low";
 
-export type Verdict = "pass" | "minor_revision" | "deeper_review";
+export type Tier = "verified" | "corroborated" | "advisory";
 
-export type JobStatus =
-  | "accepted"
-  | "extracting"
-  | "detecting"
-  | "correcting"
-  | "complete"
-  | "error";
+export type EvidenceClass =
+  | "code_verified"
+  | "checklist"
+  | "quote_anchored"
+  | "model_judgment";
+
+export type JobStatus = "accepted" | "parsing" | "detecting" | "complete" | "error";
 
 export interface AgentEvent {
   job_id: string;
@@ -32,20 +32,38 @@ export interface AgentEvent {
   metadata: Record<string, unknown>;
 }
 
-export interface Correction {
-  flaw_category: string;
-  suggestion: string;
-  explanation: string;
-  priority: Severity;
-  references: string[];
+export interface SimilarDeficiency {
+  anda_number: string;
+  product_name: string;
+  deficiency_text: string;
+  similarity_score: number;
 }
 
-export interface RecommendationSet {
+export interface Fault {
+  title: string;
+  detail: string;
+  category: string;
+  severity: Severity;
+  tier: Tier;
+  evidence_class: EvidenceClass;
+  confidence: number;
+  evidence: string;
+  section: string;
+  page: number;
+  table_ref: string;
+  source: string;
+  guidance_refs: string[];
+  precedents: SimilarDeficiency[];
+  novel: boolean;
+  out_of_distribution: boolean;
+  challenge_note: string;
+}
+
+export interface FaultReport {
   job_id: string;
-  recommendations: Correction[];
-  flaws_found: boolean;
-  inner_loop_count: number;
-  outer_loop_count: number;
+  faults: Fault[];
+  faults_found: boolean;
+  domains_checked: string[];
   analysis_seconds: number;
 }
 
@@ -57,6 +75,6 @@ export interface UploadResponse {
 export interface JobResult {
   job_id: string;
   status: JobStatus;
-  recommendations?: RecommendationSet;
+  faults?: FaultReport;
   error?: string;
 }
