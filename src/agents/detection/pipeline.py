@@ -42,7 +42,7 @@ def run_detection(
     doc_desc = describe_document(ctd)
     emit_sync(job_id, "detection", "layer_start", "Detection", f"Reviewing {doc_desc}")
     emit_sync(
-        job_id, "detection", "model_selected", "Detection",
+        job_id, "detection", "agent_message", "Detection",
         f"Model: {DETECTOR_MODELS.get(detector_model, detector_model)}",
     )
 
