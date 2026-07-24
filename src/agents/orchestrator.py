@@ -14,7 +14,7 @@ from schemas.faults import FaultReport
 log = structlog.get_logger()
 
 
-def run_pipeline(pdf_path: str, job_id: str) -> FaultReport:
+def run_pipeline(pdf_path: str, job_id: str, model: str | None = None) -> FaultReport:
     log = structlog.get_logger().bind(job_id=job_id)
     start = time.time()
     emit_sync(job_id, "detection", "pipeline_start", "Orchestrator", "Starting analysis pipeline")
@@ -31,7 +31,7 @@ def run_pipeline(pdf_path: str, job_id: str) -> FaultReport:
     log.info("parsed_document", pages=doc["page_count"], sections=len(sections), groups=len(groups))
 
     update_job_status(job_id, "detecting")
-    report = run_detection(doc, sections, groups, job_id=job_id)
+    report = run_detection(doc, sections, groups, job_id=job_id, model=model)
     report.job_id = job_id
     report.analysis_seconds = round(time.time() - start, 1)
 

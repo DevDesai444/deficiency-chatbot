@@ -2,9 +2,31 @@ import type { JobResult, UploadResponse } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export async function uploadDocument(file: File): Promise<UploadResponse> {
+export interface ModelOption {
+  id: string;
+  label: string;
+}
+
+export interface ModelsResponse {
+  models: ModelOption[];
+  default: string;
+}
+
+export async function getModels(): Promise<ModelsResponse> {
+  const res = await fetch(`${API_BASE}/api/models`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch models (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function uploadDocument(
+  file: File,
+  model?: string,
+): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
+  if (model) form.append("model", model);
 
   const res = await fetch(`${API_BASE}/api/analyze`, {
     method: "POST",

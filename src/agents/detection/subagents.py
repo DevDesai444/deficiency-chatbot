@@ -94,7 +94,7 @@ def _to_faults(inst: AgentFindings, source: str, precedents: list[SimilarDeficie
     return faults
 
 
-def _run_specialist(domain: str, sections: list[dict], precedents: list[SimilarDeficiency], doc_desc: str):
+def _run_specialist(domain: str, sections: list[dict], precedents: list[SimilarDeficiency], doc_desc: str, model: str):
     system = SPECIALIST.format(
         domain=domain,
         domain_desc=CANONICAL_DOMAINS.get(domain, ""),
@@ -105,7 +105,7 @@ def _run_specialist(domain: str, sections: list[dict], precedents: list[SimilarD
     inst, failure = structured_call(
         messages=[{"role": "system", "content": system}, {"role": "user", "content": content}],
         model_cls=AgentFindings,
-        model=get_settings().detector_model,
+        model=model,
         temperature=0.0,
         max_tokens=2048,
         repair_context=f"specialist:{domain}",
@@ -113,13 +113,13 @@ def _run_specialist(domain: str, sections: list[dict], precedents: list[SimilarD
     return (_to_faults(inst, f"specialist:{domain}", precedents) if inst else []), failure
 
 
-def _run_reviewer(group: dict, doc_desc: str):
+def _run_reviewer(group: dict, doc_desc: str, model: str):
     label = group.get("group_id", "")
     content = render_sections(group.get("sections", []))
     inst, failure = structured_call(
         messages=[{"role": "system", "content": OPEN_REVIEWER}, {"role": "user", "content": content}],
         model_cls=AgentFindings,
-        model=get_settings().detector_model,
+        model=model,
         temperature=0.0,
         max_tokens=2048,
         repair_context=f"reviewer:{label}",
@@ -133,15 +133,17 @@ def run_subagents(
     domains: list[str],
     precedents_by_domain: dict[str, list[SimilarDeficiency]],
     doc_desc: str,
+    model: str | None = None,
 ) -> tuple[list[Fault], list[ParseFailed]]:
+    model = model or get_settings().detector_model
     faults: list[Fault] = []
     failures: list[ParseFailed] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
         futures = [
-            pool.submit(_run_specialist, d, sections, precedents_by_domain.get(d, []), doc_desc)
+            pool.submit(_run_specialist, d, sections, precedents_by_domain.get(d, []), doc_desc, model)
             for d in domains
         ]
-        futures += [pool.submit(_run_reviewer, g, doc_desc) for g in groups]
+        futures += [pool.submit(_run_reviewer, g, doc_desc, model) for g in groups]
         for fut in concurrent.futures.as_completed(futures):
             try:
                 fs, failure = fut.result()

@@ -19,6 +19,7 @@ from agents.detection.selection import gather_precedents, select_domains
 from agents.detection.subagents import run_subagents
 from agents.detection.verify import verify_and_tier
 from agents.event_bus import emit_sync
+from config import DETECTOR_MODELS, resolve_detector_model
 from schemas.faults import FaultReport
 
 log = structlog.get_logger()
@@ -32,11 +33,18 @@ def _leading_text(doc: dict, pages: int = 3) -> str:
     return " ".join(parts)
 
 
-def run_detection(doc: dict, sections: list[dict], groups: list[dict], job_id: str = "") -> FaultReport:
+def run_detection(
+    doc: dict, sections: list[dict], groups: list[dict], job_id: str = "", model: str | None = None
+) -> FaultReport:
     start = time.time()
+    detector_model = resolve_detector_model(model)
     ctd = detect_ctd_section(_leading_text(doc) or doc.get("filename", ""))
     doc_desc = describe_document(ctd)
     emit_sync(job_id, "detection", "layer_start", "Detection", f"Reviewing {doc_desc}")
+    emit_sync(
+        job_id, "detection", "model_selected", "Detection",
+        f"Model: {DETECTOR_MODELS.get(detector_model, detector_model)}",
+    )
 
     # Stage 1 + 2 — deterministic, run unconditionally on the full doc.
     oracle_faults = run_oracles(doc)
@@ -47,18 +55,18 @@ def run_detection(doc: dict, sections: list[dict], groups: list[dict], job_id: s
     )
 
     # Stage 3 — selection (adaptive) then the sub-agent fan-out.
-    domains = select_domains(doc, sections)
+    domains = select_domains(doc, sections, model=detector_model)
     emit_sync(job_id, "detection", "selection", "Selector", f"Domains: {', '.join(domains) or 'none'}")
     precedents = {d: gather_precedents(d, doc) for d in domains}
     for d in domains:
         emit_sync(job_id, "detection", "agent_spawned", f"specialist:{d}", CANONICAL_DOMAINS.get(d, "")[:80])
     for g in groups:
         emit_sync(job_id, "detection", "agent_spawned", f"reviewer:{g.get('group_id', '')}", "Open review of this region")
-    agent_faults, failures = run_subagents(sections, groups, domains, precedents, doc_desc)
+    agent_faults, failures = run_subagents(sections, groups, domains, precedents, doc_desc, model=detector_model)
 
     # Stage 4 — verify + tier + dedup, then the grounded challenge (scores, never vetoes).
     faults = verify_and_tier(oracle_faults + checklist_faults + agent_faults, doc)
-    faults = challenge_faults(faults, sections, doc)
+    faults = challenge_faults(faults, sections, doc, model=detector_model)
     emit_sync(job_id, "detection", "agent_message", "Challenge", "Grounded-challenge pass complete")
     emit_sync(
         job_id, "detection", "layer_complete", "Detection",

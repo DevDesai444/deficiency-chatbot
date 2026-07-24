@@ -90,7 +90,7 @@ def _apply_verdict(fault: Fault, verdict: ChallengeVerdict, corpus: str) -> None
         fault.confidence = min(round(fault.confidence + 0.1, 2), 0.9)
 
 
-def _challenge_one(fault: Fault, sections: list[dict]) -> ChallengeVerdict | None:
+def _challenge_one(fault: Fault, sections: list[dict], model: str) -> ChallengeVerdict | None:
     context = _context_for(fault, sections)
     user = (
         "Proposed deficiency:\n"
@@ -102,7 +102,7 @@ def _challenge_one(fault: Fault, sections: list[dict]) -> ChallengeVerdict | Non
     inst, _failure = structured_call(
         messages=[{"role": "system", "content": CHALLENGE}, {"role": "user", "content": user}],
         model_cls=ChallengeVerdict,
-        model=get_settings().detector_model,
+        model=model,
         temperature=0.0,
         max_tokens=512,
         repair_context="challenge",
@@ -110,8 +110,9 @@ def _challenge_one(fault: Fault, sections: list[dict]) -> ChallengeVerdict | Non
     return inst
 
 
-def challenge_faults(faults: list[Fault], sections: list[dict], doc: dict) -> list[Fault]:
+def challenge_faults(faults: list[Fault], sections: list[dict], doc: dict, model: str | None = None) -> list[Fault]:
     """Run the grounded challenge on soft findings and re-sort by (tier, severity, confidence)."""
+    model = model or get_settings().detector_model
     corpus = _doc_corpus(doc)
     targets = [
         f for f in faults
@@ -120,7 +121,7 @@ def challenge_faults(faults: list[Fault], sections: list[dict], doc: dict) -> li
 
     if targets:
         with concurrent.futures.ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
-            future_to_fault = {pool.submit(_challenge_one, f, sections): f for f in targets}
+            future_to_fault = {pool.submit(_challenge_one, f, sections, model): f for f in targets}
             for future in concurrent.futures.as_completed(future_to_fault):
                 fault = future_to_fault[future]
                 try:
