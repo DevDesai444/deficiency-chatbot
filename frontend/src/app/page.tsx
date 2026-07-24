@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { UploadPanel } from "@/components/upload-panel";
 import { AgentActivity } from "@/components/agent-activity";
 import { Faults } from "@/components/faults";
-import { uploadDocument, getJobResult } from "@/lib/api-client";
+import {
+  uploadDocument,
+  getJobResult,
+  getModels,
+  type ModelOption,
+} from "@/lib/api-client";
 import { useAgentStream } from "@/lib/ws-client";
 import type { FaultReport, JobStatus } from "@/types";
 
@@ -13,23 +18,39 @@ export default function Home() {
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [report, setReport] = useState<FaultReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>("");
 
   const { events } = useAgentStream(jobId);
 
-  const handleUpload = useCallback(async (file: File) => {
-    setError(null);
-    setReport(null);
-    setStatus("accepted");
-
-    try {
-      const { job_id } = await uploadDocument(file);
-      setJobId(job_id);
-      pollForResults(job_id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-      setStatus("error");
-    }
+  useEffect(() => {
+    getModels()
+      .then((res) => {
+        setModels(res.models);
+        setSelectedModel(res.default);
+      })
+      .catch(() => {
+        // backend unavailable — leave empty; the pipeline falls back to its default model
+      });
   }, []);
+
+  const handleUpload = useCallback(
+    async (file: File) => {
+      setError(null);
+      setReport(null);
+      setStatus("accepted");
+
+      try {
+        const { job_id } = await uploadDocument(file, selectedModel || undefined);
+        setJobId(job_id);
+        pollForResults(job_id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload failed");
+        setStatus("error");
+      }
+    },
+    [selectedModel],
+  );
 
   async function pollForResults(id: string) {
     const poll = setInterval(async () => {
@@ -64,6 +85,27 @@ export default function Home() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {models.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <label htmlFor="model-select" className="text-gray-500">
+                Model
+              </label>
+              <select
+                id="model-select"
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                disabled={isProcessing}
+                className="border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 disabled:opacity-50"
+              >
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <UploadPanel onUpload={handleUpload} disabled={isProcessing} />
 
           {error && (

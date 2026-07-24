@@ -86,3 +86,20 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+# Detection models the analyst can pick from in the UI. Endpoint id -> display label.
+# The default (when no model is chosen) stays whatever Settings.detector_model resolves to.
+DETECTOR_MODELS: dict[str, str] = {
+    "databricks-meta-llama-3-3-70b-instruct": "Llama 3.3 70B",
+    "databricks-qwen35-122b-a10b": "Qwen3.5 122B · A10B (MoE)",
+    "databricks-qwen3-next-80b-a3b-instruct": "Qwen3-Next 80B · A3B (MoE)",
+}
+
+
+def resolve_detector_model(model: str | None) -> str:
+    """A requested model is used only if it is in the allow-list; otherwise fall back
+    to the configured default. Never lets an arbitrary client string reach the LLM call."""
+    if model and model in DETECTOR_MODELS:
+        return model
+    return get_settings().detector_model

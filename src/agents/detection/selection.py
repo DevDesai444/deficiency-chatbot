@@ -56,7 +56,7 @@ def _fallback_domains(sections: list[dict]) -> list[str]:
     return hits or ["specification", "method-validation", "impurities"]
 
 
-def select_domains(doc: dict, sections: list[dict]) -> list[str]:
+def select_domains(doc: dict, sections: list[dict], model: str | None = None) -> list[str]:
     picked: list[str] = []
     try:
         resp = chat_completion(
@@ -64,7 +64,7 @@ def select_domains(doc: dict, sections: list[dict]) -> list[str]:
                 {"role": "system", "content": DOMAIN_SELECTOR.format(catalog=domain_catalog_text())},
                 {"role": "user", "content": f"Document: {doc.get('filename', '')}\n\n{_doc_digest(sections)}"},
             ],
-            model=get_settings().detector_model,
+            model=model or get_settings().detector_model,
             max_tokens=200,
         )
         picked = [d for d in _parse_domain_array(resp) if d in CANONICAL_DOMAINS]
