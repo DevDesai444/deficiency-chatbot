@@ -10,5 +10,11 @@
     "path": "src/evals/dataset/docs/mini_spec.docx",
     "format": "docx",
     "held_out": false
+  },
+  {
+    "doc_id": "spec32s41",
+    "path": "data/32s41-Specification.pdf",
+    "format": "pdf",
+    "held_out": true
   }
 ]

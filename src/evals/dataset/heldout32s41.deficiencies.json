@@ -1,0 +1,32 @@
+[
+  {
+    "id": "H-01",
+    "doc_id": "spec32s41",
+    "title": "The Ph. Eur. monograph attached later in this same document names four specified impurities (A, B, C, D) for Estradiol hemihydrate, but the internal Related Compounds specification (01-1548-RC) and its vendor/EP/IUPAC name-mapping table define a test and limit for only three (D, B, A) -- Impurity C has no corresponding test, limit, or mapping entry anywhere in the document",
+    "evidence_anchor": "Specified impurities: A, B, C, D.",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "p.12 IMPURITIES / p.4 Related Compounds (01-1548-RC) / p.5 vendor-name table",
+    "tp_required": false
+  },
+  {
+    "id": "H-02",
+    "doc_id": "spec32s41",
+    "title": "The internal Water <921> Method I criterion is a one-sided ceiling ('NMT 3.5%.') with no lower bound, while the Ph. Eur. monograph for the same hemihydrate substance, included later in this document, specifies a two-sided range ('2.9 per cent to 3.5 per cent') -- the internal spec would pass a sample far below the hemihydrate's expected water content",
+    "evidence_anchor": "NMT 3.5%.",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "likely",
+    "section_hint": "p.3 Water test row / p.12 Ph. Eur. Water (2.5.12)",
+    "tp_required": false
+  },
+  {
+    "id": "H-03",
+    "doc_id": "spec32s41",
+    "title": "The Assay row's acceptance range (97.0%-103.0%) is defined 'calculated on the anhydrous basis,' but the same cell also instructs 'Report assay on as is basis' -- no acceptance criterion for the as-is-basis value is defined anywhere in the specification",
+    "evidence_anchor": "Report assay on as is basis.",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "p.4 Assay row (01-1548-AS)",
+    "tp_required": false
+  }
+]
