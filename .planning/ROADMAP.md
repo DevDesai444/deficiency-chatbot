@@ -55,7 +55,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 - [x] 01-03-PLAN.md — Normalizer + reversible offset map (RISK-1 offset round-trip gate)
 - [x] 01-04-PLAN.md — DOCX parser converging on the PDF dict + section-splitter guard
 - [x] 01-05-PLAN.md — Data-driven CTD-family registry + D-05 enum→registry migration
-- [ ] 01-06-PLAN.md — Span-anchor re-open/verify primitive + (table_id,row,col) cell addressing
+- [x] 01-06-PLAN.md — Span-anchor re-open/verify primitive + (table_id,row,col) cell addressing
 - [ ] 01-07-PLAN.md — Coverage manifest (statuses + availability tiers) + resumable content-hash store
 - [ ] 01-08-PLAN.md — Content classifier: deterministic-first + measured LLM escalation
 - [ ] 01-09-PLAN.md — Corpus orchestrator + CLI shell + eval-harness DOCX seam
