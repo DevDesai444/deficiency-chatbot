@@ -50,7 +50,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
   5. Every reconstructed table cell is **addressable**: it carries an ordinary span-ID (byte-exact, re-openable) and resolves through a `(table_id, row, col)` index; merged cells resolve identically from every coordinate they span; and a document whose tables could not be reconstructed reports **table-tier unavailable** in the coverage manifest rather than appearing complete. Without this, Phase 5 SC1's "code recomputation over two verbatim cells" and Phase 4's X1/X2 cell-level comparisons have no substrate to run on.
   6. Ingestion declares a per-document **availability contract** — canonical text + span-IDs guaranteed for anything that parses; section outline and table addressing best-effort — so downstream phases read capability from the manifest instead of discovering it at runtime. A flat, structureless document still grounds; it is simply reported as having no outline.
 **Plans**: 9 plans
-- [ ] 01-01-PLAN.md — Test infrastructure + committed merged-cell DOCX fixture (Wave 0 foundation)
+- [x] 01-01-PLAN.md — Test infrastructure + committed merged-cell DOCX fixture (Wave 0 foundation)
 - [ ] 01-02-PLAN.md — Canonical-text/span-ID schema + reading-order serializer + security limits
 - [ ] 01-03-PLAN.md — Normalizer + reversible offset map (RISK-1 offset round-trip gate)
 - [ ] 01-04-PLAN.md — DOCX parser converging on the PDF dict + section-splitter guard
