@@ -1,0 +1,32 @@
+[
+  {
+    "id": "MS-01",
+    "doc_id": "minispec",
+    "title": "Stated total impurities (0.14%) is less than the largest single component impurity, Impurity B (0.15%) - an arithmetic impossibility",
+    "evidence_anchor": "0.14",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "certain",
+    "section_hint": "Impurities table / Total impurities row",
+    "tp_required": false
+  },
+  {
+    "id": "MS-02",
+    "doc_id": "minispec",
+    "title": "Stated 'Maximum' impurity (0.15%) does not match the true maximum across component rows (Impurity C, 0.19%)",
+    "evidence_anchor": "Maximum",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "certain",
+    "section_hint": "Impurities table / Maximum row",
+    "tp_required": false
+  },
+  {
+    "id": "MS-03",
+    "doc_id": "minispec",
+    "title": "Narrative claims accuracy was established at three concentration levels, but no accuracy result table or data appears anywhere in the document",
+    "evidence_anchor": "Accuracy of the method was established",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "Narrative paragraph",
+    "tp_required": false
+  }
+]

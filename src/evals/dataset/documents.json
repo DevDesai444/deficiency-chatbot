@@ -4,5 +4,11 @@
     "path": "data/32s43-validation-related-compounds-method.pdf",
     "format": "pdf",
     "held_out": false
+  },
+  {
+    "doc_id": "minispec",
+    "path": "src/evals/dataset/docs/mini_spec.docx",
+    "format": "docx",
+    "held_out": false
   }
 ]
