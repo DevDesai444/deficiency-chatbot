@@ -9,9 +9,16 @@ class TestLoadEvalSet:
         eval_set = load_eval_set()
         assert eval_set is not None
 
-    def test_exactly_28_deficiencies(self):
+    def test_mvr1381_tuning_set_has_exactly_28_deficiencies(self):
+        """The canonical estradiol tuning set (doc_id=mvr1381) stays pinned at
+        exactly 28 -- scoped by doc_id, not a raw total, because Plan 00-02's
+        breadth expansion intentionally adds further *.deficiencies.json files
+        that `load_eval_set()` globs in alongside this one (see
+        tests/evals/test_breadth.py for the >=34 whole-set assertion).
+        """
         eval_set = load_eval_set()
-        assert len(eval_set.deficiencies) == 28
+        mvr1381_deficiencies = [d for d in eval_set.deficiencies if d.doc_id == "mvr1381"]
+        assert len(mvr1381_deficiencies) == 28
 
     def test_every_deficiency_has_a_non_empty_evidence_anchor(self):
         eval_set = load_eval_set()
