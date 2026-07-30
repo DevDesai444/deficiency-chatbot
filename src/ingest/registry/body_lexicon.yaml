@@ -1,0 +1,20 @@
+# Per-family body keyword lexicon (D-06), keyed by the same registry ids as ctd_families.yaml.
+# Seeded from checklists.py _VALIDATION_REQUIRED + catalog.py domain vocabulary. This is the
+# content signal the deterministic classifier (Plan 08) scores over body text — never the
+# filename/path (D-09). Keys MUST be a subset of family_ids().
+"3.2.S.2": ["manufacturing process", "synthesis", "in-process control", "process validation", "route of synthesis"]
+"3.2.S.3": ["characterization", "elucidation of structure", "impurity profile", "physicochemical"]
+"3.2.S.4.1": ["specification", "acceptance criteria", "limit", "assay", "impurity", "certificate of analysis"]
+"3.2.S.4.2": ["analytical procedure", "test method", "hplc", "chromatography", "gc"]
+"3.2.S.4.3": ["validation", "specificity", "linearity", "accuracy", "precision", "robustness", "lod", "loq", "system suitability"]
+"3.2.S.4.4": ["batch analyses", "batch results", "lot number", "batch number"]
+"3.2.S.5": ["reference standard", "working standard", "primary standard", "traceability"]
+"3.2.S.6": ["container closure", "packaging", "extractable", "leachable"]
+"3.2.S.7": ["stability", "shelf life", "storage condition", "accelerated", "long-term", "timepoint", "re-test period"]
+"3.2.P.2": ["pharmaceutical development", "formulation", "qbd", "design space", "excipient compatibility"]
+"3.2.P.3": ["manufacturing process", "in-process control", "process validation", "batch record", "scale-up"]
+"3.2.P.4.1": ["excipient specification", "specification", "acceptance criteria", "limit"]
+"3.2.P.4.3": ["validation", "specificity", "linearity", "accuracy", "precision", "robustness"]
+"3.2.P.5": ["reference standard", "working standard", "traceability"]
+"3.2.P.6": ["container closure", "extractable", "leachable", "usp <88>", "usp <661>", "aet"]
+"3.2.P.7": ["stability", "shelf life", "storage condition", "accelerated", "long-term", "dissolution over time"]
