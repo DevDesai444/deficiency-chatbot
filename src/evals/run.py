@@ -8,7 +8,7 @@ graded against (ROADMAP Phase 0 success criteria 3 and 4).
   gate   -- load the eval set + a captured report + the committed baseline, run the zero-
             true-positives-lost gate (`evals.gate.check_gate`); print `GATE OK` / exit 0 on pass,
             print `GATE FAILED: lost {ids}` / exit 1 on failure. This is the CI gate.
-  run    -- LIVE: reuse parse -> detect headlessly (NOT `run_pipeline` -- no Databricks
+  run    -- LIVE: reuse parse -> detect headlessly (NOT the single-file pipeline entry -- no Databricks
             job-store write) for every non-held-out document in the eval set, score each,
             aggregate. A document with no parse path yet (DOCX at Phase 0) or that raises
             during parse/detect is recorded as a parse_failure and skipped, never crashes
@@ -153,7 +153,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     """`run`: LIVE parse -> detect over every non-held-out eval-set document.
 
     Headless reuse of the orchestrator's parse->detect sequence (`parse.pdf.extract_pdf` ->
-    `parse.section_splitter` -> `agents.detection.pipeline.run_detection`), NOT `run_pipeline`
+    `parse.section_splitter` -> `agents.detection.pipeline.run_detection`), NOT the single-file pipeline entry
     (which writes the Databricks job store; `job_id=""` here, which `emit_sync` tolerates).
     A document whose format has no parse path yet (DOCX at Phase 0) or that raises anywhere in
     parse/detect is recorded as a `parse_failure` and skipped -- one bad document never crashes
@@ -171,11 +171,15 @@ def cmd_run(args: argparse.Namespace) -> int:
     for doc in eval_set.documents:
         if doc.held_out:
             continue
-        if doc.format != "pdf":
-            parse_failures[doc.doc_id] = f"no parse path for format={doc.format!r} at Phase 0"
-            continue
         try:
-            parsed = extract_pdf(doc.path)
+            if doc.format == "pdf":
+                parsed = extract_pdf(doc.path)
+            elif doc.format == "docx":
+                from parse.docx import extract_docx  # lazy import (Phase 1 DOCX seam; matches the lazy-import style)
+                parsed = extract_docx(doc.path)
+            else:
+                parse_failures[doc.doc_id] = f"no parse path for format={doc.format!r}"
+                continue
             sections = split_document(parsed)
             groups = group_sections(sections)
             report = run_detection(parsed, sections, groups, job_id="", model=args.model)
