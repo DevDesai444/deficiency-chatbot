@@ -49,7 +49,16 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
   4. Parse fidelity on both the PDF and DOCX paths meets the Phase 0 harness threshold — no regression in the parse-fidelity metric versus the existing PDF baseline.
   5. Every reconstructed table cell is **addressable**: it carries an ordinary span-ID (byte-exact, re-openable) and resolves through a `(table_id, row, col)` index; merged cells resolve identically from every coordinate they span; and a document whose tables could not be reconstructed reports **table-tier unavailable** in the coverage manifest rather than appearing complete. Without this, Phase 5 SC1's "code recomputation over two verbatim cells" and Phase 4's X1/X2 cell-level comparisons have no substrate to run on.
   6. Ingestion declares a per-document **availability contract** — canonical text + span-IDs guaranteed for anything that parses; section outline and table addressing best-effort — so downstream phases read capability from the manifest instead of discovering it at runtime. A flat, structureless document still grounds; it is simply reported as having no outline.
-**Plans**: TBD
+**Plans**: 9 plans
+- [ ] 01-01-PLAN.md — Test infrastructure + committed merged-cell DOCX fixture (Wave 0 foundation)
+- [ ] 01-02-PLAN.md — Canonical-text/span-ID schema + reading-order serializer + security limits
+- [ ] 01-03-PLAN.md — Normalizer + reversible offset map (RISK-1 offset round-trip gate)
+- [ ] 01-04-PLAN.md — DOCX parser converging on the PDF dict + section-splitter guard
+- [ ] 01-05-PLAN.md — Data-driven CTD-family registry + D-05 enum→registry migration
+- [ ] 01-06-PLAN.md — Span-anchor re-open/verify primitive + (table_id,row,col) cell addressing
+- [ ] 01-07-PLAN.md — Coverage manifest (statuses + availability tiers) + resumable content-hash store
+- [ ] 01-08-PLAN.md — Content classifier: deterministic-first + measured LLM escalation
+- [ ] 01-09-PLAN.md — Corpus orchestrator + CLI shell + eval-harness DOCX seam
 
 ### Phase 2: Retrieval, Navigation Tools & Rulebook
 **Goal**: The agent has hands — five deterministic navigation tools that return **identifiers and verbatim spans, never whole documents** — over a hybrid-retrieval corpus index and an FDA/ICH rulebook it can consult like a reviewer reading the rulebook. Landing the rulebook here (before the spike) isolates the go/no-go loop risk from external-sourcing risk.
@@ -127,7 +136,7 @@ Phase 0 (Eval Harness) is also the **continuous gate**: its recall-by-family met
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 0. Eval Harness | 4/4 | Complete   | 2026-07-30 |
-| 1. Ingestion Foundation | 0 / TBD | Not started | - |
+| 1. Ingestion Foundation | 0 / 9 | Not started | - |
 | 2. Retrieval, Navigation Tools & Rulebook | 0 / TBD | Not started | - |
 | 3. Drive-Loop Spike (GO/NO-GO) | 0 / TBD | Not started | - |
 | 4. Orchestrator + Sub-Agent Fan-Out | 0 / TBD | Not started | - |
