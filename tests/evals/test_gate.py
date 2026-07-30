@@ -1,12 +1,16 @@
 """Tests for the zero-true-positives-lost CI gate (EVAL-03)."""
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from evals.capture import golden_report
 from evals.gate import GateResult, baseline_found_ids, check_gate, true_positives_lost
 from evals.schema import load_eval_set
 
 DOC_ID = "mvr1381"
 BASELINE = {"C-01", "C-02"}
+BASELINE_PATH = Path(__file__).resolve().parents[2] / "src" / "evals" / "baseline" / "recall_by_family.json"
 
 
 class TestBaselineFoundIds:
@@ -28,7 +32,7 @@ class TestCheckGatePassesOnGoldenRun:
 
     def test_golden_run_matched_set_contains_both_anchors(self):
         g = check_gate(golden_report(), load_eval_set(), DOC_ID, BASELINE)
-        assert BASELINE <= g.matched
+        assert g.matched >= BASELINE
 
     def test_a_run_that_finds_more_than_baseline_still_passes(self):
         # Superset is fine -- only LOSING a previously-found TP fails the gate.
@@ -75,3 +79,24 @@ class TestCheckGateFailsWhenATrueDeficiencyDisappears:
 
         assert g.ok is False
         assert g.lost == {"C-01", "C-02"}
+
+
+class TestCommittedBaseline:
+    """CI test for the committed `src/evals/baseline/recall_by_family.json` (Plan 00-04 Task 3):
+    pins its found-set/tp and proves the golden run actually passes the gate it protects --
+    the same default path `python -m evals.run gate` reads."""
+
+    def test_baseline_found_set_is_exactly_c01_c02_and_tp_is_two(self):
+        baseline = json.loads(BASELINE_PATH.read_text())
+        assert set(baseline["found_set"]) == {"C-01", "C-02"}
+        assert baseline["overall"]["tp"] == 2
+
+    def test_golden_run_passes_the_gate_against_the_committed_baseline(self):
+        baseline = json.loads(BASELINE_PATH.read_text())
+        eval_set = load_eval_set()
+        baseline_ids = baseline_found_ids(eval_set, extra=set(baseline["found_set"]))
+
+        g = check_gate(golden_report(), eval_set, DOC_ID, baseline_ids)
+
+        assert g.ok is True
+        assert g.lost == set()
