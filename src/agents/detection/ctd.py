@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 
+from ingest.registry import family_ids
 from schemas.documents import CTDSection
 
 _CTD_PATTERNS: list[tuple[re.Pattern, CTDSection]] = [
@@ -29,6 +30,20 @@ def detect_ctd_section(text: str) -> CTDSection:
         if pattern.search(text):
             return section
     return CTDSection.UNKNOWN
+
+
+def detect_family(text: str) -> str:
+    """Doc-level CTD-family id via the same first-match regex seam (D-07 deterministic tier).
+
+    Returns a data-driven registry family id (== a CTDSection value) on a literal CTD-number
+    match, or "" when nothing matches -- the low-confidence case Plan 08's classifier escalates
+    to the lexicon/LLM tiers. Reuses `detect_ctd_section` so the two stay in lockstep, and
+    validates the id against the registry (the single source of truth, D-05).
+    """
+    section = detect_ctd_section(text)
+    if section is CTDSection.UNKNOWN:
+        return ""
+    return section.value if section.value in family_ids() else ""
 
 
 def describe_document(section: CTDSection) -> str:

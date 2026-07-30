@@ -28,6 +28,9 @@ _VALIDATION_REQUIRED: dict[str, list[str]] = {
     "solution stability": ["solution stability", "stability of standard", "stability of sample", "stability of analytical"],
 }
 
+# These CTDSection values equal registry family ids (D-05, ingest.registry is the single
+# source of truth for the CTD-family vocabulary). Kept as enum members here so membership
+# resolution is unchanged; do NOT renumber the enum or these ids drift from the registry.
 _VALIDATION_SECTIONS = {
     CTDSection.S_4_3_VALIDATION,
     CTDSection.P_4_3_VALIDATION,
