@@ -12,7 +12,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 
 7 phases (0–6), granularity `standard`.
 
-- [ ] **Phase 0: Eval Harness** - Multi-doc ground-truth + per-stage metrics (recall-by-family); the continuous gate on every later phase
+- [x] **Phase 0: Eval Harness** - Multi-doc ground-truth + per-stage metrics (recall-by-family); the continuous gate on every later phase (completed 2026-07-30)
 - [ ] **Phase 1: Ingestion Foundation** - Walk arbitrary nested PDF+DOCX, content-classify, converge on one document model, build the corpus index
 - [ ] **Phase 2: Retrieval, Navigation Tools & Rulebook** - Hybrid corpus retrieval + five span-ID tools + the FDA/ICH rulebook the agent reads
 - [ ] **Phase 3: Drive-Loop Spike (GO/NO-GO)** - One tool-using agent that grounds every finding to source + rule within hard code budgets — validate on Llama 3.3 70B / Qwen
@@ -35,7 +35,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 - [x] 00-01-PLAN.md — Eval-set schema + the 28-item estradiol ground truth, family-tagged (EVAL-01)
 - [x] 00-02-PLAN.md — Ground-truth breadth: planted-deficiency DOCX + held-out spec PDF (EVAL-01)
 - [x] 00-03-PLAN.md — Deterministic scorer: per-stage + by-failure-family metrics from a captured run (EVAL-02)
-- [ ] 00-04-PLAN.md — Zero-true-positives-lost gate + CI-style command + committed baseline (EVAL-03)
+- [x] 00-04-PLAN.md — Zero-true-positives-lost gate + CI-style command + committed baseline (EVAL-03)
 **Research flag**: Ground-truth breadth (multi-doc-type + PDF/DOCX + held-out corpus) is real de-risking work — schedule the expansion inside this phase.
 
 ### Phase 1: Ingestion Foundation
@@ -117,7 +117,7 @@ Phase 0 (Eval Harness) is also the **continuous gate**: its recall-by-family met
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 0. Eval Harness | 3/4 | In Progress|  |
+| 0. Eval Harness | 4/4 | Complete   | 2026-07-30 |
 | 1. Ingestion Foundation | 0 / TBD | Not started | - |
 | 2. Retrieval, Navigation Tools & Rulebook | 0 / TBD | Not started | - |
 | 3. Drive-Loop Spike (GO/NO-GO) | 0 / TBD | Not started | - |
