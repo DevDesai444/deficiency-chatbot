@@ -71,3 +71,40 @@ which fails loudly (non-zero exit) and names the lost id(s) the moment C-01, C-0
 added to the found-set stops being found in a new run. See `src/evals/gate.py` and
 `tests/evals/test_gate.py` for the implementation and the doctored-report regression test that
 pins this behavior.
+
+---
+
+## 2026-07-30 — DOCX parse path landed (Phase 1, `mini_spec.docx` now parses live)
+
+Phase 1 wired the DOCX live-parse seam into the eval harness (`evals/run.py`: the `format != "pdf"`
+skip at `cmd_run` is replaced by a `pdf → extract_pdf` / `docx → parse.docx.extract_docx` dispatch).
+`mini_spec.docx` (`minispec`, 3 hand-verified ground-truth deficiencies) is **no longer reported as
+a `parse_failure`** — it now parses live through the new DOCX path.
+
+**The committed baseline (`src/evals/baseline/recall_by_family.json`) is deliberately UNCHANGED.**
+`minispec`'s 3 deficiencies are **NOT yet in the scored denominator**: the document now *parses*
+live, but it has **no captured golden detection output** to score against (the baseline is scored
+LLM-free from a committed golden, `golden:mvr1381_run3`; there is no `golden:minispec`). Scoring a
+document requires a reviewed golden — a *live* detection run on `minispec` is nondeterministic and
+must not be transcribed into the measurement foundation unreviewed. So the JSON remains the
+reproducible `golden:mvr1381` baseline (2/28, `found_set` `["C-01","C-02"]`), **unshifted**, and the
+DOCX ground truth does not yet move the denominator.
+
+**Deviation (Phase 1 plan 01-09, Task 4):** the plan's acceptance criterion *"re-record
+`recall_by_family.json` so the DOCX items enter the denominator"* is **SUPERSEDED** — it embedded a
+wrong assumption, that `minispec` could enter the *deterministic* denominator without a golden. It
+cannot: `evals.run score` scores a captured golden report, and none exists for `minispec`.
+
+**Deferred to phase verification (senior reviewer):** capturing a `golden:minispec` from an
+*inspected* live detection run, then re-recording an aggregated baseline in which `minispec`'s 3
+deficiencies enter the denominator. Until then this note — not a silently-shifted number — records
+that the DOCX path is live.
+
+**Zero-true-positives-lost, proven deterministically for the OCR/DOCX change:**
+`python -m evals.run gate --captured src/evals/dataset/golden/mvr1381_run3.json` → `GATE OK`
+(exit 0). The change is detection-neutral for the scored PDF: mvr1381's `extract_pdf` output is
+**byte-identical before/after** the Phase-1 OCR 5-tuple change (SHA256
+`5a81d683611828fae9766cf6ad0b1a30332a8fb46df3a6c44d9fadf7b843a1c6`, OCR mocked to a fixed response
+to isolate the code change from OCR-endpoint variance). A *live* `run --gate` is subject to
+pre-existing LLM detection nondeterminism (it did not reproduce `golden:run3`'s findings) and is not
+a reliable gate here; the deterministic golden gate above is the proof.
