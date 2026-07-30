@@ -142,7 +142,7 @@ def _merge_tables(a: dict, b: dict) -> None:
 
 
 def _stitch_cross_page_tables(tables: list[dict], page_heights: dict[int, float]) -> list[dict]:
-    ordered = sorted(tables, key=lambda t: (t["page"], t["bbox"][1] if t.get("bbox") else 0.0))
+    ordered = sorted(tables, key=lambda t: (t["page"] if t.get("page") is not None else -1, t["bbox"][1] if t.get("bbox") else 0.0))
     result: list[dict] = []
     last_frag: list[tuple[int, object]] = []  # (page, bbox) of the newest fragment merged
     for table in ordered:
@@ -158,17 +158,19 @@ def _stitch_cross_page_tables(tables: list[dict], page_heights: dict[int, float]
 # --- assembly ----------------------------------------------------------------
 def _kept_pages(doc: dict) -> set[int]:
     """Drop the cover/approval page 1, unless the document is tiny."""
-    if doc["page_count"] <= 2:
+    # DOCX has page_count=None / page_number=None (D-20) — treat as a tiny single "page".
+    if doc["page_count"] is None or doc["page_count"] <= 2:
         return {p["page_number"] for p in doc["pages"]}
     return {p["page_number"] for p in doc["pages"] if p["page_number"] > 1}
 
 
 def _position(page: int, bbox) -> tuple[int, float]:
-    return (page, bbox[1] if bbox else 0.0)
+    # DOCX blocks/tables have page=None (D-20) — order by bbox alone (None sorts first).
+    return (page if page is not None else -1, bbox[1] if bbox else 0.0)
 
 
 def _build_section(heading: str, blocks: list[dict]) -> dict:
-    pages = [b["page"] for b in blocks]
+    pages = [b["page"] for b in blocks if b["page"] is not None]  # DOCX page=None (D-20)
     return {
         "heading": heading,
         "text": "\n".join(b["text"] for b in blocks if b.get("text")),
@@ -203,7 +205,8 @@ def split_document(doc: dict) -> list[dict]:
         for b in page["blocks"]
         if b.get("role") not in ("page_header", "page_footer")
     ]
-    body_blocks.sort(key=lambda b: (b["page"], b["reading_order"]))
+    # DOCX blocks have page=None (D-20) — order by reading_order alone (None sorts first).
+    body_blocks.sort(key=lambda b: (b["page"] if b["page"] is not None else -1, b["reading_order"]))
 
     page_heights = {p["page_number"]: p["height"] for p in doc["pages"]}
     tables = [t for page in doc["pages"] if page["page_number"] in kept for t in page["tables"]]
@@ -216,7 +219,7 @@ def split_document(doc: dict) -> list[dict]:
         section = _build_section(doc.get("filename", ""), [])
         section["tables"] = list(tables)
         section["figures"] = list(figures)
-        item_pages = [t["page"] for t in tables] + [f["page"] for f in figures]
+        item_pages = [t["page"] for t in tables if t.get("page") is not None] + [f["page"] for f in figures if f.get("page") is not None]  # DOCX page=None (D-20)
         section["page_start"] = min(item_pages) if item_pages else 0
         section["page_end"] = max(item_pages) if item_pages else 0
         return [section]
