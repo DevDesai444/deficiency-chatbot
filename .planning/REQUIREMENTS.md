@@ -19,17 +19,20 @@
 - [ ] **RULES-02**: System ingests ICH guidelines into the rulebook (storing the required copyright acknowledgment with each chunk)
 - [ ] **RULES-03**: System ingests FDA guidances (via regulations.gov) for the topics the eval set exercises
 - [ ] **RULES-04**: Every rule chunk is stored with `{source, citation, version/date, license, url}` metadata
+- [ ] **RULES-05**: The rulebook exposes a compact **requirement index** (citation + one-line applicability trigger) separate from full rule text, so the agent can *enumerate* what a submission must contain rather than only semantically searching what it does contain — the mechanism absence-of-evidence detection depends on; full rule text is fetched on demand (progressive disclosure)
 
 ### Navigation Tools
 
 - [ ] **TOOLS-01**: Agent has general tools — `search_corpus`, `open_doc`, `get_section`, `follow_reference`, `read_guideline` — that return identifiers/snippets, not whole documents (JIT retrieval)
 - [ ] **TOOLS-02**: Tools return verbatim span-IDs so a finding's quote is *selected* from the source, never authored by the model (prevents citation drift)
+- [ ] **TOOLS-03**: Findings are emitted **only** through an `emit_finding` tool whose input validation re-resolves the cited span against the corpus and **rejects the call with a typed, self-correcting error** when the quote is not byte-identical, is not unique, was never retrieved this session, or carries no rule citation — grounding enforced at the tool boundary, not audited downstream
+- [ ] **TOOLS-04**: Tool results exceeding a size threshold are persisted to disk and returned as a bounded preview plus a re-openable handle; over-large `get_section` requests **fail with a narrow-your-range error rather than truncating** (a truncated result costs ~25k tokens, an error costs ~100 bytes)
 
 ### Agentic Loop
 
 - [ ] **AGENT-01**: Detection runs as a model-driven, model-agnostic tool loop (reviewer requests evidence → reasons → requests more → stops on done/budget), replacing the one-shot pre-rendered call
 - [ ] **AGENT-02**: An orchestrator decomposes a review into objectives and fans out isolated sub-agents that each return a distilled, cited finding set
-- [ ] **AGENT-03**: Hard per-run budgets and a circuit breaker are enforced in code (stop conditions are code gates, not prompt instructions)
+- [ ] **AGENT-03**: Hard per-run budgets and a circuit breaker are enforced in code (stop conditions are code gates, not prompt instructions), **plus a diminishing-returns stop** — N consecutive steps yielding negligible new grounded evidence halts the loop before the ceiling, so budget is spent on progress rather than circling
 
 ### Grounding & Verification
 
@@ -53,8 +56,10 @@
 
 ### Cost Governor
 
-- [ ] **COST-01**: A prompt-cache stable prefix + escalating context compaction let one agent reason over a corpus larger than the context window
+- [ ] **COST-01**: A prompt-cache stable prefix + escalating context compaction let one agent reason over a corpus larger than the context window. **Cache-stability invariant:** nothing dynamic (rule lists, corpus manifests, document counts) may live in the system prompt or tool schemas — dynamic content goes in messages, or every corpus change busts the whole cached prefix
 - [ ] **COST-02**: Cheap-model triage + per-run budget ceilings keep cost scaling with docs that need deep reasoning, not raw corpus size
+- [ ] **COST-03**: Compaction clears **tool results (evidence) only — never reasoning or emitted findings** — retains the N most recent results, and **freezes every replacement decision by span-ID** so re-rendered turns are byte-identical. This is what makes the recall invariant survive compaction: the agent keeps what it concluded even after the bulk evidence is shed, and can re-open any shed span by handle
+- [ ] **COST-04**: Re-retrieving an unchanged span returns a "still current, refer to your earlier retrieval" stub instead of the full text (read deduplication)
 
 ## v2 Requirements
 
@@ -102,8 +107,11 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 | RULES-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 | RULES-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 | RULES-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| RULES-05 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 | TOOLS-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 | TOOLS-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| TOOLS-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| TOOLS-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 | AGENT-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
 | AGENT-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
 | GROUND-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
@@ -117,15 +125,19 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 | GROUND-02 | Phase 5 — Grounded Adversarial Verifier | Pending |
 | COST-01 | Phase 6 — Cost Governor | Pending |
 | COST-02 | Phase 6 — Cost Governor | Pending |
+| COST-03 | Phase 6 — Cost Governor | Pending |
+| COST-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 
 **Coverage:**
-- v1 requirements: 25 total *(the earlier "24" undercounted by one; the enumerated IDs above total 25 — INGEST 3 + RULES 4 + TOOLS 2 + AGENT 3 + GROUND 3 + DETECT 5 + EVAL 3 + COST 2)*
-- Mapped to phases: 25 ✓
+- v1 requirements: 30 total *(INGEST 3 + RULES 5 + TOOLS 4 + AGENT 3 + GROUND 3 + DETECT 5 + EVAL 3 + COST 4 = 30)*
+- Mapped to phases: 30 ✓
 - Unmapped: 0 ✓
 - Duplicates (mapped to >1 phase): 0 ✓
 
-**Per-phase distribution:** Phase 0 → 3 · Phase 1 → 3 · Phase 2 → 6 · Phase 3 → 6 · Phase 4 → 4 · Phase 5 → 1 · Phase 6 → 2 (= 25).
+**Per-phase distribution:** Phase 0 → 3 · Phase 1 → 3 · Phase 2 → 10 · Phase 3 → 6 · Phase 4 → 4 · Phase 5 → 1 · Phase 6 → 3 (= 30).
+
+**Note on category-vs-phase:** requirement prefixes are *categories*, not phases. Several categories split across phases by design — GROUND-01/03 land in Phase 3 while GROUND-02 lands in Phase 5; COST-04 lands in Phase 2 (it is tool-layer behavior) while COST-01/02/03 land in Phase 6.
 
 ---
 *Requirements defined: 2026-07-30*
-*Last updated: 2026-07-30 after roadmap creation (traceability populated, count corrected 24 → 25)*
+*Last updated: 2026-07-30 — +6 requirements (RULES-05, TOOLS-03/04, COST-03/04, AGENT-03 amended) derived from reading the Claude Code source; count 25 → 31*
