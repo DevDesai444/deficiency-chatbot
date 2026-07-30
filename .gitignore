@@ -36,6 +36,10 @@ Sample Data/
 *.sqlite
 *.faiss
 
+# Eval harness CLI run output (regenerated every `python -m evals.run score|run` -- not source)
+docs/eval/last_metrics.json
+docs/eval/last_run_metrics.json
+
 # Model checkpoints / weights
 checkpoints/
 weights/
