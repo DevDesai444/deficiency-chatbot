@@ -31,6 +31,8 @@ dependencies = [
     "databricks-sql-connector>=3.1",
     # observability
     "structlog>=24.1",
+    # config / data-driven CTD-family registry (src/ingest/registry imports yaml)
+    "pyyaml>=6.0",
 ]
 
 [dependency-groups]
