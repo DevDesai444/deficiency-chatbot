@@ -16,10 +16,15 @@ from dataclasses import dataclass, field
 
 from evals.schema import GroundTruthDeficiency
 
-# Numeric/identifier runs (e.g. "11477", "0.15", "05/10/2016") -- min length 3 by construction
-# (1 leading digit + >=2 more from the class). Word regex requires >=6 letters (e.g.
-# "degradants") so short common words ("data", "table") never masquerade as a distinctive anchor.
-_TOKEN_RE = re.compile(r"[0-9][0-9.\/]{2,}")
+# Numeric/identifier runs (e.g. "11477", "0.15", "05/10/2016") -- min length 4 by construction
+# (1 leading digit + >=3 more from the class), mirroring agents.detection.verify._anchored's own
+# `len(n) >= 4` verbatim-anchoring floor. A 3-char floor let a bare "0.5" (a generic RSD/limit
+# value reused throughout the document for unrelated measurements) count as "distinctive" and
+# false-match an unrelated GT item; 4 chars is the shortest floor that still keeps both real
+# pinned anchors ("11477", "0.15") matchable while excluding that class of coincidence.
+# Word regex requires >=6 letters (e.g. "degradants") so short common words ("data", "table")
+# never masquerade as a distinctive anchor either.
+_TOKEN_RE = re.compile(r"[0-9][0-9.\/]{3,}")
 _WORD_RE = re.compile(r"[a-z]{6,}")
 
 
@@ -49,17 +54,33 @@ def _anchor_tokens(anchor: str) -> list[str]:
 
 
 def finding_text(fault: dict) -> str:
-    """Normalized concatenation of the fields a finding could carry its anchor in."""
+    """Normalized concatenation of the fields a finding could carry its anchor in.
+
+    General-purpose text view of a finding (used e.g. by callers that want the whole narrative,
+    not just its quoted evidence). `matches()` deliberately does NOT use this -- see its
+    docstring for why the anchor check itself is scoped to `evidence` alone.
+    """
     return _norm(" ".join([fault.get("evidence", ""), fault.get("title", ""), fault.get("detail", "")]))
 
 
 def matches(fault: dict, gt: GroundTruthDeficiency) -> bool:
-    """True iff every distinctive anchor token of `gt` appears verbatim in `fault`'s text.
+    """True iff every distinctive anchor token of `gt` appears verbatim in `fault["evidence"]`.
 
     Requires >=1 token (an anchor with none is never deterministically matchable -- it will
     always count as FN, which is correct: the matcher only credits what it can prove). When the
     anchor yields 2+ tokens, ALL must appear -- this is what stops a single common number (e.g.
     "0.6") from matching every deficiency that happens to share it.
+
+    Checks `fault["evidence"]` only -- NOT title/detail -- mirroring `agents.detection.verify`'s
+    own real precedent (`_anchored(f.evidence, corpus)` never anchors off title/detail either).
+    `evidence` is the field `Fault` itself documents as "verbatim span ... the finding rests
+    on"; title/detail are narrative prose that routinely restates a document's own recurring
+    vocabulary (e.g. "Absorptivity Factor", "Any Unspecified Impurity") across many *different*
+    findings on the same general topic -- concatenating them in, as this module's
+    `finding_text()` does for general use, was measured to credit several unrelated GT items
+    with a false match purely on shared terminology. Scoping the check to the finding's own
+    quoted evidence keeps the matcher code-grounded per the plan's objective: a finding is only
+    credited for the specific fact it actually cites, not for discussing the same topic.
 
     Does not check `gt.doc_id` -- that scoping happens in `score()`, which knows the run's
     `doc_id`; a bare `Fault` dict has no doc_id field of its own to compare against.
@@ -67,8 +88,8 @@ def matches(fault: dict, gt: GroundTruthDeficiency) -> bool:
     tokens = _anchor_tokens(gt.evidence_anchor)
     if not tokens:
         return False
-    text = finding_text(fault)
-    return all(tok in text for tok in tokens)
+    evidence_text = _norm(fault.get("evidence", ""))
+    return all(tok in evidence_text for tok in tokens)
 
 
 @dataclass

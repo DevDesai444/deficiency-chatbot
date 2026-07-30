@@ -46,6 +46,19 @@ class TestAnchorTokens:
         # anchor before tokenizing, or "11477 12601" would collapse into one merged digit run.
         assert _anchor_tokens("11477 12601") == ["11477", "12601"]
 
+    def test_three_char_numeric_anchor_yields_no_token(self):
+        # Regression guard (found scoring the golden fixture against the real 28-item GT set):
+        # a bare 3-char number like "0.5" is a generic RSD/limit value reused for unrelated
+        # measurements throughout the document. The floor is 4 chars, matching
+        # agents.detection.verify._anchored's own `len(n) >= 4` convention, so an anchor built
+        # entirely from a sub-4-char number yields zero tokens (never deterministically
+        # matchable) instead of false-matching on every unrelated occurrence of that number.
+        assert _anchor_tokens("0.5%") == []
+
+    def test_four_char_numeric_anchor_is_still_a_token(self):
+        # The real pinned C-02 anchor sits exactly at the floor and must remain matchable.
+        assert _anchor_tokens("0.15") == ["0.15"]
+
     def test_short_common_word_is_not_a_token(self):
         assert _anchor_tokens("data table") == []
 
@@ -84,6 +97,22 @@ class TestMatches:
             "detail": "",
         }
         assert matches(fault, C02)
+
+    def test_anchor_token_present_only_in_title_or_detail_does_not_match(self):
+        # Regression guard (found scoring the golden fixture): matching must be scoped to
+        # `evidence` alone, mirroring agents.detection.verify's real `_anchored(f.evidence,
+        # corpus)` precedent. Title/detail are narrative prose that routinely restates a
+        # document's own recurring vocabulary across many *different* findings on the same
+        # general topic -- crediting a match off title/detail let unrelated findings that merely
+        # *discuss* Absorptivity Factor / Any Unspecified Impurity false-match GT items that were
+        # really about a different specific claim.
+        word_anchor_gt = _gt("C-06x", "Absorptivity Factor")
+        fault = {
+            "evidence": "Table 11: AFs = 0.40, 1.03, 0.96",
+            "title": "Absorptivity Factors in Table 11 are not derived from the linearity slopes",
+            "detail": "The text states AF is calculated from Absorptivity Factor tables.",
+        }
+        assert not matches(fault, word_anchor_gt)
 
     def test_paraphrase_with_no_anchor_tokens_does_not_match(self):
         fault = {
