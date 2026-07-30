@@ -1,0 +1,282 @@
+[
+  {
+    "id": "A-01",
+    "doc_id": "mvr1381",
+    "title": "Estradiol USP RS potency 99.9% used without the required water-content / anhydrous-basis correction",
+    "evidence_anchor": "99.9%",
+    "failure_family": "absence_of_evidence",
+    "confidence": "certain",
+    "section_hint": "§1.2 / Appendix 1",
+    "tp_required": false
+  },
+  {
+    "id": "A-02",
+    "doc_id": "mvr1381",
+    "title": "Diluent chromatogram cross-referenced as 'No Interference' in Table 2 is not peak-free; no disregard limit is defined",
+    "evidence_anchor": "13439",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "certain",
+    "section_hint": "Table 2 / Appendix 6",
+    "tp_required": false
+  },
+  {
+    "id": "A-03",
+    "doc_id": "mvr1381",
+    "title": "Specificity: 3 of 5 solution types the report says were analysed (incl. the control sample) have no reported result",
+    "evidence_anchor": "control sample",
+    "failure_family": "absence_of_evidence",
+    "confidence": "certain",
+    "section_hint": "§1.4.1 / Table 2",
+    "tp_required": false
+  },
+  {
+    "id": "A-04",
+    "doc_id": "mvr1381",
+    "title": "Specificity shown only by spiking with 3 known impurities; no degradation samples despite the report's own definition invoking degradants",
+    "evidence_anchor": "degradants",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "§1.4.1",
+    "tp_required": false
+  },
+  {
+    "id": "A-05",
+    "doc_id": "mvr1381",
+    "title": "Linearity judged on correlation coefficient alone; large negative intercepts and low-end response-factor depression are never evaluated",
+    "evidence_anchor": "377.49",
+    "failure_family": "derivation_plausibility",
+    "confidence": "likely",
+    "section_hint": "Table 3",
+    "tp_required": false
+  },
+  {
+    "id": "A-06",
+    "doc_id": "mvr1381",
+    "title": "The statistic reported as 'Co-relation Coefficient' in Tables 3 and 6 is r-squared, not the correlation coefficient the criterion specifies",
+    "evidence_anchor": "Co-relation Coefficient",
+    "failure_family": "derivation_plausibility",
+    "confidence": "likely",
+    "section_hint": "Table 3 / Table 6",
+    "tp_required": false
+  },
+  {
+    "id": "A-07",
+    "doc_id": "mvr1381",
+    "title": "Demonstrated linearity range (to 150% of individual limits) does not cover the 0.5% Total Impurities specification",
+    "evidence_anchor": "0.5%",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "§1.1 / §1.4.2",
+    "tp_required": false
+  },
+  {
+    "id": "A-08",
+    "doc_id": "mvr1381",
+    "title": "Accuracy is not included as a verification parameter; the only recovery data are at a single concentration level (incl. the LOQ-specific accuracy gap vs. the method's own definition)",
+    "evidence_anchor": "specification level",
+    "failure_family": "regulatory_framing",
+    "confidence": "likely",
+    "section_hint": "§1.1 / §1.4.4 / Table 13",
+    "tp_required": false
+  },
+  {
+    "id": "A-09",
+    "doc_id": "mvr1381",
+    "title": "USP <1226> (verification of compendial procedures) is invoked for a method the report itself calls a vendor-DMF procedure distinct from the USP method",
+    "evidence_anchor": "<1226>",
+    "failure_family": "regulatory_framing",
+    "confidence": "certain",
+    "section_hint": "§1.1",
+    "tp_required": false
+  },
+  {
+    "id": "A-10",
+    "doc_id": "mvr1381",
+    "title": "Non-compendial impurity working standards: chromatographic area-percent purity used as assigned potency, ignoring reported water content",
+    "evidence_anchor": "0.92%",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "§1.2 / Appendix 3",
+    "tp_required": false
+  },
+  {
+    "id": "A-11",
+    "doc_id": "mvr1381",
+    "title": "The verification protocol and the governing SOP are referenced but never identified by number or version",
+    "evidence_anchor": "current in-house SOP",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "§1.1 / §1.3",
+    "tp_required": false
+  },
+  {
+    "id": "A-12",
+    "doc_id": "mvr1381",
+    "title": "The report's issue date (May 02, 2016) precedes the preparer's and QA approver's signature dates",
+    "evidence_anchor": "05/10/2016",
+    "failure_family": "regulatory_framing",
+    "confidence": "likely",
+    "section_hint": "Approval page",
+    "tp_required": false
+  },
+  {
+    "id": "B-01",
+    "doc_id": "mvr1381",
+    "title": "LOD and LOQ were not derived from the standard deviation of the response as stated; both are pre-set 10%/20% dilutions of the specification level (LOQ = 2 x LOD)",
+    "evidence_anchor": "10%LOD-LOQLevel",
+    "failure_family": "derivation_plausibility",
+    "confidence": "certain",
+    "section_hint": "§1.4.3 / §1.4.4 / Appendix 9-10",
+    "tp_required": false
+  },
+  {
+    "id": "B-02",
+    "doc_id": "mvr1381",
+    "title": "No supporting data (sigma, slope, S/N, or a dilution series) is presented for the LOD/LOQ determination",
+    "evidence_anchor": "standard deviation of the response",
+    "failure_family": "absence_of_evidence",
+    "confidence": "certain",
+    "section_hint": "§1.4.3 / §1.4.4",
+    "tp_required": false
+  },
+  {
+    "id": "B-03",
+    "doc_id": "mvr1381",
+    "title": "Unexplained gross outlier retained in the LOD precision data set (Estradiol injection #6 = 389); it alone produces the reported 18.9% RSD",
+    "evidence_anchor": "389",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "certain",
+    "section_hint": "Table 8",
+    "tp_required": false
+  },
+  {
+    "id": "B-04",
+    "doc_id": "mvr1381",
+    "title": "Absorptivity factors were calculated from only 3 of the 7 linearity levels (60/100/150%), and the omission is undisclosed",
+    "evidence_anchor": "6559.876",
+    "failure_family": "derivation_plausibility",
+    "confidence": "certain",
+    "section_hint": "Table 11",
+    "tp_required": false
+  },
+  {
+    "id": "B-05",
+    "doc_id": "mvr1381",
+    "title": "The absorptivity factor is strongly concentration-dependent (up to 27% spread) yet a single value is adopted with no acceptance criterion",
+    "evidence_anchor": "27.0%",
+    "failure_family": "derivation_plausibility",
+    "confidence": "likely",
+    "section_hint": "§1.4.5 / Table 11",
+    "tp_required": false
+  },
+  {
+    "id": "B-06",
+    "doc_id": "mvr1381",
+    "title": "Sensitivity solution stated as injected in §1.4.6.1 has no reported result or acceptance criterion; its area (485) is below the LOD-level mean (629)",
+    "evidence_anchor": "485",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "§1.4.6.1 / Appendix 13",
+    "tp_required": false
+  },
+  {
+    "id": "B-07",
+    "doc_id": "mvr1381",
+    "title": "LOQ precision is marginal for 3 of 4 analytes (within ~1.3 points of the 10% limit); no evidence the chosen LOQ level is robust",
+    "evidence_anchor": "9.83",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "Table 10",
+    "tp_required": false
+  },
+  {
+    "id": "B-08",
+    "doc_id": "mvr1381",
+    "title": "Method precision was never demonstrated for the 'Any Unspecified Impurity' and 'Total Impurities' specification attributes",
+    "evidence_anchor": "Any Unspecified Impurity",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "Table 13 / Table 15",
+    "tp_required": false
+  },
+  {
+    "id": "C-01",
+    "doc_id": "mvr1381",
+    "title": "Table 20 'Maximum' theoretical plates cell is wrong (11477 reported; the true maximum of the tabulated rows is 12601)",
+    "evidence_anchor": "11477",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "certain",
+    "section_hint": "Table 20",
+    "tp_required": true
+  },
+  {
+    "id": "C-02",
+    "doc_id": "mvr1381",
+    "title": "Unspecified impurity of 0.15% is reported as meeting the NMT 0.10% limit in the equivalency study, and the section concludes equivalency",
+    "evidence_anchor": "0.15",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "certain",
+    "section_hint": "Table 19 / §1.4.8",
+    "tp_required": true
+  },
+  {
+    "id": "C-03",
+    "doc_id": "mvr1381",
+    "title": "The two methods are not 'comparable' for the single largest unspecified impurity: 0.15% by USP method vs. not detected in-house",
+    "evidence_anchor": "ND",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "likely",
+    "section_hint": "Table 19",
+    "tp_required": false
+  },
+  {
+    "id": "C-04",
+    "doc_id": "mvr1381",
+    "title": "Table 19 is internally inconsistent for the USP method: total impurities (0.14%) is lower than the single largest unspecified impurity (0.15%)",
+    "evidence_anchor": "0.14",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "likely",
+    "section_hint": "Table 19",
+    "tp_required": false
+  },
+  {
+    "id": "C-05",
+    "doc_id": "mvr1381",
+    "title": "The §1.4.7 conclusion asserts solutions were 'stored at room temperature,' a condition documented nowhere in the study description",
+    "evidence_anchor": "room temperature",
+    "failure_family": "absence_of_evidence",
+    "confidence": "likely",
+    "section_hint": "§1.4.7",
+    "tp_required": false
+  },
+  {
+    "id": "C-06",
+    "doc_id": "mvr1381",
+    "title": "§1.5 Conclusions omits Limit of Detection, Limit of Quantitation, Absorptivity Factor, and System Suitability while claiming complete coverage",
+    "evidence_anchor": "Absorptivity Factor",
+    "failure_family": "regulatory_framing",
+    "confidence": "likely",
+    "section_hint": "§1.5",
+    "tp_required": false
+  },
+  {
+    "id": "C-07",
+    "doc_id": "mvr1381",
+    "title": "§1.4.9's conclusion claims system suitability across the 'entire verification study' but Table 20 omits the solution-stability runs",
+    "evidence_anchor": "entire verification study",
+    "failure_family": "regulatory_framing",
+    "confidence": "likely",
+    "section_hint": "§1.4.9 / Table 20",
+    "tp_required": false
+  },
+  {
+    "id": "D-01",
+    "doc_id": "mvr1381",
+    "title": "Table 17's notebook-page citation differs between the report body (Notebook 8133, p.56) and Table 1 (Notebook 8133, p.46)",
+    "evidence_anchor": "45, 56",
+    "failure_family": "cross_reference_integrity",
+    "confidence": "certain",
+    "section_hint": "Table 17 / Table 1",
+    "tp_required": false
+  }
+]
