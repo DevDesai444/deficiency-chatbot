@@ -58,7 +58,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 - [x] 01-06-PLAN.md — Span-anchor re-open/verify primitive + (table_id,row,col) cell addressing
 - [x] 01-07-PLAN.md — Coverage manifest (statuses + availability tiers) + resumable content-hash store
 - [x] 01-08-PLAN.md — Content classifier: deterministic-first + measured LLM escalation
-- [ ] 01-09-PLAN.md — Corpus orchestrator + CLI shell + eval-harness DOCX seam
+- [x] 01-09-PLAN.md — Corpus orchestrator + CLI shell + eval-harness DOCX seam
 
 ### Phase 2: Retrieval, Navigation Tools & Rulebook
 **Goal**: The agent has hands — five deterministic navigation tools that return **identifiers and verbatim spans, never whole documents** — over a hybrid-retrieval corpus index and an FDA/ICH rulebook it can consult like a reviewer reading the rulebook. Landing the rulebook here (before the spike) isolates the go/no-go loop risk from external-sourcing risk.
