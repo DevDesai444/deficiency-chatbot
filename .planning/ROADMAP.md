@@ -31,7 +31,11 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
   2. Running the harness reports per-stage metrics **separately**: retrieval recall@k, parse fidelity, anchor rate, verifier precision/recall, and end-to-end precision/recall **broken down by failure family** (absence-of-evidence, derivation-plausibility, cross-reference integrity, regulatory-framing).
   3. Any filter or change can be run through a **"zero true-positives-lost"** gate that fails loudly if a known real deficiency disappears from the output.
   4. The harness runs as a repeatable CI-style command and records baseline recall-by-family numbers, establishing the measured starting point every later phase must beat.
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 00-01-PLAN.md — Eval-set schema + the 28-item estradiol ground truth, family-tagged (EVAL-01)
+- [ ] 00-02-PLAN.md — Ground-truth breadth: planted-deficiency DOCX + held-out spec PDF (EVAL-01)
+- [ ] 00-03-PLAN.md — Deterministic scorer: per-stage + by-failure-family metrics from a captured run (EVAL-02)
+- [ ] 00-04-PLAN.md — Zero-true-positives-lost gate + CI-style command + committed baseline (EVAL-03)
 **Research flag**: Ground-truth breadth (multi-doc-type + PDF/DOCX + held-out corpus) is real de-risking work — schedule the expansion inside this phase.
 
 ### Phase 1: Ingestion Foundation
@@ -113,7 +117,7 @@ Phase 0 (Eval Harness) is also the **continuous gate**: its recall-by-family met
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 0. Eval Harness | 0 / TBD | Not started | - |
+| 0. Eval Harness | 0 / 4 | Not started | - |
 | 1. Ingestion Foundation | 0 / TBD | Not started | - |
 | 2. Retrieval, Navigation Tools & Rulebook | 0 / TBD | Not started | - |
 | 3. Drive-Loop Spike (GO/NO-GO) | 0 / TBD | Not started | - |
