@@ -41,7 +41,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 ### Phase 1: Ingestion Foundation
 **Goal**: The system ingests an arbitrary, deeply-nested directory of mixed PDF+DOCX documents — content-classified and uncapped — into one unified structured document model with a navigable corpus index. This is the substrate swap: one document → an ingested corpus.
 **Depends on**: Phase 0 (eval harness gates parse fidelity)
-**Requirements**: INGEST-01, INGEST-02, INGEST-03
+**Requirements**: INGEST-01, INGEST-02, INGEST-03, INGEST-04, INGEST-05
 **Success Criteria** (what must be TRUE):
   1. Pointing the system at an arbitrarily nested folder of mixed PDF and DOCX files ingests **every** document with no count or depth cap, and each is classified by **content** — renaming or reorganizing folders does not change what gets ingested or how it is classified (rename-folders regression test passes).
   2. A DOCX document parses into the **identical** structured document model used for PDFs, and the same parse-fidelity suite (merged cells, multi-page tables, borderless tables) passes on both paths — emitting a typed `ParseFailed` rather than passing a corrupt table downstream.

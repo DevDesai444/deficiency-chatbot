@@ -11,7 +11,9 @@
 
 - [ ] **INGEST-01**: System ingests an arbitrary deeply-nested directory of PDF + DOCX documents with no document-count cap, classifying each document by content (never by folder name)
 - [ ] **INGEST-02**: System parses DOCX into the same unified structured document model used for PDFs (alongside the existing PDF/OCR path)
-- [ ] **INGEST-03**: System builds a per-submission corpus index and a coverage manifest of what the corpus contains
+- [ ] **INGEST-03**: System builds a per-submission corpus index and a coverage manifest of what the corpus contains — including a per-document **availability contract** (canonical text + span-IDs guaranteed; section outline and table addressing best-effort) and typed statuses `parsed / parsed_partial / parse_failed / unsupported`, so downstream phases read capability from the manifest instead of discovering it at runtime
+- [ ] **INGEST-04**: Ingestion emits the **span-anchor substrate** every later phase grounds on: one canonical normalized text stream per document, a retained canonical→raw offset map, a versioned normalizer, stable content-addressed span-IDs (`{doc_id, start, end}` + substring hash), and a **re-open/verify primitive** that returns both the raw and canonical substrings for a span-ID or fails on hash mismatch. (Anchors are an ingestion property; Phase 2's `TOOLS-02` span-ID contract and `TOOLS-03` emit gate are built on this, not alongside it.)
+- [ ] **INGEST-05**: Every reconstructed table cell is **addressable** — serialized into the canonical text so it carries an ordinary span-ID, and resolvable through a `(table_id, row, col)` index, with merged cells resolving identically from every coordinate they span and serialization order deterministic and version-stamped. (Phase 5's "code recomputation over two verbatim cells" and Phase 4's X1/X2 cell-level comparisons have no substrate without this.)
 
 ### Rulebook (FDA/ICH retrievable reference)
 
@@ -103,6 +105,8 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 | INGEST-01 | Phase 1 — Ingestion Foundation | Pending |
 | INGEST-02 | Phase 1 — Ingestion Foundation | Pending |
 | INGEST-03 | Phase 1 — Ingestion Foundation | Pending |
+| INGEST-04 | Phase 1 — Ingestion Foundation | Pending |
+| INGEST-05 | Phase 1 — Ingestion Foundation | Pending |
 | RULES-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 | RULES-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 | RULES-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
@@ -129,12 +133,12 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 | COST-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
 
 **Coverage:**
-- v1 requirements: 30 total *(INGEST 3 + RULES 5 + TOOLS 4 + AGENT 3 + GROUND 3 + DETECT 5 + EVAL 3 + COST 4 = 30)*
-- Mapped to phases: 30 ✓
+- v1 requirements: 32 total *(INGEST 5 + RULES 5 + TOOLS 4 + AGENT 3 + GROUND 3 + DETECT 5 + EVAL 3 + COST 4 = 32)*
+- Mapped to phases: 32 ✓
 - Unmapped: 0 ✓
 - Duplicates (mapped to >1 phase): 0 ✓
 
-**Per-phase distribution:** Phase 0 → 3 · Phase 1 → 3 · Phase 2 → 10 · Phase 3 → 6 · Phase 4 → 4 · Phase 5 → 1 · Phase 6 → 3 (= 30).
+**Per-phase distribution:** Phase 0 → 3 · Phase 1 → 5 · Phase 2 → 10 · Phase 3 → 6 · Phase 4 → 4 · Phase 5 → 1 · Phase 6 → 3 (= 32).
 
 **Note on category-vs-phase:** requirement prefixes are *categories*, not phases. Several categories split across phases by design — GROUND-01/03 land in Phase 3 while GROUND-02 lands in Phase 5; COST-04 lands in Phase 2 (it is tool-layer behavior) while COST-01/02/03 land in Phase 6.
 
