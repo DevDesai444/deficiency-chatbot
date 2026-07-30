@@ -88,17 +88,44 @@ Explicitly excluded (anti-features). Documented to prevent scope creep.
 
 ## Traceability
 
-Populated during roadmap creation — each v1 requirement maps to exactly one phase.
+Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for phase detail and success criteria. Phases execute 0 → 6; Phase 0 (Eval Harness) also runs continuously as the gate on every later phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| _(to be filled by roadmapper)_ | — | Pending |
+| EVAL-01 | Phase 0 — Eval Harness | Pending |
+| EVAL-02 | Phase 0 — Eval Harness | Pending |
+| EVAL-03 | Phase 0 — Eval Harness | Pending |
+| INGEST-01 | Phase 1 — Ingestion Foundation | Pending |
+| INGEST-02 | Phase 1 — Ingestion Foundation | Pending |
+| INGEST-03 | Phase 1 — Ingestion Foundation | Pending |
+| RULES-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| RULES-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| RULES-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| RULES-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| TOOLS-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| TOOLS-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| AGENT-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| AGENT-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| GROUND-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| GROUND-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| DETECT-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| DETECT-04 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| AGENT-02 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
+| DETECT-01 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
+| DETECT-02 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
+| DETECT-05 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
+| GROUND-02 | Phase 5 — Grounded Adversarial Verifier | Pending |
+| COST-01 | Phase 6 — Cost Governor | Pending |
+| COST-02 | Phase 6 — Cost Governor | Pending |
 
 **Coverage:**
-- v1 requirements: 24 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 24 ⚠️
+- v1 requirements: 25 total *(the earlier "24" undercounted by one; the enumerated IDs above total 25 — INGEST 3 + RULES 4 + TOOLS 2 + AGENT 3 + GROUND 3 + DETECT 5 + EVAL 3 + COST 2)*
+- Mapped to phases: 25 ✓
+- Unmapped: 0 ✓
+- Duplicates (mapped to >1 phase): 0 ✓
+
+**Per-phase distribution:** Phase 0 → 3 · Phase 1 → 3 · Phase 2 → 6 · Phase 3 → 6 · Phase 4 → 4 · Phase 5 → 1 · Phase 6 → 2 (= 25).
 
 ---
 *Requirements defined: 2026-07-30*
-*Last updated: 2026-07-30 after initial definition*
+*Last updated: 2026-07-30 after roadmap creation (traceability populated, count corrected 24 → 25)*
