@@ -52,7 +52,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 **Plans**: 9 plans
 - [x] 01-01-PLAN.md — Test infrastructure + committed merged-cell DOCX fixture (Wave 0 foundation)
 - [x] 01-02-PLAN.md — Canonical-text/span-ID schema + reading-order serializer + security limits
-- [ ] 01-03-PLAN.md — Normalizer + reversible offset map (RISK-1 offset round-trip gate)
+- [x] 01-03-PLAN.md — Normalizer + reversible offset map (RISK-1 offset round-trip gate)
 - [ ] 01-04-PLAN.md — DOCX parser converging on the PDF dict + section-splitter guard
 - [x] 01-05-PLAN.md — Data-driven CTD-family registry + D-05 enum→registry migration
 - [ ] 01-06-PLAN.md — Span-anchor re-open/verify primitive + (table_id,row,col) cell addressing
