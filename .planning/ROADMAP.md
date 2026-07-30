@@ -51,7 +51,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
   6. Ingestion declares a per-document **availability contract** — canonical text + span-IDs guaranteed for anything that parses; section outline and table addressing best-effort — so downstream phases read capability from the manifest instead of discovering it at runtime. A flat, structureless document still grounds; it is simply reported as having no outline.
 **Plans**: 9 plans
 - [x] 01-01-PLAN.md — Test infrastructure + committed merged-cell DOCX fixture (Wave 0 foundation)
-- [ ] 01-02-PLAN.md — Canonical-text/span-ID schema + reading-order serializer + security limits
+- [x] 01-02-PLAN.md — Canonical-text/span-ID schema + reading-order serializer + security limits
 - [ ] 01-03-PLAN.md — Normalizer + reversible offset map (RISK-1 offset round-trip gate)
 - [ ] 01-04-PLAN.md — DOCX parser converging on the PDF dict + section-splitter guard
 - [ ] 01-05-PLAN.md — Data-driven CTD-family registry + D-05 enum→registry migration
