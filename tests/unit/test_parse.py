@@ -75,3 +75,24 @@ class TestValidationPDF:
         sections = split_document(extract_pdf(VALIDATION_PDF))
         for s in sections:
             assert len(s["text"]) > 0
+
+
+def test_flat_text_ocr_tagged_and_preserved():
+    """The flat-text OCR compat branch preserves the text AND tags source='rapidocr-flat-text'
+    (D-17 regression insurance); a boxed payload yields source='rapidocr'. No network/samples."""
+    import fitz
+
+    from parse.ocr import _reconstruct_prediction
+
+    doc = fitz.open()
+    page = doc.new_page()
+    # flat-text payload: a plain string NOT starting with "[" -> flat-text compat branch
+    res = _reconstruct_prediction("Total impurities 0.14%", page)
+    assert isinstance(res, tuple) and len(res) == 5
+    assert res[0] == "Total impurities 0.14%"      # text PRESERVED (dropping it would fail here)
+    assert res[4] == "rapidocr-flat-text"          # degradation is an explicit FACT
+    # boxed payload -> normal source
+    boxed = [{"text": "X", "x0": 0, "y0": 0, "x1": 10, "y1": 10, "score": 1.0}]
+    res2 = _reconstruct_prediction(boxed, page)
+    assert res2[4] == "rapidocr"
+    doc.close()

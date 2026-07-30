@@ -44,7 +44,10 @@ _RENDER_DPI = 200
 _FIGURE_MIN_GAP = 6.0
 _CAPTION_RE = re.compile(r"\b(figure|appendix|table)\b", re.IGNORECASE)
 
-OcrResult = tuple[str, list[ExtractedTable], list[LayoutBlock], list[LayoutFigure]]
+# 5th element = ocr_source FACT: "rapidocr" (boxed/healthy or genuinely blank) or
+# "rapidocr-flat-text" (old-endpoint flat-text compat branch: text preserved, tables/boxes lost).
+# The corpus reads this fact to mark parsed_partial (D-17) -- never inferred from empty blocks.
+OcrResult = tuple[str, list[ExtractedTable], list[LayoutBlock], list[LayoutFigure], str]
 
 
 def is_scanned_page(page: fitz.Page) -> bool:
@@ -94,7 +97,7 @@ def ocr_page(page: fitz.Page) -> OcrResult | None:
         return None
 
     if not predictions:
-        return "", [], [], []
+        return "", [], [], [], "rapidocr"
     return _reconstruct_prediction(predictions[0], page)
 
 
@@ -119,7 +122,9 @@ def _reconstruct_prediction(payload, page: fitz.Page) -> OcrResult | None:
             except json.JSONDecodeError:
                 records = None
         if records is None:
-            return payload, [], [], []  # old endpoint: flat text, no boxes
+            # old endpoint: flat text, no boxes. PRESERVE the text; tag the degradation as a FACT
+            # so the corpus marks the doc parsed_partial (D-17) rather than inferring from emptiness.
+            return payload, [], [], [], "rapidocr-flat-text"
     else:
         # Unexpected payload shape -> fall back to the embedded text layer.
         log.warning("ocr_unexpected_payload", page=page_number, payload_type=type(payload).__name__)
@@ -128,13 +133,13 @@ def _reconstruct_prediction(payload, page: fitz.Page) -> OcrResult | None:
     scale = 72.0 / _RENDER_DPI  # image pixels @ _RENDER_DPI -> PDF points
     regions = _regions_from_records(records, scale)
     if not regions:
-        return "", [], [], []
+        return "", [], [], [], "rapidocr"
 
     blocks, tables = reconstruct_ocr_page(regions, page_number)
     mark_header_footer(blocks, page.rect.height)
     figures = _detect_figures(regions, page, page_number)
     text = blocks_to_text(blocks, tables)
-    return text, tables, blocks, figures
+    return text, tables, blocks, figures, "rapidocr"
 
 
 def _regions_from_records(records, scale: float) -> list[OCRRegion]:

@@ -222,7 +222,8 @@ def extract_pdf(path: str | Path) -> dict:
             source = "rapidocr"
             ocr_result = ocr_page(page)
             if ocr_result is not None:
-                text, ocr_tables, blocks, figures = ocr_result
+                text, ocr_tables, blocks, figures, ocr_source = ocr_result
+                source = ocr_source  # "rapidocr" (boxed/blank) or "rapidocr-flat-text" (degraded, text kept)
                 # find_tables() finds nothing on a scan (grid lines are pixels, not
                 # vectors), so these reconstructed tables are all this page has.
                 tables = tables + ocr_tables
