@@ -495,7 +495,7 @@ def open_span(span: SpanID, doc) -> tuple[str, str]:      # doc = loaded cache e
 | A5 | PDF digital tables in the eval corpus are rectangular enough that merged-cell RISK is DOCX-provable and PDF-best-effort suffices for SC2 | Pitfall 4 / Validation | Medium — if a flagship X1 PDF has merged headers, PDF addressing must improve or that doc is table-tier best-effort. Reported honestly per D-30. |
 | A6 | eCFR/ICH corpus (Phase 2) is a suitable source for the domain-term half of the lexicon | Code Examples | Low — it's additive; the general wordlist stands alone if the corpus isn't ready. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where does the span-ID hash sit — over canonical or raw substring?**
    - What we know: D-19 says "content-hash of the exact substring"; offsets are over the canonical stream; D-21 re-open verifies the hash and returns both layers.

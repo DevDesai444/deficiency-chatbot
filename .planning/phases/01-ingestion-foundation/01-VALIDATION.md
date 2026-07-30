@@ -1,8 +1,8 @@
 ---
 phase: 1
 slug: ingestion-foundation
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-30
 ---
@@ -101,11 +101,13 @@ Ingestion parses **untrusted** drug-submission files. The planner MUST include a
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (7 test files + merged-cell DOCX fixture + DOCX eval path)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+> **Design-time gate (plan approval) — closed.** `nyquist_compliant: true` attests the validation *strategy* is sound: every task carries an endpoint-free automated `<acceptance_criteria>` command that execute-plan runs as a per-task hard gate. `wave_0_complete` stays **false** until Plan 01 (Wave 1) actually builds the `tests/ingest/` scaffolding + fixtures — that flag flips at execution, and the "Wave 0 Requirements" checklist above tracks those execution artifacts (legitimately unchecked pre-execution).
 
-**Approval:** pending
+- [x] All tasks have `<acceptance_criteria>` automated verify or Wave 0 dependencies (checker-confirmed, all 20 tasks)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (7 test files + merged-cell DOCX fixture + DOCX eval path — all in Plan 01)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
+
+**Approval:** approved 2026-07-30 (plan-checker: 0 blockers)
