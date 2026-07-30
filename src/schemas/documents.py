@@ -61,8 +61,8 @@ class LayoutBlock(BaseModel):
     """
     role: str = "paragraph"  # paragraph | page_header | page_footer | caption | list_item
     text: str = ""
-    bbox: Bbox = (0.0, 0.0, 0.0, 0.0)
-    page: int = 0
+    bbox: Bbox | None = (0.0, 0.0, 0.0, 0.0)  # None on DOCX (D-20) -- never synthetic; PDF fills it as provenance
+    page: int | None = 0                       # None on DOCX (D-20) -- never synthetic; PDF fills it as provenance
     reading_order: int = 0
     confidence: float = 1.0
     style: TextStyle | None = None
@@ -71,8 +71,8 @@ class LayoutBlock(BaseModel):
 
 class LayoutFigure(BaseModel):
     """A figure located on the page. Caption + bbox only -- the image is not interpreted."""
-    bbox: Bbox = (0.0, 0.0, 0.0, 0.0)
-    page: int = 0
+    bbox: Bbox | None = (0.0, 0.0, 0.0, 0.0)  # None on DOCX (D-20) -- never synthetic; PDF fills it as provenance
+    page: int | None = 0                       # None on DOCX (D-20) -- never synthetic; PDF fills it as provenance
     caption: str = ""
     image_ref: str = ""       # PDF image xref on digital pages; "" on scans
     confidence: float = 1.0
@@ -88,9 +88,12 @@ class ExtractedTable(BaseModel):
     title: str = ""
     headers: list[str] = Field(default_factory=list)
     rows: list[list[str]] = Field(default_factory=list)
-    page: int = 0
+    page: int | None = 0  # None on DOCX (D-20) -- never synthetic; PDF fills it as provenance
     # structured-layout additions
     kind: str = "grid"                                      # "grid" | "key_value"
+    table_id: str = ""     # stable per-doc table id (D-31); "" until minted by the parser/serializer
+    # "r,c" (a covered NON-origin coordinate) -> [origin_row, origin_col]; empty when no merges (D-31)
+    merged_origins: dict[str, list[int]] = Field(default_factory=dict)
     pairs: list[TablePair] = Field(default_factory=list)    # populated when kind == "key_value"
     bbox: Bbox | None = None
     n_cols: int = 0
@@ -116,3 +119,65 @@ class ChunkGroup(BaseModel):
     """A set of sections grouped for one review pass."""
     group_id: str
     sections: list[ParsedSection]
+
+
+# --- Phase-1 span-anchor substrate (D-18..D-24, D-31) ------------------------
+# These types are the interface contract every later phase grounds on. Phase 1
+# builds the substrate (canonical text + span-IDs + re-open primitive); Phase 2
+# builds the agent-facing tools on top (D-21).
+
+class SpanID(BaseModel):
+    """A content-addressed span identity: a char range over the CANONICAL stream (D-19).
+
+    Identity is the (doc_id, start, end) triple over canonical text -- NOT geometry,
+    NOT raw offsets (D-18/D-19). `hash` is a short content-hash of canonical[start:end]
+    bound to the normalizer version, so re-opening a shifted/tampered stream fails loudly.
+    """
+    doc_id: str
+    start: int          # char offset over the CANONICAL stream (D-19) -- NOT raw, NOT geometry
+    end: int
+    hash: str           # short content-hash of canonical[start:end] + normalizer_version
+
+
+class OffsetRun(BaseModel):
+    """One run of the canonical<->raw alignment map (D-23).
+
+    Each run maps a contiguous canonical slice to its originating raw slice so the
+    RAW source substring (the citation, D-22) is always reconstructable from a
+    canonical span. `kind` records which normalization op produced the run.
+    """
+    canon_start: int
+    canon_len: int
+    raw_start: int
+    raw_len: int
+    kind: str           # "equal" | "compose" | "collapse" | "delete" | "expand"
+
+
+class NormalizedText(BaseModel):
+    """The per-document canonical text + its reversible map back to raw serialized text.
+
+    `canonical` is the normalized matching/addressing stream; `raw_serialized` is the
+    reading-order pre-normalization text (the citation source, D-22, D-32). `offset_map`
+    is the retained canonical->raw alignment (D-23). Both versions are stamped so a
+    normalizer/serializer change is detectable and migratable, never a silent offset
+    shift (D-24).
+    """
+    canonical: str = ""
+    raw_serialized: str = ""
+    offset_map: list[OffsetRun] = Field(default_factory=list)
+    normalizer_version: str = ""
+    serializer_version: str = ""
+
+
+class DocClassification(BaseModel):
+    """Content-driven document classification output (D-01..D-03, D-29).
+
+    Emits a free-form label + optional CTD-family guess + a RAW confidence score with
+    NO threshold applied (D-03), plus the resolving tier and the span that triggered
+    the class (D-29) so per-tier calibration is possible downstream.
+    """
+    label: str = ""                 # free-form inferred document type (D-01)
+    family_guess: str = ""          # optional CTD-family registry id, "" if none (D-01/D-02)
+    confidence: float = 0.0         # raw continuous score, NO threshold applied (D-03)
+    tier: str = ""                  # "regex" | "lexicon" | "llm" (D-29)
+    triggering_span: SpanID | None = None   # span that triggered the class (D-29)
