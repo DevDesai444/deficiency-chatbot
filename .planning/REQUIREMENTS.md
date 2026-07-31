@@ -17,18 +17,18 @@
 
 ### Rulebook (FDA/ICH retrievable reference)
 
-- [ ] **RULES-01**: System ingests eCFR Title 21 (public-domain XML) as the retrievable rulebook backbone
-- [ ] **RULES-02**: System ingests ICH guidelines into the rulebook (storing the required copyright acknowledgment with each chunk)
-- [ ] **RULES-03**: System ingests FDA guidances (via regulations.gov) for the topics the eval set exercises
-- [ ] **RULES-04**: Every rule chunk is stored with `{source, citation, version/date, license, url}` metadata
-- [ ] **RULES-05**: The rulebook exposes a compact **requirement index** (citation + one-line applicability trigger) separate from full rule text, so the agent can *enumerate* what a submission must contain rather than only semantically searching what it does contain — the mechanism absence-of-evidence detection depends on; full rule text is fetched on demand (progressive disclosure)
+- [x] **RULES-01**: System ingests eCFR Title 21 (public-domain XML) as the retrievable rulebook backbone
+- [x] **RULES-02**: System ingests ICH guidelines into the rulebook (storing the required copyright acknowledgment with each chunk)
+- [x] **RULES-03**: System ingests FDA guidances (via regulations.gov) for the topics the eval set exercises
+- [x] **RULES-04**: Every rule chunk is stored with `{source, citation, version/date, license, url}` metadata
+- [x] **RULES-05**: The rulebook exposes a compact **requirement index** (citation + one-line applicability trigger) separate from full rule text, so the agent can *enumerate* what a submission must contain rather than only semantically searching what it does contain — the mechanism absence-of-evidence detection depends on; full rule text is fetched on demand (progressive disclosure)
 
 ### Navigation Tools
 
-- [ ] **TOOLS-01**: Agent has general tools — `search_corpus`, `open_doc`, `get_section`, `follow_reference`, `read_guideline` — that return identifiers/snippets, not whole documents (JIT retrieval)
-- [ ] **TOOLS-02**: Tools return verbatim span-IDs so a finding's quote is *selected* from the source, never authored by the model (prevents citation drift)
-- [ ] **TOOLS-03**: Findings are emitted **only** through an `emit_finding` tool whose input validation re-resolves the cited span against the corpus and **rejects the call with a typed, self-correcting error** when the quote is not byte-identical, is not unique, was never retrieved this session, or carries no rule citation — grounding enforced at the tool boundary, not audited downstream
-- [ ] **TOOLS-04**: Tool results exceeding a size threshold are persisted to disk and returned as a bounded preview plus a re-openable handle; over-large `get_section` requests **fail with a narrow-your-range error rather than truncating** (a truncated result costs ~25k tokens, an error costs ~100 bytes)
+- [x] **TOOLS-01**: Agent has general tools — `search_corpus`, `open_doc`, `get_section`, `follow_reference`, `read_guideline` — that return identifiers/snippets, not whole documents (JIT retrieval)
+- [x] **TOOLS-02**: Tools return verbatim span-IDs so a finding's quote is *selected* from the source, never authored by the model (prevents citation drift)
+- [x] **TOOLS-03**: Findings are emitted **only** through an `emit_finding` tool whose input validation re-resolves the cited span against the corpus and **rejects the call with a typed, self-correcting error** when the quote is not byte-identical, is not unique, was never retrieved this session, or carries no rule citation — grounding enforced at the tool boundary, not audited downstream
+- [x] **TOOLS-04**: Tool results exceeding a size threshold are persisted to disk and returned as a bounded preview plus a re-openable handle; over-large `get_section` requests **fail with a narrow-your-range error rather than truncating** (a truncated result costs ~25k tokens, an error costs ~100 bytes)
 
 ### Agentic Loop
 
@@ -61,7 +61,7 @@
 - [ ] **COST-01**: A prompt-cache stable prefix + escalating context compaction let one agent reason over a corpus larger than the context window. **Cache-stability invariant:** nothing dynamic (rule lists, corpus manifests, document counts) may live in the system prompt or tool schemas — dynamic content goes in messages, or every corpus change busts the whole cached prefix
 - [ ] **COST-02**: Cheap-model triage + per-run budget ceilings keep cost scaling with docs that need deep reasoning, not raw corpus size
 - [ ] **COST-03**: Compaction clears **tool results (evidence) only — never reasoning or emitted findings** — retains the N most recent results, and **freezes every replacement decision by span-ID** so re-rendered turns are byte-identical. This is what makes the recall invariant survive compaction: the agent keeps what it concluded even after the bulk evidence is shed, and can re-open any shed span by handle
-- [ ] **COST-04**: Re-retrieving an unchanged span returns a "still current, refer to your earlier retrieval" stub instead of the full text (read deduplication)
+- [x] **COST-04**: Re-retrieving an unchanged span returns a "still current, refer to your earlier retrieval" stub instead of the full text (read deduplication)
 
 ## v2 Requirements
 
@@ -107,15 +107,15 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 | INGEST-03 | Phase 1 — Ingestion Foundation | Pending |
 | INGEST-04 | Phase 1 — Ingestion Foundation | Pending |
 | INGEST-05 | Phase 1 — Ingestion Foundation | Pending |
-| RULES-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
-| RULES-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
-| RULES-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
-| RULES-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
-| RULES-05 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
-| TOOLS-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
-| TOOLS-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
-| TOOLS-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
-| TOOLS-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| RULES-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| RULES-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| RULES-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| RULES-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| RULES-05 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| TOOLS-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| TOOLS-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| TOOLS-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| TOOLS-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
 | AGENT-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
 | AGENT-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
 | GROUND-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
@@ -130,7 +130,7 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 | COST-01 | Phase 6 — Cost Governor | Pending |
 | COST-02 | Phase 6 — Cost Governor | Pending |
 | COST-03 | Phase 6 — Cost Governor | Pending |
-| COST-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Pending |
+| COST-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
 
 **Coverage:**
 - v1 requirements: 32 total *(INGEST 5 + RULES 5 + TOOLS 4 + AGENT 3 + GROUND 3 + DETECT 5 + EVAL 3 + COST 4 = 32)*

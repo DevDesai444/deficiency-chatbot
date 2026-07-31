@@ -1,6 +1,20 @@
-# Phase 2 — Senior-Reviewer Verification Queue
+# Phase 2 — Senior-Reviewer Verification Queue → Phase-3 Entry Gating
 
-Items the senior reviewer must resolve at **phase verification** (none block plan execution; recorded during 02-06 finalize and Wave 3). Phase verification does NOT auto-run — it waits for the senior reviewer.
+**Phase 2 VERIFIED (passed, `02-VERIFICATION.md`).** Senior-reviewer disposition of the items below:
+
+| Item | Disposition |
+|---|---|
+| **5** (RULES-05 enumerate→fetch→emit) | **RESOLVED** (`9c1f191`, 15/15 e2e) |
+| **2** → **P1** (3.2.S.5 real-ingestion classification proof) | **PHASE-3 EXECUTION PRECONDITION** — must be green before the drive loop runs (it corrupts the recall number Phase 3 measures). **Runs AFTER P2** (the 3.2.S.5 classification signal may itself sit on the OCR-less scanned pages P2 recovers). |
+| **1** → **P2** (SC4 7/12 — reclassified: PARSE gap, not retrieval) | **PHASE-3 EXECUTION PRECONDITION** — `src/parse/pdf.py` drops the embedded text layer on OCR-less scanned pages (the parsed_partial-honesty gap from Phase 1); fix recovers the 5 anchors, lifts SC4 toward 12/12, update SC4 baseline. **NOT an override — fixing the cause.** |
+| **code-review 2** (scoped to un-crossed-boundary hunt) | **ENTRY CRITERION into Phase-3 execution** — not a style pass; hunt for more enumerate→X / build→Y / classify→Z chains unit-tested each side but never composed on real data (3 found this phase). |
+| **3** (LFS), **4** (rulebook FAISS rebuild) | tracked hygiene, non-blocking |
+
+**Gate:** Phase-3 execution starts only after P1 + P2 green AND senior-reviewer confirm. Phase-3 *planning* (`/gsd-discuss-phase 3`) may proceed in parallel now.
+
+---
+
+Original recorded items (detail retained below):
 
 ## 1. Requirement-index 3.2.S.5 classification assumption (integration proof)
 The D-RI1(2) traceability test (14/14) passes against **hardcoded manifests** that assume `mvr1381` and `spec32s41` classify to family **3.2.S.5** (reference-standard content). A green test proves *"IF the profile includes 3.2.S.5, the CFR entries fire"* — it does NOT prove real ingestion tags these docs 3.2.S.5.
