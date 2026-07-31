@@ -2,6 +2,15 @@
 post-v1. Fetches eCFR/ICH/FDA sources, parses each into the unified document-dict contract,
 flows every source through the SAME Phase-1 substrate a submission uses, and persists via
 rulebook.store.write_chunk. One bad source becomes a recorded skip, never a crashed build (D-16).
+
+OFFLINE-FIRST (D-RB6): every build_* function checks the COMMITTED rulebook/** snapshot path
+first. When that file already exists on disk, the build reads/parses it locally -- NO network
+call -- so a clean checkout of this repo (CI, a fresh worktree, tests) can rebuild the local
+chunk store deterministically from the vendored snapshot alone. A live fetch only happens in
+"vendoring mode": the source file is genuinely missing (first-time vendoring of a new source).
+Every build_* function also accepts an optional `(cache_dir, db_path)` pair so a caller (tests)
+can target an ISOLATED store instead of the shared default `data/` store, and `update_manifest`
+to opt out of writing to the committed `rulebook/manifest.yaml` when building into such a store.
 """
 from __future__ import annotations
 
@@ -55,8 +64,19 @@ def fetch_ecfr_part(part: str, title: str = "21") -> tuple[str, str]:
 
 
 def _ingest_and_persist(
-    doc_dict: dict, doc_id: str, citation: str, source: str, version: str, license_text: str, url: str
+    doc_dict: dict,
+    doc_id: str,
+    citation: str,
+    source: str,
+    version: str,
+    license_text: str,
+    url: str,
+    cache_dir: str | None = None,
+    db_path: str | None = None,
 ) -> RuleChunk:
+    """cache_dir/db_path are OPTIONAL -- None (the default) forwards nothing to write_chunk, so
+    it falls back to its own module defaults (the shared data/ store). Pass both to target an
+    ISOLATED store instead (e.g. a tmp_path-scoped store for tests, D-RB6)."""
     raw, _cell_ranges = serialize_document(doc_dict)
     nt = normalize(raw, serializer_version=SERIALIZER_VERSION)
     span = mint_span(nt.canonical, 0, len(nt.canonical), doc_id, nt.normalizer_version)
@@ -65,7 +85,12 @@ def _ingest_and_persist(
         license=license_text, url=url, span=span,
         normalizer_version=nt.normalizer_version, serializer_version=nt.serializer_version,
     )
-    write_chunk(chunk, nt)
+    write_kwargs = {}
+    if cache_dir is not None:
+        write_kwargs["cache_dir"] = cache_dir
+    if db_path is not None:
+        write_kwargs["db_path"] = db_path
+    write_chunk(chunk, nt, **write_kwargs)
     return chunk
 
 
@@ -80,33 +105,66 @@ def _save_manifest_rows(rows: list[dict]) -> None:
     MANIFEST_PATH.write_text(yaml.safe_dump(rows, sort_keys=False))
 
 
-def build_ecfr(parts: tuple[str, ...] = ECFR_PARTS) -> list[dict]:
+def _prior_manifest_row(rows: list[dict], source: str, citation: str) -> dict | None:
+    for row in rows:
+        if row.get("source") == source and row.get("citation") == citation and "error" not in row:
+            return row
+    return None
+
+
+def build_ecfr(
+    parts: tuple[str, ...] = ECFR_PARTS,
+    cache_dir: str | None = None,
+    db_path: str | None = None,
+    update_manifest: bool = True,
+) -> list[dict]:
     out_dir = RULEBOOK_DIR / "ecfr" / "title-21"
     out_dir.mkdir(parents=True, exist_ok=True)
-    rows = [r for r in _load_manifest_rows() if r.get("source") != "ecfr"]
+    manifest_rows = _load_manifest_rows()
+    rows = [r for r in manifest_rows if r.get("source") != "ecfr"]
     ecfr_public_domain_notice = "Public domain (17 U.S.C. 105 -- U.S. Government work; no copyright)."
     for part in parts:
         try:
-            xml_text, edition_date = fetch_ecfr_part(part)
             part_path = out_dir / f"part-{part}.xml"
-            part_path.write_text(xml_text, encoding="utf-8")
+            citation_guess = f"21 CFR Part {part}"
+            if part_path.exists():
+                # OFFLINE: build from the committed snapshot, no network call. The edition date
+                # + URL are recovered from the manifest row recorded when this exact XML was
+                # vendored -- a deterministic re-build from the snapshot (D-RB2), never a
+                # fabricated date. Falls back to a self-describing placeholder only if the
+                # snapshot's own manifest record is unexpectedly absent.
+                xml_text = part_path.read_text(encoding="utf-8")
+                prior = _prior_manifest_row(manifest_rows, "ecfr", citation_guess)
+                edition_date = prior["version"] if prior else "offline (no prior manifest record)"
+                url = (
+                    prior["url"]
+                    if prior
+                    else f"https://www.ecfr.gov/api/versioner/v1/full/{edition_date}/title-21.xml?part={part}"
+                )
+            else:
+                xml_text, edition_date = fetch_ecfr_part(part)  # vendoring mode: file missing, fetch once
+                part_path.write_text(xml_text, encoding="utf-8")
+                url = f"https://www.ecfr.gov/api/versioner/v1/full/{edition_date}/title-21.xml?part={part}"
             sections = parse_ecfr_sections(xml_text, part)
-            url = f"https://www.ecfr.gov/api/versioner/v1/full/{edition_date}/title-21.xml?part={part}"
             for doc_dict, citation in sections:
                 # doc_id derived deterministically from the citation string, e.g.
                 # "21 CFR 211.166" -> "ecfr-211.166"; "21 CFR Part 11" -> "ecfr-Part-11".
                 # No two sections within one part share a citation, so no collision risk.
                 doc_id = "ecfr-" + citation.replace("21 CFR ", "").replace(" ", "-")
-                _ingest_and_persist(doc_dict, doc_id, citation, "ecfr", edition_date, ecfr_public_domain_notice, url)
+                _ingest_and_persist(
+                    doc_dict, doc_id, citation, "ecfr", edition_date, ecfr_public_domain_notice, url,
+                    cache_dir=cache_dir, db_path=db_path,
+                )
             rows.append({
-                "source": "ecfr", "citation": f"21 CFR Part {part}", "version": edition_date,
+                "source": "ecfr", "citation": citation_guess, "version": edition_date,
                 "license": ecfr_public_domain_notice, "url": url, "sha256": _sha256(xml_text.encode("utf-8")),
                 "path": str(part_path), "section_count": len(sections),
             })
         except Exception as exc:  # noqa: BLE001 -- one bad part must never abort the other 6 (D-16)
             rows.append({"source": "ecfr", "citation": f"21 CFR Part {part}", "error": str(exc)[:300]})
             continue
-    _save_manifest_rows(rows)
+    if update_manifest:
+        _save_manifest_rows(rows)
     return rows
 
 
@@ -143,41 +201,64 @@ def _fetch_pdf_bytes(url: str) -> bytes:
         return _get_with_retry(client, url).content
 
 
-def build_ich() -> list[dict]:
+def build_ich(
+    cache_dir: str | None = None,
+    db_path: str | None = None,
+    update_manifest: bool = True,
+) -> list[dict]:
     rows = [r for r in _load_manifest_rows() if r.get("source") != "ich"]
     for doc_id, citation, version, url, rel_path in ICH_GUIDELINES:
         try:
             path = Path(rel_path)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            data = _fetch_pdf_bytes(url)
-            path.write_bytes(data)
+            if path.exists():
+                data = path.read_bytes()  # OFFLINE: build from the committed snapshot, no network
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                data = _fetch_pdf_bytes(url)  # vendoring mode: source file missing, fetch once
+                path.write_bytes(data)
             parsed = extract_pdf(path)   # REUSE verbatim -- ordinary PDF, no new parser
-            _ingest_and_persist(parsed, f"ich-{doc_id}", citation, "ich", version, ICH_LEGAL_NOTICE, url)
+            _ingest_and_persist(
+                parsed, f"ich-{doc_id}", citation, "ich", version, ICH_LEGAL_NOTICE, url,
+                cache_dir=cache_dir, db_path=db_path,
+            )
             rows.append({"source": "ich", "citation": citation, "version": version, "license": "ICH_LEGAL_NOTICE (applied uniformly, see src/rulebook/build.py -- stored regardless of whether the source PDF embeds its own copy, Pitfall 4)",
                         "url": url, "sha256": _sha256(data), "path": rel_path})
         except Exception as exc:  # noqa: BLE001
             rows.append({"source": "ich", "citation": citation, "error": str(exc)[:300]})
             continue
-    _save_manifest_rows(rows)
+    if update_manifest:
+        _save_manifest_rows(rows)
     return rows
 
 
-def build_fda() -> list[dict]:
+def build_fda(
+    cache_dir: str | None = None,
+    db_path: str | None = None,
+    update_manifest: bool = True,
+) -> list[dict]:
     rows = [r for r in _load_manifest_rows() if r.get("source") != "fda"]
     doc_id, citation, url, rel_path = FDA_GUIDANCE
     try:
         path = Path(rel_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        data = _fetch_pdf_bytes(url)
-        path.write_bytes(data)
+        if path.exists():
+            data = path.read_bytes()  # OFFLINE: build from the committed snapshot, no network
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            data = _fetch_pdf_bytes(url)  # vendoring mode: source file missing, fetch once
+            path.write_bytes(data)
         parsed = extract_pdf(path)
-        _ingest_and_persist(parsed, doc_id, citation, "fda", "current as vendored", "U.S. Government work -- public domain (17 U.S.C. 105).", url)
+        _ingest_and_persist(
+            parsed, doc_id, citation, "fda", "current as vendored",
+            "U.S. Government work -- public domain (17 U.S.C. 105).", url,
+            cache_dir=cache_dir, db_path=db_path,
+        )
         rows.append({"source": "fda", "citation": citation, "version": "current as vendored",
                     "license": "U.S. Government work -- public domain (17 U.S.C. 105).",
                     "url": url, "sha256": _sha256(data), "path": rel_path})
     except Exception as exc:  # noqa: BLE001
         rows.append({"source": "fda", "citation": citation, "error": str(exc)[:300]})
-    _save_manifest_rows(rows)
+    if update_manifest:
+        _save_manifest_rows(rows)
     return rows
 
 
