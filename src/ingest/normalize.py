@@ -253,11 +253,18 @@ def canon_range_to_raw(offset_map: list[OffsetRun], cs: int, ce: int) -> tuple[i
         re_ = run_j.raw_start + (ce - run_j.canon_start)
     else:
         re_ = run_j.raw_start + run_j.raw_len
-    # absorb trailing deletion runs (raw-contiguous) that follow run j
-    k = j + 1
-    while k < len(offset_map) and offset_map[k].canon_len == 0:
-        re_ = offset_map[k].raw_start + offset_map[k].raw_len
-        k += 1
+    # Absorb trailing deletion runs (raw-contiguous) that follow run j -- but ONLY when ce lands
+    # exactly on run_j's canonical right edge. Without this guard the loop unconditionally walks
+    # forward whenever ANY zero-canon run happens to follow run_j in the run list, even when ce
+    # sits deep inside a large equal run far from its own boundary -- silently snapping the end
+    # of the raw span out to wherever the run's next deletion (and beyond) happens to be, instead
+    # of interpolating (the END-boundary bug, D-22). Interpolation for a probe strictly inside a
+    # run (any kind) never needs to see past run_j at all.
+    if ce == run_j.canon_start + run_j.canon_len:
+        k = j + 1
+        while k < len(offset_map) and offset_map[k].canon_len == 0:
+            re_ = offset_map[k].raw_start + offset_map[k].raw_len
+            k += 1
     return (rs, re_)
 
 

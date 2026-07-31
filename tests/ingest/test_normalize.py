@@ -82,6 +82,52 @@ def test_offset_roundtrip_dropped_hyphen_returns_hyphen():
     assert "-" in r[rs:re] and "\n" in r[rs:re], (repr(r[rs:re]),)
 
 
+def test_canon_range_to_raw_tightness_inside_equal_run():
+    """TIGHTNESS (D-22 END-boundary bugfix): a probe range fully inside one `equal` run must
+    give raw_len == canon_len -- i.e. the raw span is exactly as wide as the canonical span,
+    never wider. Containment alone (rs<=re<=len(raw)) let a END-boundary bug through Phase 1:
+    the trailing-deletion-absorption loop in canon_range_to_raw walked forward past run_j
+    whenever ANY zero-canon run followed it in the run list, even when the probe's end sat deep
+    inside a large equal run far from that run's own boundary -- silently snapping the raw end
+    out to wherever the next unrelated deletion happened to be instead of interpolating.
+    """
+    rng = random.Random(20260731)
+    for _ in range(200):
+        r = _random_raw(rng)
+        nt = normalize(r)
+        canon = nt.canonical
+        if not canon:
+            continue
+        for run in nt.offset_map:
+            if run.kind != "equal" or run.canon_len < 2:
+                continue
+            # probe a sub-range strictly inside this equal run (never touching its boundary)
+            lo = rng.randint(0, run.canon_len - 2)
+            hi = rng.randint(lo + 1, run.canon_len - 1)
+            cs, ce = run.canon_start + lo, run.canon_start + hi
+            rs, re = canon_range_to_raw(nt.offset_map, cs, ce)
+            assert re - rs == ce - cs, (repr(r), run, cs, ce, rs, re)
+
+
+def test_canon_range_to_raw_front_edit_probe_middle_regression():
+    """Regression fixture (RESEARCH: containment let this through Phase 1): one dehyphenation
+    edit at the FRONT of a long string produces a small equal run followed by one large
+    coalesced equal run; if the run list ALSO has a later edit further down (e.g. another
+    dehyphenation near the tail), probing a range fully inside the MIDDLE of the large equal
+    run must stay tight -- it must not "absorb" the far-away trailing edit.
+    """
+    raw = "co-\nvalent bond " + ("X" * 40000) + "y-\nz"
+    nt = normalize(raw)
+    big_run = max((r for r in nt.offset_map if r.kind == "equal"), key=lambda r: r.canon_len)
+    assert big_run.canon_len > 39000, big_run  # sanity: this IS the big front-coalesced run
+    cs, ce = big_run.canon_start + 1000, big_run.canon_start + 1130
+    rs, re = canon_range_to_raw(nt.offset_map, cs, ce)
+    assert (re - rs) == (ce - cs) == 130, (rs, re)
+    assert re < big_run.raw_start + big_run.raw_len, (
+        "raw end leaked past the probe into the tail of the run / beyond it", rs, re
+    )
+
+
 def test_raw_range_to_canon_inverse_on_equal_runs():
     r = "hello world assay"
     nt = normalize(r)
