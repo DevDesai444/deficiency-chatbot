@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import json
 
-from databricks.delta import _escape, _run_sql, _table
-from rulebook.store import all_chunks, read_chunk_nt
+import numpy as np
+
+from databricks.delta import _escape, _rows_from_result, _run_sql, _table
+from rulebook.store import RuleChunk, all_chunks, read_chunk_nt
 
 
 def _ensure_rulebook_tables() -> None:
@@ -49,3 +51,57 @@ def push_chunks_to_delta() -> int:
             f"INSERT INTO {emb_table} (doc_id, embedding) VALUES ({_escape(chunk.doc_id)}, {_escape(json.dumps(emb.tolist()))})"
         )
     return len(chunks)
+
+
+# NOTE (plan-checker Warning 1 / D-RB6 traceability): search_rulebook_databricks has ZERO
+# agent-facing tool consumers in Phase 2 -- mirrors the identical, already-documented deferral
+# on rulebook.store.rulebook_search (Plan 02-02, local leg of this SAME dispatch seam). It is
+# still REQUIRED here: D-RB2 locks the Databricks-side query capability as its own serving-layer
+# deliverable, independent of a consumer. Wiring either leg into an agent-facing tool is
+# DEFERRED to Phase-3 evidence, mirroring D-RB3's identical precedent-search deferral. Do not
+# delete this function for having no caller yet; it is locked-decision infrastructure.
+def search_rulebook_databricks(query_text: str, top_k: int) -> list[RuleChunk]:
+    from retrieval.vector_search import embed_query as _embed
+
+    query_emb = _embed(query_text)
+
+    emb_table, chunks_table = _table("rulebook_embeddings"), _table("rulebook_chunks")
+    emb_data = _run_sql(f"SELECT doc_id, embedding FROM {emb_table}")
+    emb_rows = _rows_from_result(emb_data)  # NEVER read data_array alone -- walks chunk pagination
+    if not emb_rows:
+        return []
+
+    doc_ids = [r["doc_id"] for r in emb_rows]
+    embeddings = np.array([json.loads(r["embedding"]) for r in emb_rows], dtype=np.float32)
+    q = query_emb.reshape(1, -1).astype(np.float32)
+    q_norm = q / (np.linalg.norm(q) + 1e-9)
+    e_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-9)
+    scores = (e_norm @ q_norm.T).flatten()
+    top_indices = np.argsort(scores)[::-1][:top_k]
+    top_ids = [doc_ids[i] for i in top_indices]
+
+    id_list = ", ".join(_escape(i) for i in top_ids)
+    chunk_data = _run_sql(f"SELECT * FROM {chunks_table} WHERE doc_id IN ({id_list})")
+    chunk_rows = {r["doc_id"]: r for r in _rows_from_result(chunk_data)}
+
+    from schemas.documents import SpanID
+
+    results = []
+    for doc_id in top_ids:
+        r = chunk_rows.get(doc_id)
+        if r is None:
+            continue
+        results.append(
+            RuleChunk(
+                doc_id=r["doc_id"],
+                citation=r["citation"],
+                source=r["source"],
+                version=r["version"],
+                license=r["license"],
+                url=r["url"],
+                span=SpanID.model_validate_json(r["span_json"]),
+                normalizer_version=r["normalizer_version"],
+                serializer_version=r["serializer_version"],
+            )
+        )
+    return results

@@ -8,12 +8,12 @@ conventions (config_module.get_settings monkeypatch) for consistency. Makes ZERO
 network calls -- no httpx/requests import is exercised un-mocked here, and no real .env
 Databricks credentials are required for this test to pass (D-RB6 HARD constraint).
 """
+
 from __future__ import annotations
 
 import config as config_module
 from config import Settings
 from rulebook import store
-
 from tests.rulebook.conftest import fixture_chunk
 
 

@@ -316,10 +316,18 @@ def test_rulebook_search_dense_leg_is_consulted_when_faiss_index_present(tmp_pat
     assert results[0].doc_id == chunk_a.doc_id  # lexical leg still ranks the substring match first
 
 
-def test_rulebook_search_databricks_dispatch_fails_loudly_not_silently(tmp_path, monkeypatch):
-    """is_databricks=True but src/databricks/rulebook.py does not exist yet (lands in Plan
-    02-08) -- must raise, never silently fall back to the local branch (D-RB6 / T-02-08)."""
+def test_rulebook_search_databricks_dispatch_routes_to_databricks_module(tmp_path, monkeypatch):
+    """is_databricks=True correctly dispatches into databricks.rulebook.search_rulebook_databricks
+    (Plan 02-08 landed the module) -- never silently falls back to the local branch (D-RB6 /
+    T-02-08). Superseded assumption: this test previously asserted ImportError/ModuleNotFoundError
+    because src/databricks/rulebook.py did not exist yet ("lands in Plan 02-08"); now that it
+    does, dispatch must be proven WITHOUT reaching real Databricks -- search_rulebook_databricks
+    is monkeypatched, mirroring tests/rulebook/test_databricks_dispatch.py's dedicated seam test
+    (Plan 02-08 Task 2, D-RB6 HARD offline constraint)."""
     monkeypatch.setattr(config_module, "get_settings", lambda: Settings(environment="databricks"))
+    chunk, _nt, _cache_dir, _db_path = fixture_chunk(tmp_path)
+    monkeypatch.setattr("databricks.rulebook.search_rulebook_databricks", lambda q, k: [chunk])
 
-    with pytest.raises((ImportError, ModuleNotFoundError)):
-        store.rulebook_search("stability testing", top_k=3)
+    results = store.rulebook_search("stability testing", top_k=3)
+
+    assert results == [chunk]
