@@ -35,6 +35,7 @@ dependencies = [
     "structlog>=24.1",
     # config / data-driven CTD-family registry (src/ingest/registry imports yaml)
     "pyyaml>=6.0",
+    "rank-bm25>=0.2.2",
 ]
 
 [dependency-groups]
