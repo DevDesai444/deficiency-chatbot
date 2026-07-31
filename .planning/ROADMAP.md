@@ -76,9 +76,9 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 **Plans**: 9 plans
 - [x] 02-01-PLAN.md — Tool layer foundation: RetrievalLedger + ToolRejected + textsplit + open_doc/get_section/follow_reference (TOOLS-01/02/04, COST-04, D-FR)
 - [x] 02-02-PLAN.md — Rulebook storage primitives: RuleChunk local store (SQLite+FAISS+BM25) + the generic edge table (RULES-04, D-RB3, D-RB6)
-- [ ] 02-03-PLAN.md — Rulebook sourcing: eCFR/ICH/FDA vendoring + build orchestration, real live-fetched content committed to rulebook/ (RULES-01/02/03/04, D-RB1, D-RB2, D-PREC)
-- [ ] 02-04-PLAN.md — search_corpus: local hybrid (FAISS+BM25+RRF) per-submission retrieval tool (TOOLS-01, D-RB5)
-- [ ] 02-05-PLAN.md — emit_finding: the dual byte-exact grounding gate, the only path a finding can exist through (TOOLS-03, D-EF1)
+- [x] 02-03-PLAN.md — Rulebook sourcing: eCFR/ICH/FDA vendoring + build orchestration, real live-fetched content committed to rulebook/ (RULES-01/02/03/04, D-RB1, D-RB2, D-PREC)
+- [x] 02-04-PLAN.md — search_corpus: local hybrid (FAISS+BM25+RRF) per-submission retrieval tool (TOOLS-01, D-RB5)
+- [x] 02-05-PLAN.md — emit_finding: the dual byte-exact grounding gate, the only path a finding can exist through (TOOLS-03, D-EF1)
 - [ ] 02-06-PLAN.md — Requirement index: loader gate + authored v1 data + edges + ground-truth traceability + senior-reviewer checkpoint (RULES-05, D-RI1, D-RB4)
 - [ ] 02-07-PLAN.md — Eval harness extension: real search_corpus-driven recall@k + retrieval-gate CI command + committed SC4 baseline (D-SC4)
 - [ ] 02-08-PLAN.md — Databricks rulebook serving: Delta population + client-side-cosine query, completing the two-backend dispatch (D-RB2, D-RB6)
