@@ -54,3 +54,52 @@
   sha256: 7fff122daf0a667920b359ce857373b6cf503e36c5b6d96b5537bac925ae9197
   path: rulebook/ecfr/title-21/part-11.xml
   section_count: 10
+- source: ich
+  citation: ICH Q2(R2)
+  version: '2023-11-30'
+  license: ICH_LEGAL_NOTICE (applied uniformly, see src/rulebook/build.py -- stored
+    regardless of whether the source PDF embeds its own copy, Pitfall 4)
+  url: https://database.ich.org/sites/default/files/ICH_Q2(R2)_Guideline_2023_1130.pdf
+  sha256: d935618fd3c51d2f063eec7a227d19da50db8b6cfe44f59d09ab43039ad6472c
+  path: rulebook/ich/Q2-R2_Guideline_2023-11-30.pdf
+- source: ich
+  citation: ICH Q3A(R2)
+  version: '2006-10-25'
+  license: ICH_LEGAL_NOTICE (applied uniformly, see src/rulebook/build.py -- stored
+    regardless of whether the source PDF embeds its own copy, Pitfall 4)
+  url: https://database.ich.org/sites/default/files/Q3A_R2__Guideline.pdf
+  sha256: e40ed73478c8d74773ab9352fc92340fb3f117b9322dd22cb46f6192bf710834
+  path: rulebook/ich/Q3A-R2_Guideline.pdf
+- source: ich
+  citation: ICH Q3B(R2)
+  version: '2006-06-02'
+  license: ICH_LEGAL_NOTICE (applied uniformly, see src/rulebook/build.py -- stored
+    regardless of whether the source PDF embeds its own copy, Pitfall 4)
+  url: https://database.ich.org/sites/default/files/Q3B(R2)%20Guideline.pdf
+  sha256: d84ddb26cc34e3d2c380abe12e9269d4bd8840ab1498144146464e484c755a20
+  path: rulebook/ich/Q3B-R2_Guideline.pdf
+- source: ich
+  citation: ICH Q6A
+  version: '1999-10-06'
+  license: ICH_LEGAL_NOTICE (applied uniformly, see src/rulebook/build.py -- stored
+    regardless of whether the source PDF embeds its own copy, Pitfall 4)
+  url: https://database.ich.org/sites/default/files/Q6A%20Guideline.pdf
+  sha256: a797b2a83c161c9a533ac17b899e6fa38bbec67e023ea56c664ceb53703b6b4a
+  path: rulebook/ich/Q6A_Guideline.pdf
+- source: fda
+  citation: 'FDA Guidance: Analytical Procedures and Methods Validation for Drugs
+    and Biologics'
+  version: current as vendored
+  license: U.S. Government work -- public domain (17 U.S.C. 105).
+  url: https://www.fda.gov/files/drugs/published/Analytical-Procedures-and-Methods-Validation-for-Drugs-and-Biologics.pdf
+  sha256: 40df8a1252d09f43da1d1928101bdf3a281217db63158a49e4229b2bfcfae20e
+  path: rulebook/fda/analytical-procedures-and-methods-validation-for-drugs-and-biologics.pdf
+- source: precedent
+  citation: ANDA-TDDS Deficiency Roadmap (precedent spreadsheet)
+  version: vendored as-is
+  license: internal
+  url: ''
+  sha256: df8663718613130f86201567b4218fa1f87154d9f2fb4fac4f6de8bdf5f834cc
+  path: rulebook/precedents/ANDA-TDDS-Deficiency-Roadmap.xlsm
+  note: 'D-PREC: schema audit + dedupe policy vs defpredict.main.deficiency_kb is
+    a senior-reviewer manual step, NOT performed here.'

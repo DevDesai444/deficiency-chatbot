@@ -15,6 +15,7 @@ import yaml
 from ingest.anchors import mint_span
 from ingest.normalize import NORMALIZER_VERSION, normalize
 from ingest.serialize import SERIALIZER_VERSION, serialize_document
+from parse.pdf import extract_pdf
 from rulebook.ecfr_parse import parse_ecfr_sections
 from rulebook.store import RuleChunk, rebuild_local_index, write_chunk
 
@@ -107,3 +108,103 @@ def build_ecfr(parts: tuple[str, ...] = ECFR_PARTS) -> list[dict]:
             continue
     _save_manifest_rows(rows)
     return rows
+
+
+# --- ICH + FDA + precedent vendoring (Task 3) ---------------------------------------------
+
+ICH_LEGAL_NOTICE = (
+    "This document is protected by copyright and may be used, reproduced, incorporated "
+    "into other works, adapted, modified, translated or distributed under a public license "
+    "provided that ICH's copyright in the document is acknowledged at all times. In case of "
+    "any adaption, modification or translation of the document, reasonable steps must be "
+    "taken to clearly label, demarcate or otherwise identify that changes were made to or "
+    "based on the original document. Any impression that the adaption, modification or "
+    "translation of the original document is endorsed or sponsored by the ICH must be avoided. "
+    "The document is provided \"as is\" without warranty of any kind. In no event shall the "
+    "ICH or the authors of the original document be liable for any claim, damages or other "
+    "liability arising from the use of the document. The above-mentioned permissions do not "
+    "apply to content supplied by third parties. Therefore, for documents where the copyright "
+    "vests in a third party, permission for reproduction must be obtained from this copyright holder."
+)
+
+ICH_GUIDELINES = [
+    ("Q2-R2", "ICH Q2(R2)", "2023-11-30", "https://database.ich.org/sites/default/files/ICH_Q2(R2)_Guideline_2023_1130.pdf", "rulebook/ich/Q2-R2_Guideline_2023-11-30.pdf"),
+    ("Q3A-R2", "ICH Q3A(R2)", "2006-10-25", "https://database.ich.org/sites/default/files/Q3A_R2__Guideline.pdf", "rulebook/ich/Q3A-R2_Guideline.pdf"),
+    ("Q3B-R2", "ICH Q3B(R2)", "2006-06-02", "https://database.ich.org/sites/default/files/Q3B(R2)%20Guideline.pdf", "rulebook/ich/Q3B-R2_Guideline.pdf"),
+    ("Q6A", "ICH Q6A", "1999-10-06", "https://database.ich.org/sites/default/files/Q6A%20Guideline.pdf", "rulebook/ich/Q6A_Guideline.pdf"),
+]
+FDA_GUIDANCE = ("fda-analytical-procedures", "FDA Guidance: Analytical Procedures and Methods Validation for Drugs and Biologics",
+               "https://www.fda.gov/files/drugs/published/Analytical-Procedures-and-Methods-Validation-for-Drugs-and-Biologics.pdf",
+               "rulebook/fda/analytical-procedures-and-methods-validation-for-drugs-and-biologics.pdf")
+
+
+def _fetch_pdf_bytes(url: str) -> bytes:
+    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+        return _get_with_retry(client, url).content
+
+
+def build_ich() -> list[dict]:
+    rows = [r for r in _load_manifest_rows() if r.get("source") != "ich"]
+    for doc_id, citation, version, url, rel_path in ICH_GUIDELINES:
+        try:
+            path = Path(rel_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            data = _fetch_pdf_bytes(url)
+            path.write_bytes(data)
+            parsed = extract_pdf(path)   # REUSE verbatim -- ordinary PDF, no new parser
+            _ingest_and_persist(parsed, f"ich-{doc_id}", citation, "ich", version, ICH_LEGAL_NOTICE, url)
+            rows.append({"source": "ich", "citation": citation, "version": version, "license": "ICH_LEGAL_NOTICE (applied uniformly, see src/rulebook/build.py -- stored regardless of whether the source PDF embeds its own copy, Pitfall 4)",
+                        "url": url, "sha256": _sha256(data), "path": rel_path})
+        except Exception as exc:  # noqa: BLE001
+            rows.append({"source": "ich", "citation": citation, "error": str(exc)[:300]})
+            continue
+    _save_manifest_rows(rows)
+    return rows
+
+
+def build_fda() -> list[dict]:
+    rows = [r for r in _load_manifest_rows() if r.get("source") != "fda"]
+    doc_id, citation, url, rel_path = FDA_GUIDANCE
+    try:
+        path = Path(rel_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = _fetch_pdf_bytes(url)
+        path.write_bytes(data)
+        parsed = extract_pdf(path)
+        _ingest_and_persist(parsed, doc_id, citation, "fda", "current as vendored", "U.S. Government work -- public domain (17 U.S.C. 105).", url)
+        rows.append({"source": "fda", "citation": citation, "version": "current as vendored",
+                    "license": "U.S. Government work -- public domain (17 U.S.C. 105).",
+                    "url": url, "sha256": _sha256(data), "path": rel_path})
+    except Exception as exc:  # noqa: BLE001
+        rows.append({"source": "fda", "citation": citation, "error": str(exc)[:300]})
+    _save_manifest_rows(rows)
+    return rows
+
+
+def vendor_precedent(src: str = "Sample Data/ANDA-TDDS-Deficiency Roadmap.xlsm",
+                     dest: str = "rulebook/precedents/ANDA-TDDS-Deficiency-Roadmap.xlsm") -> dict:
+    """D-PREC: VENDOR ONLY (copy + hash + manifest row). Do NOT parse, ingest, or dedupe here --
+    the schema-vs-deficiency_kb audit and dedupe policy are the senior reviewer's recorded
+    manual step (02-CONTEXT.md D-PREC), not executable work for this phase."""
+    src_path, dest_path = Path(src), Path(dest)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    data = src_path.read_bytes()
+    dest_path.write_bytes(data)
+    row = {"source": "precedent", "citation": "ANDA-TDDS Deficiency Roadmap (precedent spreadsheet)",
+          "version": "vendored as-is", "license": "internal", "url": "",
+          "sha256": _sha256(data), "path": dest, "note": "D-PREC: schema audit + dedupe policy vs defpredict.main.deficiency_kb is a senior-reviewer manual step, NOT performed here."}
+    rows = [r for r in _load_manifest_rows() if r.get("source") != "precedent"]
+    rows.append(row)
+    _save_manifest_rows(rows)
+    return row
+
+
+def main() -> int:
+    build_ecfr(); build_ich(); build_fda(); vendor_precedent()
+    rebuild_local_index()
+    print(f"rulebook build complete: {len(_load_manifest_rows())} manifest rows")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

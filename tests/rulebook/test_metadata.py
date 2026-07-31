@@ -1,19 +1,29 @@
-"""Tests for rulebook/manifest.yaml -- RULES-04 metadata completeness (Task 2 baseline; Task 3
-extends this file to assert the full 13-row manifest once ICH/FDA/precedent vendoring lands).
+"""Tests for rulebook/manifest.yaml -- RULES-04 metadata completeness.
 
-Offline, fixture-based: reads the COMMITTED rulebook/manifest.yaml from disk -- does NOT
-re-fetch network. This is deliberately not tmp_path-isolated like tests/rulebook/test_store.py:
-RULES-04 is a property of the ACTUAL vendored artifact this plan commits, not a synthetic
-fixture -- the manifest under test IS the one `git status` shows as tracked/staged.
+Offline, fixture-based: reads the COMMITTED rulebook/manifest.yaml (and, for the sha256 check,
+the committed vendored files it references) from disk -- does NOT re-fetch network. This is
+deliberately not tmp_path-isolated like tests/rulebook/test_store.py: RULES-04 is a property of
+the ACTUAL vendored artifact this plan commits, not a synthetic fixture -- the manifest under
+test IS the one `git status` shows as tracked/staged.
+
+Task 2 baseline: every-row metadata completeness (7 eCFR rows at that point). Task 3 extends
+this file with the full 13-row manifest check (sha256-verified against the actual committed
+files) and the D-PREC vendor-only boundary note.
 """
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import yaml
 
 _MANIFEST_PATH = Path("rulebook/manifest.yaml")
 _REQUIRED_FIELDS = ("source", "citation", "version", "license", "url")
+# RULES-04's metadata-completeness contract names "eCFR, ICH, FDA" chunks explicitly (this
+# plan's <interfaces> block) -- rule TEXT fetched from a network source. The precedent row
+# (Task 3) is a local, vendor-only copy (D-PREC: copy + hash + manifest row, never fetched) with
+# no source URL by design -- `url` is legitimately empty there, not a completeness bug.
+_URL_EXEMPT_SOURCES = ("precedent",)
 
 
 def _load_manifest_rows() -> list[dict]:
@@ -30,8 +40,30 @@ def test_every_chunk_has_required_metadata_and_no_placeholder_date():
             # field checks below; its presence IS the required record for that source.
             assert row["error"]
             continue
-        for field in _REQUIRED_FIELDS:
+        fields = [f for f in _REQUIRED_FIELDS if not (f == "url" and row.get("source") in _URL_EXEMPT_SOURCES)]
+        for field in fields:
             assert row.get(field), f"row {row!r} missing required field {field!r}"
 
     raw_text = _MANIFEST_PATH.read_text()
     assert "_SUBSTITUTE_DATE_" not in raw_text
+
+
+def test_manifest_has_13_rows_with_verified_sha256_and_dprec_boundary():
+    rows = _load_manifest_rows()
+    assert len(rows) == 13  # 7 ecfr + 4 ich + 1 fda + 1 precedent (Task 3's <behavior> contract)
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["source"]] = counts.get(row["source"], 0) + 1
+        if "error" in row:
+            continue
+        path = Path(row["path"])
+        assert path.exists(), f"manifest row references a missing file: {row['path']}"
+        actual_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        assert actual_sha256 == row["sha256"], f"{row['path']} sha256 does not match the manifest"
+
+    assert counts == {"ecfr": 7, "ich": 4, "fda": 1, "precedent": 1}
+
+    precedent_rows = [r for r in rows if r["source"] == "precedent"]
+    assert len(precedent_rows) == 1
+    assert "senior-reviewer" in precedent_rows[0]["note"]
