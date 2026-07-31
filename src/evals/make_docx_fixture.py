@@ -26,6 +26,17 @@ Planted deficiencies (kept in lockstep with minispec.deficiencies.json):
   3. Narrative claims "Accuracy of the method was established at three
      concentration levels." with no accuracy result table anywhere in the
      document (family = absence_of_evidence).
+
+EMERGENT (not deliberately planted, but factually present and hand-verified):
+  4. "Impurity B" row: Result 0.15% > Limit 0.10% -- a direct specification
+     exceedance (family = cross_reference_integrity, MS-04). B's 0.15% was
+     authored as supporting data for deficiency #1 (the largest single
+     component), but 0.15% against its own 0.10% limit is ALSO a real
+     deficiency the original 3-item ground truth did not enumerate. Added to
+     minispec.deficiencies.json 2026-07-30 after a reviewed live detection run
+     caught it (see docs/eval/BASELINE.md) -- a measurement instrument that
+     omits a real deficiency the document contains cannot measure "catch all".
+     The document BYTES are unchanged; only the ground-truth labeling grew.
 """
 from __future__ import annotations
 

@@ -1,0 +1,54 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Impurity B level exceeds its limit.",
+      "detail": "The result for Impurity B is 0.15%, which is higher than its limit of 0.10%.",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "model_judgment",
+      "confidence": 0.6,
+      "evidence": "Impurity B result is 0.15%, which exceeds its limit of 0.10%",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "specialist:0:suspicion",
+      "guidance_refs": [],
+      "precedents": [
+        {
+          "anda_number": "",
+          "product_name": "",
+          "deficiency_text": "3. We acknowledge your submission of data for the system suitability test for\nresolution between impurity J and the drug substance. We however note that\nthere is not adequate resolution between impurities H, F and A. Perform the revalidation\nof system suitability and demonstrate that there is adequate resolution between these impurities or alternatively, improve on your analytical method for\nadequate resolution.",
+          "similarity_score": 0.7384493350982666
+        },
+        {
+          "anda_number": "",
+          "product_name": "",
+          "deficiency_text": "20. We note that you do not control for related compounds impurities A and B\n(module 3.2.P.5.5, pages 5-7). This is not acceptable. We propose you provide\nstability data for impurities A and B to demonstrate their absence in the finished\ntransdermal systems. Alternatively, revise the specification at release and\nstability for the finished transdermal system to include tests and limits for these\nimpurities. Additionally, provide the analytical methods, method validation report\nand COAs accordingly.",
+          "similarity_score": 0.7304080724716187
+        },
+        {
+          "anda_number": "208528",
+          "product_name": "Fentanyl Transdermal System,\n 12.5 mcg/hr, 25 mcg/hr, 50 mcg/hr, 75 mcg/hr and 100 mcg/hr.",
+          "deficiency_text": "2. We have the following recommendations for your leachables study. \n\na. Identify all the impurities from the release liner, backing layer, and ink that could potentially leach into the drug product. Using reference standards for these identified impurities, demonstrate that the analytical methods are capable of detecting these impurities in the drug product at the desired level. \n\nb. We acknowledge that you plan to conduct a second leachables study on the newly manufactured post-ANDA batches with all of the changes (ink, release liner, and pouch stock) implemented. Please submit the results. You are encouraged to provide a multiple time point leachable analysis (e.g. 0, 6, 12, 24 months) to provide the most robust understanding of the leachable profile. In addition, we recommend that your analytical evaluation threshold be calculated based on a safety concern threshold of 1.5 mcg/day and a maximum daily dose of three 100-mcg/hr fentanyl transdermal systems.",
+          "similarity_score": 0.725327730178833
+        }
+      ],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [
+    "mini_spec.docx"
+  ],
+  "parse_failures": [],
+  "analysis_seconds": 11.3
+}

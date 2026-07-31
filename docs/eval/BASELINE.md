@@ -100,6 +100,46 @@ cannot: `evals.run score` scores a captured golden report, and none exists for `
 deficiencies enter the denominator. Until then this note — not a silently-shifted number — records
 that the DOCX path is live.
 
+## 2026-07-30 — `golden:minispec` captured & ground truth corrected (reviewer, deferred item RESOLVED)
+
+The deferred capture above is done. A live detection run on `minispec` was inspected, not
+transcribed blind — and the inspection surfaced a ground-truth defect worth more than the golden.
+
+**What the detector found:** exactly one fault — *"Impurity B result 0.15% exceeds its limit of
+0.10%"* (tier `corroborated`, deterministic result-vs-limit oracle). It is **factually correct and
+grounded**: the impurities table literally lists Impurity B as Result 0.15 / Limit 0.10.
+
+**The ground-truth defect:** that finding scored **fp=1** — a *false positive* — because it was not
+one of the 3 originally-planted deficiencies. But it is a real deficiency the fixture contains; the
+author set B=0.15/limit=0.10 as supporting data for planted deficiency #1 and never enumerated the
+exceedance itself. Per the project goal (*catch every real deficiency; every caught one must be
+correct*), scoring a correct finding as a false positive means the **ground truth was incomplete,
+not the detector wrong**. Fixed by adding **MS-04** (`Impurity B exceeds limit 0.10`,
+`cross_reference_integrity`) to `minispec.deficiencies.json`. The document **bytes are unchanged** —
+only the labeling grew to enumerate what was always there.
+
+**Honest `minispec` measurement (golden `golden:minispec_run1`, scored LLM-free):**
+`end_to_end: precision=1.000, recall=0.250, tp=1, fp=0, fn=3`. The one finding is correct
+(precision 1.0); it catches 1 of **4** real deficiencies. The 3 misses are exactly the *reasoning*
+families the agentic redesign targets: MS-01 arithmetic impossibility + MS-02 stated-max mismatch
+(`cross_reference_integrity`) and MS-03 accuracy-claim-without-data (`absence_of_evidence`).
+**`minispec` is thus a micro-benchmark for the whole thesis:** the current detector catches the one
+*directly grounded* deficiency and misses every *reasoning/absence* one — the 7%-recall gap in
+miniature, and a concrete target for Phases 3–5.
+
+**Provenance caveat:** `minispec_run1.json` was captured against the **uncommitted detection
+redesign** in the working tree (planner/summariser/sandwich/workers), so it is not reproducible from
+committed history until that redesign lands — recapture when it does. It is loaded via an explicit
+`--captured` path; `golden_report()` still hardcodes `mvr1381`, so nothing auto-consumes it yet.
+
+**`recall_by_family.json` remains the unshifted `golden:mvr1381` aggregate** (2/28). `minispec` now
+has its own reviewed golden and its own honest numbers above; folding `minispec` into the *aggregate*
+recall-by-family baseline is a separate, deliberate step deferred until the detection redesign is
+committed (so the aggregate has reproducible provenance). **Follow-up candidate:** MS-04 is caught by
+a *deterministic* oracle, so it is a strong candidate to promote to `tp_required: true` (adding it to
+the zero-TP-lost protected set) — deliberately NOT done here, to avoid bundling a gate-behavior
+change into a measurement fix.
+
 **Zero-true-positives-lost, proven deterministically for the OCR/DOCX change:**
 `python -m evals.run gate --captured src/evals/dataset/golden/mvr1381_run3.json` → `GATE OK`
 (exit 0). The change is detection-neutral for the scored PDF: mvr1381's `extract_pdf` output is
