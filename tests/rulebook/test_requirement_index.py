@@ -406,7 +406,7 @@ _ABSENCE_ITEM_EXPECTATIONS = [
     ("mvr1381/B-06 (sensitivity solution area below the LOD-level mean, unreported)", _MVR1381_MANIFEST, "Q2-DETECTION-LIMIT"),
     ("mvr1381/B-07 (LOQ precision marginal for 3 of 4 analytes)", _MVR1381_MANIFEST, "Q2-QUANTITATION-LIMIT"),
     ("mvr1381/B-08 (precision never demonstrated for Any Unspecified Impurity/Total Impurities)", _MVR1381_MANIFEST, "Q2-PRECISION"),
-    ("mvr1381/C-05 (room-temperature storage asserted but never documented)", _MVR1381_MANIFEST, "Q2-SOLUTION-STABILITY"),
+    ("mvr1381/C-05 (room-temperature storage asserted but never documented)", _MVR1381_MANIFEST, "FDA-SOLUTION-STABILITY"),
     ("minispec/MS-03 (accuracy narrative claim with no accuracy result table)", _MINISPEC_MANIFEST, "Q2-ACCURACY"),
     ("spec32s41/H-01 (Ph.Eur. names 4 specified impurities, internal spec covers only 3)", _SPEC32S41_MANIFEST, "Q3A-SPECIFIED-IMPURITY-COMPLETENESS"),
     ("spec32s41/H-03 (anhydrous-basis assay range with no as-is-basis acceptance criterion)", _SPEC32S41_MANIFEST, "CFR-211160B-SOUND-BASIS"),
@@ -438,6 +438,6 @@ def test_every_absence_family_deficiency_has_firing_entry(_self_contained_rulebo
 def test_requirement_index_version_bumped_for_this_revision():
     """D-24 discipline (mirrors LEXICON_VERSION/NORMALIZER_VERSION): the requirement-index carries
     its own version stamp, bumped on any material change to requirement_index.yaml -- this
-    reviewer-approved reset (Q6A rename+re-family, Q2-SOLUTION-STABILITY FDA re-cite, 2 new CFR
+    reviewer-approved reset (Q6A rename+re-family, FDA-SOLUTION-STABILITY FDA re-cite, 2 new CFR
     entries) is v1 -> v2."""
     assert ri.REQUIREMENT_INDEX_VERSION == "2"

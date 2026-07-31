@@ -30,7 +30,7 @@ _PATH = Path(__file__).parent / "requirement_index.yaml"
 # whenever requirement_index.yaml's entries change materially (rename, re-cite, family re-tag,
 # new/removed entry) -- a senior-reviewer-reviewed data artifact needs the same version-stamp
 # migration path as the normalizer (02-CONTEXT.md: "index version bumped on any change").
-# v1 -> v2: reviewer-approved reset (Q6A rename+re-family, Q2-SOLUTION-STABILITY FDA re-cite,
+# v1 -> v2: reviewer-approved reset (Q6A rename+re-family, FDA-SOLUTION-STABILITY FDA re-cite,
 # 2 new CFR entries: CFR-211160B-SOUND-BASIS, CFR-211194-CALCULATIONS).
 REQUIREMENT_INDEX_VERSION = "2"
 
