@@ -591,27 +591,31 @@ def load_requirement_index(path: str) -> list[RequirementEntry]:
 | A5 | `faiss-cpu`'s presence in the `dev` dependency-group is sufficient for it to be installed wherever `search_corpus`'s dense leg eventually runs (tests, harness, and Phase-3 runtime) | Retrieval (D-RB5) | If a non-dev install path is ever used, `search_corpus` breaks with `ImportError` at runtime — empirically true TODAY (confirmed installed in the active `.venv`), not proven for every future install path. |
 | A6 | ICH Q2(R2)'s Step-4 adoption date is 1 November 2023 (the ICH Assembly action date), distinct from the `2023_1130` (30 November 2023) date embedded in its `database.ich.org` filename, which is likely a site-publish date rather than a second adoption event | State of the Art | If conflated, a build script might record the wrong "version/date" metadata field (RULES-04) — low practical impact (both dates are within the same month), but worth a single human confirmation glance at the PDF's own cover page before locking the metadata value. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Can the Databricks token's scope be elevated to include `vector-search`, or should v1 ship on the client-side-cosine fallback?**
    - What we know: SQL Statement Execution API and Model Serving (chat + embeddings) are fully live with the current token; the Vector Search Admin API returns 403 for the SAME token.
    - What's unclear: whether a differently-scoped token is obtainable from whoever administers this Databricks workspace, or whether that's out of reach for this milestone.
    - Recommendation: plan the rulebook Delta tables + client-side-cosine query path as the v1 Wave-1 deliverable (already proven working); treat literal Vector Search endpoint creation as a follow-up task explicitly gated on confirming token scope BEFORE any plan commits engineering time to it.
+   - **Resolution:** shipped on the client-side-cosine fallback, per Plan 02-08.
 
 2. **Where should the vendored snapshot live relative to `Sample Data/` and `data/`?**
    - What we know: both existing directories are blanket-gitignored; a new `rulebook/` directory sidesteps both ignore rules cleanly.
    - What's unclear: whether the team has a preference for negating the `Sample Data/` ignore rule for just the one xlsm file instead of duplicating it into `rulebook/precedents/`.
    - Recommendation: use the new `rulebook/` directory (cleaner, avoids negation-pattern fragility); copy (don't move) the xlsm so nothing that currently reads from `Sample Data/` breaks.
+   - **Resolution:** the new `rulebook/` directory -- used throughout Plan 02-03.
 
 3. **What does ich.org's rendered legal-mentions page actually say?**
    - What we know: the PER-DOCUMENT notice text (verified verbatim, twice).
    - What's unclear: the site-wide terms (JS-rendered, unreachable by this session's tools).
    - Recommendation: a one-time human check (open the URL in an actual browser) before the ICH build script ships; record the confirmation as a line in `rulebook/manifest.yaml`.
+   - **Resolution:** folded into Plan 02-06 Task 3's human-review checkpoint, rather than a separate checkpoint.
 
 4. **Exact requirement-index entry count/wording for v1?**
    - What we know: the source material is clearly identified — the existing 9-key `_VALIDATION_REQUIRED` checklist (method-validation family) plus a handful of Q3A/Q3B/Q6A impurity-specification-completeness entries and 2-3 21 CFR 211.194 documentation-completeness entries, all directly traceable to the 14 `absence_of_evidence` items in the Phase-0 eval set.
    - What's unclear: exact final wording/citations — D-RI1 explicitly requires human review before merge, so this is intentionally NOT settled at research time.
    - Recommendation: the plan should schedule LLM-drafting (via `llm.structured`) against this identified source material, followed by the senior-reviewer session D-RI1(3) requires.
+   - **Resolution:** Plan 02-06 Task 2 drafts the requirement-index entries; Task 3 is the required senior-reviewer/human review before merge.
 
 ## Environment Availability
 
