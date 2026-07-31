@@ -28,5 +28,5 @@ Offline (Databricks unset): `tests/rulebook/` + `tests/ingest/` + `tests/evals/`
 - `FDA-SOLUTION-STABILITY` id keeps the source-prefix convention (honest: the entry cites FDA, and the id rides on every finding as metadata).
 
 ## Next-phase readiness / carried items
-- Phase-verification queue: see `02-PHASE-VERIFICATION-QUEUE.md` (4 items, none block 02-06 or Wave 4).
+- Phase-verification queue: see `02-PHASE-VERIFICATION-QUEUE.md` (5 items, none block 02-06 or Wave 4; item 5 — citation↔store granularity — found in 02-09 and MATERIAL for Phase 3).
 - 02-09 `read_guideline` (Wave 4) consumes this index (enumerate mode, D-RI2) — stable requirement ids feed `emit_finding`'s rule-citation field.
