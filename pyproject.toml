@@ -26,6 +26,8 @@ dependencies = [
     "json-repair>=0.30",
     # embedding
     "sentence-transformers>=3.0",
+    # rulebook + search_corpus local dense retrieval leg (D-RB5) -- runtime, not dev-only
+    "faiss-cpu>=1.8",
     # databricks
     "databricks-sdk>=0.30",
     "databricks-sql-connector>=3.1",
@@ -41,8 +43,6 @@ dev = [
     "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
     "ruff>=0.6",
-    # local dev only -- vector search fallback
-    "faiss-cpu>=1.8",
 ]
 finetune = [
     "peft>=0.11",
