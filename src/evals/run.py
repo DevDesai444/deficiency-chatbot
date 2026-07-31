@@ -1,7 +1,7 @@
 """CI-style command-line entry point for the eval harness (EVAL-03).
 
-`python -m evals.run <score|gate|run>` -- a single, repeatable command every later phase is
-graded against (ROADMAP Phase 0 success criteria 3 and 4).
+`python -m evals.run <score|gate|run|retrieval-gate>` -- a single, repeatable command every
+later phase is graded against (ROADMAP Phase 0 success criteria 3 and 4; Phase 2 SC4).
 
   score  -- load the eval set + a captured report (golden fixture by default), compute the
             full per-stage + by-family metrics, print a human-readable table, write metrics.json.
@@ -13,12 +13,20 @@ graded against (ROADMAP Phase 0 success criteria 3 and 4).
             aggregate. A document with no parse path yet (DOCX at Phase 0) or that raises
             during parse/detect is recorded as a parse_failure and skipped, never crashes
             the run. `--gate` additionally applies the zero-TP-lost gate to each live report.
+  retrieval-gate -- LIVE but LLM-free: SC4's real `search_corpus`-driven recall@k gate (D-SC4).
+            Ingests each non-held-out eval document via `ingest.corpus.ingest_corpus`, measures
+            `evals.metrics._search_corpus_recall_at_k` per document, enforces the exact-identifier
+            subset at 100% (hard functional gate) and the overall recall@k as a no-regress floor
+            against the committed `src/evals/baseline/retrieval_recall.json`. Never touches
+            Databricks or an LLM (D-RB6 offline contract).
 
 `score` and `gate` are LLM-free and fast: this module only imports `evals.*` (pure data/string
 modules -- see their own docstrings) and `schemas.faults` at top level. The detection stack
 (`parse.pdf.extract_pdf`, `parse.section_splitter`, `agents.detection.pipeline.run_detection`)
 is imported LAZILY, inside the function bodies that actually need it, so `--help` and the base
 `score`/`gate` paths never pull in the heavier, optional, LLM-calling detection dependencies.
+`retrieval-gate` similarly lazy-imports `ingest.corpus`/`evals.metrics`'s corpus-aware path so
+`--help` stays light.
 
 Checker note W1: `score` (and baseline generation, see `src/evals/baseline/`) parse the
 non-held-out source PDF once via `extract_pdf`, joining block text + table-cell text, and pass
@@ -46,6 +54,7 @@ DEFAULT_DOC_ID = "mvr1381"
 DEFAULT_SCORE_OUT = "docs/eval/last_metrics.json"
 DEFAULT_RUN_OUT = "docs/eval/last_run_metrics.json"
 BASELINE_PATH = Path(__file__).parent / "baseline" / "recall_by_family.json"
+RETRIEVAL_BASELINE_PATH = Path(__file__).parent / "baseline" / "retrieval_recall.json"
 
 
 def _join_source_text(parsed_doc: dict) -> str:
@@ -149,6 +158,85 @@ def cmd_gate(args: argparse.Namespace) -> int:
     return 1
 
 
+def _relabel_corpus_doc_id(corpus, doc):
+    """Bridge `ingest_corpus`'s content-hash doc_id identity to the eval set's logical `doc_id`.
+
+    `ingest.corpus.ingest_corpus` mints each `DocEntry.doc_id` as `content_hash(file_bytes)` --
+    ITS OWN identity convention, unrelated to the eval set's registered logical id ("mvr1381",
+    "minispec", ...). `_search_corpus_recall_at_k`'s per-GT-item `r["doc_id"] != doc_id` check
+    (correctly, per its own contract) compares `search_corpus` results against the `doc_id`
+    passed in -- which must be the eval set's logical id, since that is what every
+    `GroundTruthDeficiency.doc_id` uses. Without this bridge every single result is silently
+    discarded by that check (a doc-id NAMESPACE mismatch, not a retrieval-quality miss) --
+    measured empirically as a uniform 0.0 overall/hard-subset recall on the real committed
+    baseline run before this fix. Re-labels ONLY the manifest entry whose filename matches
+    `doc.path`'s own basename (never a blanket rename), so a directory with unrelated OTHER
+    parsed documents is left untouched; span-IDs/search results for the target doc then carry
+    the SAME doc_id the eval set's rows use, closing the mismatch without touching
+    `_search_corpus_recall_at_k`'s own (separately committed, separately tested) contract.
+    """
+    from ingest.corpus import CorpusIndex
+
+    target_name = Path(doc.path).name
+    relabeled = [
+        (d.model_copy(update={"doc_id": doc.doc_id}) if d.filename == target_name else d)
+        for d in corpus.manifest.documents
+    ]
+    manifest = corpus.manifest.model_copy(update={"documents": relabeled})
+    return CorpusIndex(root=corpus.root, cache_dir=corpus.cache_dir, manifest=manifest)
+
+
+def cmd_retrieval_gate(args: argparse.Namespace) -> int:
+    """`retrieval-gate`: SC4's real search_corpus-driven recall@k gate (D-SC4, measure -> record
+    -> ratchet). LIVE but LLM-free and Databricks-free -- ingests each non-held-out eval-set
+    document's own directory via `ingest.corpus.ingest_corpus` (local substrate only), computes
+    `evals.metrics._search_corpus_recall_at_k` per document, and enforces two independent checks:
+    (a) the exact-identifier subset must be 100% -- a HARD functional gate (D-SC4(i)), never a
+    soft ratchet, checked regardless of the baseline file's content; (b) the mean overall
+    recall@k across documents must not regress below the committed baseline's recorded value
+    (D-SC4(ii), the no-regress floor). One bad document's ingest failure is recorded and skipped,
+    never crashes the gate (mirrors `cmd_run`'s per-document try/except discipline).
+    """
+    from evals.metrics import _search_corpus_recall_at_k
+    from ingest.corpus import ingest_corpus
+
+    eval_set = load_eval_set()
+    baseline = json.loads(Path(args.baseline).read_text())
+
+    per_doc: dict[str, dict | str] = {}
+    for doc in eval_set.documents:
+        if doc.held_out:
+            continue
+        try:
+            corpus = ingest_corpus(Path(doc.path).parent)  # ingest the doc's own (small) directory
+            corpus = _relabel_corpus_doc_id(corpus, doc)  # bridge content-hash id -> eval-set doc_id
+        except Exception as exc:  # noqa: BLE001 -- one bad doc must never crash the gate
+            print(f"retrieval-gate: could not ingest {doc.doc_id}: {exc}")
+            continue
+        per_doc[doc.doc_id] = _search_corpus_recall_at_k(eval_set, doc.doc_id, corpus)
+
+    hard_subsets = [
+        v["exact_identifier_subset"]
+        for v in per_doc.values()
+        if isinstance(v, dict) and isinstance(v.get("exact_identifier_subset"), float)
+    ]
+    if hard_subsets and min(hard_subsets) < 1.0:
+        print(f"RETRIEVAL-GATE FAILED: exact-identifier subset not 100% -- {per_doc}")
+        return 1
+
+    overalls = [v["overall"] for v in per_doc.values() if isinstance(v, dict)]
+    measured = sum(overalls) / len(overalls) if overalls else 0.0
+    if measured < baseline.get("overall_recall_at_k", 0.0):
+        print(
+            f"RETRIEVAL-GATE FAILED: measured {measured:.3f} < "
+            f"committed baseline {baseline['overall_recall_at_k']:.3f}"
+        )
+        return 1
+
+    print(f"RETRIEVAL-GATE OK: overall={measured:.3f} per_document={per_doc}")
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     """`run`: LIVE parse -> detect over every non-held-out eval-set document.
 
@@ -237,6 +325,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("--gate", action="store_true", help="Also apply the zero-TP-lost gate.")
     run_p.add_argument("--out", default=DEFAULT_RUN_OUT)
     run_p.set_defaults(func=cmd_run)
+
+    retrieval_gate_p = subparsers.add_parser(
+        "retrieval-gate", help="SC4 retrieval recall@k gate (measure -> record -> ratchet, D-SC4)."
+    )
+    retrieval_gate_p.add_argument("--baseline", default=str(RETRIEVAL_BASELINE_PATH))
+    retrieval_gate_p.set_defaults(func=cmd_retrieval_gate)
 
     return parser
 

@@ -33,7 +33,7 @@
     "id": "MS-04",
     "doc_id": "minispec",
     "title": "Reported result for Impurity B (0.15%) exceeds its stated acceptance limit (0.10%) - a direct specification exceedance",
-    "evidence_anchor": "Impurity B exceeds limit 0.10",
+    "evidence_anchor": "Impurity B 0.15 0.10",
     "failure_family": "cross_reference_integrity",
     "confidence": "certain",
     "section_hint": "Impurities table / Impurity B row",

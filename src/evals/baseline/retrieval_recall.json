@@ -1,0 +1,19 @@
+{
+  "generated_from": "live:search_corpus_recall_at_k(mvr1381+minispec)_2026-07-31",
+  "overall_recall_at_k": 0.875,
+  "exact_identifier_subset_recall": 0.6428571428571429,
+  "per_document": {
+    "mvr1381": {
+      "overall": 0.75,
+      "exact_identifier_subset": 0.5833333333333334,
+      "n": 28,
+      "n_hard": 12
+    },
+    "minispec": {
+      "overall": 1.0,
+      "exact_identifier_subset": 1.0,
+      "n": 4,
+      "n_hard": 2
+    }
+  }
+}
