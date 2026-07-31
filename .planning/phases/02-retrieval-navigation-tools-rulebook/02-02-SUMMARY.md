@@ -130,6 +130,10 @@ None - no external service configuration required.
 - The `is_databricks` dispatch is ready for Plan 02-08 to fill in `src/databricks/rulebook.py::search_rulebook_databricks` -- the contract (`query: str, top_k: int -> list[RuleChunk]`) is locked by this plan's dispatch call site.
 - **Blocker for the orchestrator/next session (not this plan):** the pre-existing `Fault.cited_section_indices` gap in `src/schemas/faults.py`/`src/evals/metrics.py` (see Issues Encountered) blocks 19 eval-harness tests and is outside every currently-executing Phase-2 plan's `files_modified` scope -- it will need its own fix task.
 
+## Self-Check: PASSED
+
+All 7 claimed files verified present on disk (`src/rulebook/__init__.py`, `src/rulebook/store.py`, `src/rulebook/edges.py`, `tests/rulebook/__init__.py`, `tests/rulebook/conftest.py`, `tests/rulebook/test_store.py`, `tests/rulebook/test_edges.py`) plus `pyproject.toml` (modified) and this `SUMMARY.md`. All 6 task commits (`12dfba1`, `eb02498`, `a28fb65`, `8e3fd60`, `31b135c`, `5912669`) plus the SUMMARY commit (`f55e152`) verified present via `git cat-file -t`. No missing items.
+
 ---
 *Phase: 02-retrieval-navigation-tools-rulebook*
 *Completed: 2026-07-31*
