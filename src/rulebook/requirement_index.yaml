@@ -85,27 +85,26 @@
     hash: 2293b47994d0ea0e
 - id: Q2-SOLUTION-STABILITY
   family: 3.2.S.4.3
-  citation: 'ICH Q2(R2) -- Annex 1: Robustness / Other Considerations (Solution Stability)'
-  trigger: Solution stability of standard and sample preparations (i.e. that they remain valid for the
-    duration of the analysis) is a robustness/method-development consideration that must be assessed and
-    documented -- an unsupported storage condition assertion (e.g. 'stored at room temperature') is incomplete.
+  citation: 'FDA Guidance: Analytical Procedures and Methods Validation for Drugs and Biologics -- Section
+    VII.F Standards Control Solution Preparation'
+  trigger: The analytical procedure documentation must include information on the stability of sample/standard/control
+    solutions and their storage conditions -- an asserted storage condition (e.g. 'stored at room temperature')
+    with no supporting solution-stability information is incomplete.
   provenance_span_id:
-    doc_id: ich-Q2-R2
-    start: 61849
-    end: 61989
-    hash: 120144ab7a9d40ac
-- id: Q6A-REFSTD-WATER-CONTENT-BASIS
-  family: 3.2.S.5
+    doc_id: fda-analytical-procedures
+    start: 17207
+    end: 17485
+    hash: 0a53fcd32bd93def
+- id: Q6A-WATER-CONTENT-TEST
+  family: 3.2.S.4.1
   citation: ICH Q6A -- 3.3(e) Water Content
-  trigger: Where drug-substance potency, purity, or specification/assay values are expressed on a water-content-corrected
-    (e.g. anhydrous) basis, the water content must be tested and the corresponding as-is/labeled-basis
-    figure must be reconciled -- an assigned potency or acceptance range that ignores reported water content,
-    or a corrected-basis value with no as-is equivalent, is incomplete.
+  trigger: A water-content test with justified acceptance criteria is required for hygroscopic or hydrate
+    drug substances.
   provenance_span_id:
     doc_id: ich-Q6A
-    start: 36045
+    start: 36060
     end: 36239
-    hash: ff17fdca940f510a
+    hash: 82fe55a838447ccb
 - id: CFR-211194-METHOD-IDENTIFICATION
   family: 3.2.S.4.3
   citation: 21 CFR 211.194(a)(2)
@@ -117,6 +116,26 @@
     start: 481
     end: 742
     hash: e86c7ba6d52b1f31
+- id: CFR-211160B-SOUND-BASIS
+  family: 3.2.S.5
+  citation: 21 CFR 211.160(b)
+  trigger: A value/specification assigned on a corrected/anhydrous basis must be scientifically sound,
+    including accounting for reported water content.
+  provenance_span_id:
+    doc_id: ecfr-211.160
+    start: 696
+    end: 850
+    hash: f6c2e60bc8444819
+- id: CFR-211194-CALCULATIONS
+  family: 3.2.S.5
+  citation: 21 CFR 211.194(a)(5)
+  trigger: The correction calculation behind a corrected-basis value must be present in the laboratory
+    record.
+  provenance_span_id:
+    doc_id: ecfr-211.194
+    start: 1561
+    end: 1701
+    hash: aa9168a02d5e927d
 - id: Q3A-SPECIFIED-IMPURITY-COMPLETENESS
   family: 3.2.S.4.1
   citation: 'ICH Q3A(R2) -- Glossary: Specified Impurity'

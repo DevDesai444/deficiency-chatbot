@@ -17,7 +17,7 @@ import yaml
 from pydantic import BaseModel
 
 import ingest.registry as registry
-from ingest.anchors import open_span
+from ingest.anchors import mint_span, open_span
 from ingest.manifest import CoverageManifest
 from rulebook import edges
 from rulebook.store import rulebook_nt_for
@@ -25,6 +25,19 @@ from schemas.documents import SpanID
 from tools.errors import ToolRejected
 
 _PATH = Path(__file__).parent / "requirement_index.yaml"
+
+# D-24 discipline (mirrors LEXICON_VERSION/NORMALIZER_VERSION in ingest/normalize.py): bump this
+# whenever requirement_index.yaml's entries change materially (rename, re-cite, family re-tag,
+# new/removed entry) -- a senior-reviewer-reviewed data artifact needs the same version-stamp
+# migration path as the normalizer (02-CONTEXT.md: "index version bumped on any change").
+# v1 -> v2: reviewer-approved reset (Q6A rename+re-family, Q2-SOLUTION-STABILITY FDA re-cite,
+# 2 new CFR entries: CFR-211160B-SOUND-BASIS, CFR-211194-CALCULATIONS).
+REQUIREMENT_INDEX_VERSION = "2"
+
+# ecfr-314.50 provenance spans (real, byte-exact re-open verified) that JUSTIFY the 2
+# profile_requires_family closure edges build_requirement_edges persists below.
+_DRUG_SUBSTANCE_STABILITY_SPAN = (6968, 7095)   # "(i) Drug substance. ... stability;"
+_DRUG_PRODUCT_STABILITY_SPAN = (8328, 8655)     # "the specifications necessary ... expiration dating."
 
 
 class RequirementEntry(BaseModel):
@@ -54,6 +67,56 @@ def load_requirement_index(path: str | Path = _PATH) -> list[RequirementEntry]:
             )
         open_span(e.provenance_span_id, nt, e.provenance_span_id.doc_id)  # raises HashMismatch on drift
     return entries
+
+
+def build_requirement_edges(db_path: str | None = None, cache_dir: str | None = None) -> None:
+    """Committed, reproducible + IDEMPOTENT edge-build (D-RI1(2)/D-RB4).
+
+    Persists two edge relations into the generic edge table (rulebook.edges, D-RB3):
+      1. `family_requires_requirement`, one per requirement_index.yaml entry -- provenance is
+         the entry's OWN provenance_span_id (serialized), since that span IS what justifies the
+         family needing this requirement.
+      2. The 2 `profile_requires_family` closure edges (`drug_substance -> 3.2.S.7`,
+         `drug_product -> 3.2.P.7`) with real ecfr-314.50 provenance spans (re-open byte-exact,
+         verified below before persisting -- never write an edge whose provenance doesn't hold).
+
+    Idempotent: `edges.add_edge` is an upsert keyed on (src_id, dst_id, edge_type), so re-running
+    this after a requirement_index.yaml edit safely replaces stale edges with the current ones,
+    never accumulating duplicates.
+    """
+    edge_kwargs: dict = {}
+    if db_path is not None:
+        edge_kwargs["db_path"] = db_path
+    nt_kwargs: dict = {}
+    if cache_dir is not None:
+        nt_kwargs["cache_dir"] = cache_dir
+
+    for entry in load_requirement_index():
+        edges.add_edge(
+            entry.family,
+            entry.id,
+            "family_requires_requirement",
+            entry.provenance_span_id.model_dump_json(),
+            **edge_kwargs,
+        )
+
+    nt = rulebook_nt_for("ecfr-314.50", **nt_kwargs)
+    if nt is None:
+        raise ValueError("build_requirement_edges: ecfr-314.50 not found in the rulebook store")
+
+    ds_start, ds_end = _DRUG_SUBSTANCE_STABILITY_SPAN
+    dp_start, dp_end = _DRUG_PRODUCT_STABILITY_SPAN
+    ds_span = mint_span(nt.canonical, ds_start, ds_end, "ecfr-314.50", nt.normalizer_version)
+    dp_span = mint_span(nt.canonical, dp_start, dp_end, "ecfr-314.50", nt.normalizer_version)
+    open_span(ds_span, nt, "ecfr-314.50")  # raises HashMismatch if this drifted -- never persist a dead edge
+    open_span(dp_span, nt, "ecfr-314.50")
+
+    edges.add_edge(
+        "drug_substance", "3.2.S.7", "profile_requires_family", ds_span.model_dump_json(), **edge_kwargs
+    )
+    edges.add_edge(
+        "drug_product", "3.2.P.7", "profile_requires_family", dp_span.model_dump_json(), **edge_kwargs
+    )
 
 
 def submission_profile(manifest: CoverageManifest) -> set[str]:
