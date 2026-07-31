@@ -82,7 +82,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 - [x] 02-06-PLAN.md — Requirement index: loader gate + authored v1 data + edges + ground-truth traceability + senior-reviewer checkpoint (RULES-05, D-RI1, D-RB4)
 - [x] 02-07-PLAN.md — Eval harness extension: real search_corpus-driven recall@k + retrieval-gate CI command + committed SC4 baseline (D-SC4)
 - [x] 02-08-PLAN.md — Databricks rulebook serving: Delta population + client-side-cosine query, completing the two-backend dispatch (D-RB2, D-RB6)
-- [ ] 02-09-PLAN.md — read_guideline: the 5th tool, dual enumerate/fetch mode tying store + requirement index together (TOOLS-01/04, RULES-05, COST-04, D-RI2)
+- [x] 02-09-PLAN.md — read_guideline: the 5th tool, dual enumerate/fetch mode tying store + requirement index together (TOOLS-01/04, RULES-05, COST-04, D-RI2)
 **Research flag**: Rulebook sourcing is its own de-risking sub-track — ICH exact license/notice wording, FDA-guidance completeness via regulations.gov, and eCFR version pinning have real external uncertainty. (`follow_reference`'s full reference-graph backing completes in Phase 4.)
 
 ### Phase 3: Drive-Loop Spike (GO/NO-GO)
