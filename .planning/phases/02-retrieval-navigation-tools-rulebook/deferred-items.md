@@ -79,3 +79,45 @@ hard 100% exact-identifier-subset gate for `mvr1381`**
   the fix, and then re-run `python -m evals.run retrieval-gate` to confirm the hard-subset gate
   clears. Until then, this specific, well-diagnosed gap is the known reason SC4's hard gate does
   not yet pass end-to-end for `mvr1381`.
+
+## From Plan 02-09 (read_guideline -- 5th navigation tool + D-RI2 enumerate contract)
+
+**Root-caused, NOT fixed: every real `rulebook/requirement_index.yaml` entry's `citation` field
+fails the D-RI2(3)/D-EF1(5) "zero translation" round-trip through `read_guideline`'s own fetch
+mode -- `lookup_citation(entry.citation)` returns `None` for all 15 committed entries**
+
+- **Found during:** Task 1's round-trip test design (`read_guideline(citation=None)` row ->
+  `read_guideline(citation=<that row's citation>)`). Verified empirically (not guessed): built the
+  real committed rulebook snapshot (`build_ecfr`/`build_ich`/`build_fda`, all `update_manifest=False`)
+  + `build_requirement_edges()`, then ran `lookup_citation(e.citation)` for every entry returned by
+  `load_requirement_index()` -- **all 15 return `NOT FOUND`**, zero exceptions.
+- **Root cause:** `rulebook.store.write_chunk` keys each rulebook chunk by a WHOLE-SOURCE-DOCUMENT
+  citation (e.g. `"21 CFR 211.166"` for a full eCFR section, `"ICH Q2(R2)"` for an entire ~50k-char
+  guideline PDF, per `rulebook/build.py`'s `ICH_GUIDELINES`/`ECFR_PARTS` tables). Plan 02-06's
+  `requirement_index.yaml` (reviewer-approved v2) instead used finer, subsection/topic-level
+  human-readable citation strings for readability (e.g. `"21 CFR 211.166(a)"`,
+  `"ICH Q2(R2) -- Glossary: Specificity/Selectivity"`, `"ICH Q6A -- 3.3(e) Water Content"`) -- a
+  granularity mismatch between the two independently-designed schemas, not a bug in either file in
+  isolation.
+- **Not fixed:** `rulebook/requirement_index.yaml` is Plan 02-06's reviewed data artifact --
+  outside Plan 02-09's declared `files_modified` (`src/tools/read_guideline.py`,
+  `tests/tools/test_read_guideline.py`), and D-RI1(3) explicitly requires any change to that file
+  go through a senior-reviewer session with an index version bump (currently `v2`) -- not a
+  drive-by edit from an unrelated tool-implementation plan (Rule 4: this is exactly the kind of
+  change that needs a human decision, not an auto-fix).
+- **Concrete effect:** `read_guideline`'s own fetch-mode code is correct and fully tested
+  end-to-end against real vendored content (`"21 CFR 211.166"` resolves, bounds, dedups, and
+  pages forward correctly) -- proven by `tests/tools/test_read_guideline.py`'s fetch-mode suite.
+  `test_zero_translation_citation_round_trip` proves the TOOL itself performs zero translation
+  using a controlled entry whose citation format aligns with a real store key. What is NOT
+  currently true is that this round-trip holds for the REAL, currently-committed
+  `requirement_index.yaml` data -- an agent that calls `read_guideline()` to enumerate, then
+  passes the returned `citation` straight into `read_guideline(citation=...)` per the locked
+  D-EF1(5) flow, gets a `not_found` `ToolRejected` for every one of the 15 real entries today.
+- **Recommended follow-up (not scheduled by this plan):** a senior-reviewer session on
+  `rulebook/requirement_index.yaml` (Plan 02-06 owner) should either (a) re-cite every entry's
+  `citation` field to the exact whole-document citation string `rulebook.store` already uses, or
+  (b) extend `rulebook.store`/`rulebook.build` to key finer-grained sub-chunks so the reviewer's
+  more specific citations resolve directly -- either fix needs its own version bump
+  (`REQUIREMENT_INDEX_VERSION` v2 -> v3) and re-run of the ground-truth traceability test
+  (`tests/rulebook/test_requirement_index.py::test_every_absence_family_deficiency_has_firing_entry`).
