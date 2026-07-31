@@ -176,6 +176,7 @@ def rebuild_local_index() -> None:
     the build script after vendoring, Plan 02-03; safe to re-run -- fully deterministic from
     the persisted chunk store)."""
     import faiss
+    import numpy as np
 
     from retrieval.vector_search import embed_texts
 
@@ -185,7 +186,16 @@ def rebuild_local_index() -> None:
         _faiss_index, _faiss_doc_ids = None, []
         return
     texts = [(read_chunk_nt(c.doc_id).canonical if read_chunk_nt(c.doc_id) else "") for c in chunks]
-    embeddings = embed_texts(texts)
+    # One encode() call PER chunk, not one bulk call over the whole list: rulebook chunks vary
+    # wildly in length (a whole-section span can run tens of thousands of chars, e.g. some eCFR
+    # sections). A single bulk `embed_texts(texts, batch_size=1)` call still segfaults in the CPU
+    # sentence-transformers backend -- encode() pre-processes/sorts the FULL input list before
+    # its internal batch loop runs, so the crash is tied to list SIZE, not batch padding.
+    # Embedding one chunk at a time (a fresh, single-item encode() call per chunk) is proven
+    # stable up to the largest observed chunk (~46k chars) and is the safe path here. This is a
+    # one-time build script (D-RB2) -- the throughput cost of no bulk-call optimization is an
+    # acceptable trade for reliability.
+    embeddings = np.stack([embed_texts([text], batch_size=1)[0] for text in texts])
     dim = embeddings.shape[1]
     index = faiss.IndexFlatIP(dim)
     faiss.normalize_L2(embeddings)

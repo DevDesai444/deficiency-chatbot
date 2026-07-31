@@ -1,0 +1,56 @@
+- source: ecfr
+  citation: 21 CFR Part 210
+  version: '2026-07-29'
+  license: Public domain (17 U.S.C. 105 -- U.S. Government work; no copyright).
+  url: https://www.ecfr.gov/api/versioner/v1/full/2026-07-29/title-21.xml?part=210
+  sha256: 78f8930907890d9da3763f8d2ff44276b03d2618b81686bb85170483ff53eca7
+  path: rulebook/ecfr/title-21/part-210.xml
+  section_count: 3
+- source: ecfr
+  citation: 21 CFR Part 211
+  version: '2026-07-29'
+  license: Public domain (17 U.S.C. 105 -- U.S. Government work; no copyright).
+  url: https://www.ecfr.gov/api/versioner/v1/full/2026-07-29/title-21.xml?part=211
+  sha256: ecd9f8ba39e59c7713be98c293f1da4b125a68706d32ce4c77a0b579797423e3
+  path: rulebook/ecfr/title-21/part-211.xml
+  section_count: 60
+- source: ecfr
+  citation: 21 CFR Part 314
+  version: '2026-07-29'
+  license: Public domain (17 U.S.C. 105 -- U.S. Government work; no copyright).
+  url: https://www.ecfr.gov/api/versioner/v1/full/2026-07-29/title-21.xml?part=314
+  sha256: b244aef43d9274bbbed085a8c758f761a44f07bc6001f2697fe6d3fc1d65d48b
+  path: rulebook/ecfr/title-21/part-314.xml
+  section_count: 69
+- source: ecfr
+  citation: 21 CFR Part 320
+  version: '2026-07-29'
+  license: Public domain (17 U.S.C. 105 -- U.S. Government work; no copyright).
+  url: https://www.ecfr.gov/api/versioner/v1/full/2026-07-29/title-21.xml?part=320
+  sha256: 5c251e6cf0238d61b213cadc84743b2653386c73d61defa02e3901bfbe0201cd
+  path: rulebook/ecfr/title-21/part-320.xml
+  section_count: 19
+- source: ecfr
+  citation: 21 CFR Part 600
+  version: '2026-07-29'
+  license: Public domain (17 U.S.C. 105 -- U.S. Government work; no copyright).
+  url: https://www.ecfr.gov/api/versioner/v1/full/2026-07-29/title-21.xml?part=600
+  sha256: 5d8fda0c8ab9d41472ae500ecca6c0ecce41fecdfe4bf4cfb259a123cda28514
+  path: rulebook/ecfr/title-21/part-600.xml
+  section_count: 15
+- source: ecfr
+  citation: 21 CFR Part 601
+  version: '2026-07-29'
+  license: Public domain (17 U.S.C. 105 -- U.S. Government work; no copyright).
+  url: https://www.ecfr.gov/api/versioner/v1/full/2026-07-29/title-21.xml?part=601
+  sha256: c263ef9d5053d7ab782216fc3e444642fec563df49ef89bb69e48d9c58c187d2
+  path: rulebook/ecfr/title-21/part-601.xml
+  section_count: 39
+- source: ecfr
+  citation: 21 CFR Part 11
+  version: '2026-07-29'
+  license: Public domain (17 U.S.C. 105 -- U.S. Government work; no copyright).
+  url: https://www.ecfr.gov/api/versioner/v1/full/2026-07-29/title-21.xml?part=11
+  sha256: 7fff122daf0a667920b359ce857373b6cf503e36c5b6d96b5537bac925ae9197
+  path: rulebook/ecfr/title-21/part-11.xml
+  section_count: 10
