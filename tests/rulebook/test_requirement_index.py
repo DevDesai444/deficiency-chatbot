@@ -437,7 +437,9 @@ def test_every_absence_family_deficiency_has_firing_entry(_self_contained_rulebo
 
 def test_requirement_index_version_bumped_for_this_revision():
     """D-24 discipline (mirrors LEXICON_VERSION/NORMALIZER_VERSION): the requirement-index carries
-    its own version stamp, bumped on any material change to requirement_index.yaml -- this
-    reviewer-approved reset (Q6A rename+re-family, FDA-SOLUTION-STABILITY FDA re-cite, 2 new CFR
-    entries) is v1 -> v2."""
-    assert ri.REQUIREMENT_INDEX_VERSION == "2"
+    its own version stamp, bumped on any material change to requirement_index.yaml OR its
+    contract with consumers. v1 -> v2 was the reviewer-approved data reset (Q6A rename+re-family,
+    FDA-SOLUTION-STABILITY FDA re-cite, 2 new CFR entries). v2 -> v3 is the verification-queue
+    item 5 resolve: the enumerate output CONTRACT gained `rule_doc_id` per row (D-RI2/D-EF1(5)
+    enumerate->fetch->emit end-to-end fix) -- no entry content changed, only the row shape."""
+    assert ri.REQUIREMENT_INDEX_VERSION == "3"

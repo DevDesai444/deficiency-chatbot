@@ -4,6 +4,18 @@ param: omit for the compact enumerate surface (RULES-05), provide for bounded ru
 no new grounding/applicability logic lives here. An oversized fetch reuses Plan 02-01's
 src/tools/oversized.py persist+preview+handle mechanism (plan-checker Blocker 2) rather than
 a bare rejection.
+
+Requirement-index v2->v3 (senior-reviewer resolve, verification-queue item 5, D-RI2/D-EF1(5)):
+the index's `citation` field is a human-readable, subsection/glossary-granular string that does
+NOT match `rulebook.store.lookup_citation`'s whole-document citation keys (see 02-09's
+deferred-items.md) -- so an agent that enumerates then round-trips `citation` straight into
+fetch mode got `not_found` for all 15 real entries. Fixed WITHOUT touching the reviewed
+requirement_index.yaml data: each enumerate row now also carries `rule_doc_id` (the entry's
+`provenance_span_id.doc_id`, already store-resolvable -- `load_requirement_index`'s own loader
+gate proves this for every entry at load time), and fetch mode tries `lookup_citation(arg)`
+FIRST (preserving the real whole-document citation path, e.g. "21 CFR 211.166"), falling back to
+treating `arg` as a doc_id via `rulebook_nt_for` only if that misses. `rule_span_id` stays the
+grounding anchor (D-EF1(5)); `citation`/`rule_doc_id` are both metadata the model can act on.
 """
 from __future__ import annotations
 
@@ -32,7 +44,15 @@ def read_guideline(
         result = enumerate_requirements(manifest, family=family)
         if isinstance(result, ToolRejected):
             return result
-        return [{"requirement_id": e.id, "citation": e.citation, "trigger": e.trigger} for e in result]
+        return [
+            {
+                "requirement_id": e.id,
+                "citation": e.citation,
+                "rule_doc_id": e.provenance_span_id.doc_id,
+                "trigger": e.trigger,
+            }
+            for e in result
+        ]
     return _fetch_citation(citation, ledger, max_chars)
 
 
@@ -52,15 +72,27 @@ def _render_annotated_rulebook(
 
 
 def _fetch_citation(citation: str, ledger: RetrievalLedger, max_chars: int) -> str | ToolRejected:
+    # Dual-resolve (D-RI2/D-EF1(5), requirement-index v3): try the real whole-document store
+    # citation FIRST (e.g. "21 CFR 211.166" -- Plan 02-03's vendored citation keys), so that
+    # path is preserved byte-for-byte. Only if that misses, fall back to treating `citation` as
+    # a rulebook doc_id directly (e.g. "ecfr-211.166") -- the shape `read_guideline`'s enumerate
+    # mode now hands back as `rule_doc_id`, which `load_requirement_index`'s loader gate already
+    # guarantees resolves in the store for every requirement-index entry. Never invents a third
+    # translation -- both are pre-existing, independently resolvable keys.
     chunk = lookup_citation(citation)
-    if chunk is None:
-        return ToolRejected(tool="read_guideline", reason_code="not_found",
-                             reason=f"citation {citation!r} does not resolve to any vendored rulebook chunk",
-                             hint="call read_guideline() with no citation to see the applicable requirement index and its usable citation strings")
-    nt = rulebook_nt_for(chunk.doc_id)
-    if nt is None:
-        return ToolRejected(tool="read_guideline", reason_code="not_found",
-                             reason=f"chunk {chunk.doc_id!r} has no persisted canonical text", hint="")
+    if chunk is not None:
+        doc_id = chunk.doc_id
+        nt = rulebook_nt_for(doc_id)
+        if nt is None:
+            return ToolRejected(tool="read_guideline", reason_code="not_found",
+                                 reason=f"chunk {doc_id!r} has no persisted canonical text", hint="")
+    else:
+        doc_id = citation
+        nt = rulebook_nt_for(doc_id)
+        if nt is None:
+            return ToolRejected(tool="read_guideline", reason_code="not_found",
+                                 reason=f"{citation!r} does not resolve to any vendored rulebook chunk -- checked both the store citation index and as a doc_id",
+                                 hint="call read_guideline() with no citation to see the applicable requirement index (its 'citation' and 'rule_doc_id' fields are both usable here)")
 
     start, end = 0, len(nt.canonical)
     if end - start > max_chars:
@@ -69,8 +101,8 @@ def _fetch_citation(citation: str, ledger: RetrievalLedger, max_chars: int) -> s
         # a smaller range itself. Persist the full chunk under a handle, return a bounded,
         # span-ID-annotated preview plus that handle.
         preview_end = start + max_chars
-        h = persist_range("read_guideline", chunk.doc_id, start, end, nt.normalizer_version, cursor=preview_end)
-        preview_text = _render_annotated_rulebook(nt, chunk.doc_id, start, preview_end, ledger)
+        h = persist_range("read_guideline", doc_id, start, end, nt.normalizer_version, cursor=preview_end)
+        preview_text = _render_annotated_rulebook(nt, doc_id, start, preview_end, ledger)
         return ToolRejected(
             tool="read_guideline", reason_code="range_too_large",
             reason=f"{citation!r} is {end - start} chars, exceeds the {max_chars}-char bound",
@@ -78,10 +110,10 @@ def _fetch_citation(citation: str, ledger: RetrievalLedger, max_chars: int) -> s
             preview=preview_text, handle=h,
         )
 
-    if ledger.check_and_mark_served(chunk.doc_id, start, end):
+    if ledger.check_and_mark_served(doc_id, start, end):
         return f"[STILL_CURRENT] citation={citation!r} unchanged since your earlier retrieval -- refer back to that result, do not re-request it."
 
-    return _render_annotated_rulebook(nt, chunk.doc_id, start, end, ledger)
+    return _render_annotated_rulebook(nt, doc_id, start, end, ledger)
 
 
 def _resume_handle(handle: str, ledger: RetrievalLedger, max_chars: int) -> str | ToolRejected:

@@ -7,19 +7,19 @@ local store + edges, mirroring tests/rulebook/test_requirement_index.py's
 Fetch-mode tests additionally resolve a REAL vendored citation ("21 CFR 211.166") end-to-end
 (Plan 02-03's own vendored content) rather than a synthetic fixture, per this plan's own guidance.
 
-NOTE (deviation, tracked in the phase's deferred-items.md and this plan's SUMMARY.md): the REAL
-committed `rulebook/requirement_index.yaml` (Plan 02-06, reviewer-approved v2) uses subsection/
-topic-granular human-readable `citation` strings (e.g. "21 CFR 211.166(a)",
-"ICH Q2(R2) -- Glossary: Specificity/Selectivity") that do NOT exactly match
-`rulebook.store.lookup_citation`'s whole-document citation keys (e.g. "21 CFR 211.166",
-"ICH Q2(R2)") -- so round-tripping a REAL enumerate row's citation into fetch mode currently
-403s with `not_found` for every real entry. This is a pre-existing data-granularity mismatch in
-Plan 02-06's deliverable, out of THIS plan's declared `files_modified` scope (fixing it needs a
-senior-reviewer session + index version bump per D-RI1(3)) -- not introduced by read_guideline's
-own code. `test_zero_translation_citation_round_trip` below proves read_guideline's OWN code path
-performs zero translation (the tool never reformats a citation string) using a controlled entry
-whose citation format DOES align with a real store key; it does not (and cannot honestly) assert
-this holds for the current real index data.
+RESOLVED (verification-queue item 5, requirement-index v2->v3): the REAL committed
+`rulebook/requirement_index.yaml` uses subsection/topic-granular human-readable `citation`
+strings (e.g. "21 CFR 211.166(a)", "ICH Q2(R2) -- Glossary: Specificity/Selectivity") that do NOT
+exactly match `rulebook.store.lookup_citation`'s whole-document citation keys (e.g.
+"21 CFR 211.166", "ICH Q2(R2)") -- so round-tripping a REAL enumerate row's `citation` into fetch
+mode still 404s with `not_found`. The fix does NOT touch the reviewed `citation` strings; instead
+each enumerate row now ALSO carries `rule_doc_id` (the entry's own `provenance_span_id.doc_id`,
+already loader-gate-guaranteed to resolve), and fetch mode dual-resolves: `lookup_citation(arg)`
+first (preserving the real whole-document citation path), then `rulebook_nt_for(arg)`-as-doc_id
+as a fallback. `test_zero_translation_citation_round_trip` below still proves the CITATION path's
+zero-translation contract with a controlled entry; the real-data 15/15 round trip via
+`rule_doc_id` is proven end-to-end (through `emit_finding`) in
+`tests/tools/test_enumerate_fetch_emit_e2e.py`.
 """
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ import rulebook.requirement_index as ri
 import tools.read_guideline as rg
 from ingest.anchors import mint_span
 from ingest.manifest import CoverageManifest, DocEntry
+from rulebook.store import rulebook_nt_for
 from schemas.documents import DocClassification
 from tools import oversized
 from tools.errors import ToolRejected
@@ -102,10 +103,14 @@ def test_enumerate_mode_returns_compact_rows_without_rule_text(_self_contained_r
     assert isinstance(result, list)
     assert result, "expected at least one applicable requirement row for family 3.2.S.4.3"
     for row in result:
-        assert set(row.keys()) == {"requirement_id", "citation", "trigger"}
+        assert set(row.keys()) == {"requirement_id", "citation", "rule_doc_id", "trigger"}
         assert isinstance(row["requirement_id"], str) and row["requirement_id"]
         assert isinstance(row["citation"], str) and row["citation"]
+        assert isinstance(row["rule_doc_id"], str) and row["rule_doc_id"]
         assert isinstance(row["trigger"], str) and row["trigger"]
+        # rule_doc_id (requirement-index v3, verification-queue item 5) must ITSELF resolve in
+        # the rulebook store -- the whole point of adding it is a guaranteed-resolvable key.
+        assert rulebook_nt_for(row["rule_doc_id"]) is not None
 
 
 def test_enumerate_mode_family_filter_narrows_results(_self_contained_rulebook_store, fresh_ledger):
@@ -157,11 +162,49 @@ def test_zero_translation_citation_round_trip(monkeypatch, fresh_ledger):
     monkeypatch.setattr(rg, "enumerate_requirements", lambda manifest, family=None: [fake_entry])
 
     rows = read_guideline(CoverageManifest(), fresh_ledger, citation=None)
-    assert rows == [{"requirement_id": "TEST-ROUNDTRIP", "citation": "21 CFR 211.166", "trigger": "test trigger"}]
+    assert rows == [{
+        "requirement_id": "TEST-ROUNDTRIP", "citation": "21 CFR 211.166",
+        "rule_doc_id": "ecfr-211.166", "trigger": "test trigger",
+    }]
 
     fetch_result = read_guideline(CoverageManifest(), fresh_ledger, citation=rows[0]["citation"])
     assert isinstance(fetch_result, str)  # NOT a ToolRejected -- zero translation held
     assert not fetch_result.startswith("[STILL_CURRENT]")
+
+
+def test_rule_doc_id_fallback_resolves_when_citation_has_no_store_match(monkeypatch, fresh_ledger):
+    """The verification-queue item 5 fix's OTHER half: an enumerate row whose `citation` is
+    subsection-granular (does NOT match any `lookup_citation` key -- exactly the real
+    requirement_index.yaml's shape) still resolves in fetch mode via its `rule_doc_id`."""
+    from rulebook.build import build_ecfr
+
+    errors = [r for r in build_ecfr(update_manifest=False) if "error" in r]
+    assert not errors, f"ecfr build fixture hit vendoring errors: {errors}"
+
+    dummy_span = mint_span("Written stability testing procedures.", 0, 10, "ecfr-211.166", "v1")
+    fake_entry = ri.RequirementEntry(
+        id="TEST-SUBSECTION", family="3.2.P.7",
+        citation="21 CFR 211.166(a)",  # subsection-granular -- NOT a real lookup_citation key
+        trigger="test trigger", provenance_span_id=dummy_span,
+    )
+    monkeypatch.setattr(rg, "enumerate_requirements", lambda manifest, family=None: [fake_entry])
+
+    rows = read_guideline(CoverageManifest(), fresh_ledger, citation=None)
+    assert rows == [{
+        "requirement_id": "TEST-SUBSECTION", "citation": "21 CFR 211.166(a)",
+        "rule_doc_id": "ecfr-211.166", "trigger": "test trigger",
+    }]
+
+    # round-tripping the display `citation` still 404s (subsection granularity, unchanged data) --
+    # this is the honest, still-true half of the pre-fix behavior.
+    citation_result = read_guideline(CoverageManifest(), fresh_ledger, citation=rows[0]["citation"])
+    assert isinstance(citation_result, ToolRejected)
+    assert citation_result.reason_code == "not_found"
+
+    # but the NEW `rule_doc_id` field resolves -- this is the fix.
+    doc_id_result = read_guideline(CoverageManifest(), fresh_ledger, citation=rows[0]["rule_doc_id"])
+    assert isinstance(doc_id_result, str)
+    assert doc_id_result.startswith("[ecfr-211.166:")
 
 
 # --- Task 2: fetch mode (citation=<string>) -----------------------------------------------------

@@ -32,7 +32,14 @@ _PATH = Path(__file__).parent / "requirement_index.yaml"
 # migration path as the normalizer (02-CONTEXT.md: "index version bumped on any change").
 # v1 -> v2: reviewer-approved reset (Q6A rename+re-family, FDA-SOLUTION-STABILITY FDA re-cite,
 # 2 new CFR entries: CFR-211160B-SOUND-BASIS, CFR-211194-CALCULATIONS).
-REQUIREMENT_INDEX_VERSION = "2"
+# v2 -> v3: verification-queue item 5 resolve (D-RI2/D-EF1(5) enumerate->fetch->emit end-to-end
+# fix). `citation` strings are unchanged (still subsection/glossary-granular, human-readable) --
+# what changed is the CONTRACT of `read_guideline`'s enumerate output: each row now also carries
+# `rule_doc_id` (this entry's own `provenance_span_id.doc_id`, already loader-gate-guaranteed to
+# resolve in the rulebook store), and `read_guideline`'s fetch mode dual-resolves on
+# lookup_citation(arg) THEN rulebook_nt_for(arg)-as-doc_id. No entry content/family/id changed --
+# only the enumerate row shape gained a field, hence the version bump per D-24 discipline.
+REQUIREMENT_INDEX_VERSION = "3"
 
 # ecfr-314.50 provenance spans (real, byte-exact re-open verified) that JUSTIFY the 2
 # profile_requires_family closure edges build_requirement_edges persists below.
