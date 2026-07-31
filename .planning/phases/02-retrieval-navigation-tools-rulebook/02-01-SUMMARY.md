@@ -161,6 +161,12 @@ None - no external service configuration required. All tests run entirely offlin
 - `open_doc`, `get_section`, `follow_reference` are fully span-grounded, bounded, dedup'd, and ready for Phase 3's drive loop to call once a `RetrievalLedger` is constructed per agent run.
 - No blockers for this plan's own scope. The pre-existing `tests/evals/` failures (see Issues Encountered / `deferred-items.md`) are unrelated to and do not block Phase 2 tool work, but should be resolved by whoever lands the `Fault.cited_section_indices` schema change before the next full-suite eval gate run.
 
+## Self-Check: PASSED
+
+- All 15 created files verified present on disk (`src/tools/` x8, `tests/tools/` x7).
+- All 4 commit hashes verified present in `git log --oneline --all`: `3d5b9f8` (Task 1), `9a6adeb` (Task 2), `de40e53` (Task 3), `f951f13` (SUMMARY + deferred-items).
+- `deferred-items.md` verified present alongside this SUMMARY.
+
 ---
 *Phase: 02-retrieval-navigation-tools-rulebook*
 *Completed: 2026-07-31*
