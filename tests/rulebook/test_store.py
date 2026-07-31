@@ -9,8 +9,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+import config as config_module
+import rulebook.store as store
+from config import Settings
 from ingest.anchors import HashMismatch, open_span
 from rulebook.store import (
     RuleChunk,
@@ -183,3 +187,139 @@ def test_crash_mid_write_leaves_no_half_written_cache_file(tmp_path):
     (cache_dir / f"{safe}.tmp").write_text("{partial", encoding="utf-8")
 
     assert read_chunk_nt(doc_id, cache_dir=str(cache_dir)) is None
+
+
+# --- rulebook_search: local hybrid (FAISS + lexical) search (Task 2) -------
+
+
+@pytest.fixture(autouse=True)
+def _reset_faiss_module_cache(monkeypatch):
+    """The FAISS index is an intentional process-lifetime module-level cache (mirrors
+    databricks/vector.py's _ensure_faiss). Reset it before/after every test in this module so
+    one test's monkeypatched index can never leak into another (test-order independence).
+
+    raising=False: at Task-2 RED time _faiss_index/_faiss_doc_ids do not exist on the module
+    yet -- this fixture must not itself break Task 1's already-passing tests while Task 2's
+    tests are still red.
+    """
+    monkeypatch.setattr(store, "_faiss_index", None, raising=False)
+    monkeypatch.setattr(store, "_faiss_doc_ids", [], raising=False)
+    yield
+
+
+def test_rulebook_search_local_ranks_exact_substring_match_first(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_module, "get_settings", lambda: Settings(environment="local"))
+    monkeypatch.setattr(store, "_ensure_faiss", lambda: None)  # no FAISS index -- pure lexical leg
+
+    chunk_a, nt_a, _, _ = fixture_chunk(
+        tmp_path,
+        doc_id="doc-a",
+        citation="21 CFR 211.166",
+        text="Stability testing procedures for drug products.",
+    )
+    chunk_b, nt_b, _, _ = fixture_chunk(
+        tmp_path,
+        doc_id="doc-b",
+        citation="21 CFR 211.100",
+        text="Container closure system requirements for packaging.",
+    )
+    nt_by_doc = {chunk_a.doc_id: nt_a, chunk_b.doc_id: nt_b}
+    monkeypatch.setattr(store, "all_chunks", lambda db_path=store._DB_PATH: [chunk_a, chunk_b])
+    monkeypatch.setattr(
+        store,
+        "read_chunk_nt",
+        lambda doc_id, cache_dir=store.DEFAULT_RULEBOOK_CACHE_DIR: nt_by_doc.get(doc_id),
+    )
+
+    results = store.rulebook_search("stability testing", top_k=5)
+
+    assert results, "expected at least one ranked result"
+    assert results[0].doc_id == chunk_a.doc_id
+
+
+def test_rulebook_search_local_returns_ranked_list_with_no_network_call(tmp_path, monkeypatch):
+    """Confirms the return type/shape (a ranked list[RuleChunk]) and that no faiss index on
+    disk / no embeddings call is required for the local backend to answer a query."""
+    monkeypatch.setattr(config_module, "get_settings", lambda: Settings(environment="local"))
+    monkeypatch.setattr(store, "_ensure_faiss", lambda: None)
+
+    chunk, nt, _, _ = fixture_chunk(tmp_path)
+    monkeypatch.setattr(store, "all_chunks", lambda db_path=store._DB_PATH: [chunk])
+    monkeypatch.setattr(
+        store,
+        "read_chunk_nt",
+        lambda doc_id, cache_dir=store.DEFAULT_RULEBOOK_CACHE_DIR: nt if doc_id == chunk.doc_id else None,
+    )
+
+    results = store.rulebook_search("stability", top_k=5)
+
+    assert isinstance(results, list)
+    assert all(isinstance(r, RuleChunk) for r in results)
+    assert results[0].doc_id == chunk.doc_id
+
+
+def test_rulebook_search_local_with_empty_corpus_returns_empty_list(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_module, "get_settings", lambda: Settings(environment="local"))
+    monkeypatch.setattr(store, "_ensure_faiss", lambda: None)
+    monkeypatch.setattr(store, "all_chunks", lambda db_path=store._DB_PATH: [])
+
+    assert store.rulebook_search("anything", top_k=5) == []
+
+
+def test_rulebook_search_dense_leg_is_consulted_when_faiss_index_present(tmp_path, monkeypatch):
+    """The dense (FAISS) leg is exercised (not skipped) when a populated index exists -- this
+    proves the FAISS query wiring (index.search + embed_query integration) is correct and
+    raises no exception. Final fusion currently falls back to pure-lexical ranking until
+    retrieval.hybrid lands in Plan 02-04 (see the documented ImportError branch in
+    _rulebook_search_local), so this asserts the dense leg runs cleanly end-to-end and the
+    expected chunks still surface -- not a specific dense-driven fused order."""
+    import faiss
+
+    import retrieval.vector_search as vs_module
+
+    monkeypatch.setattr(config_module, "get_settings", lambda: Settings(environment="local"))
+
+    chunk_a, nt_a, _, _ = fixture_chunk(
+        tmp_path,
+        doc_id="doc-a",
+        citation="21 CFR 211.166",
+        text="Stability testing procedures for drug products.",
+    )
+    chunk_b, nt_b, _, _ = fixture_chunk(
+        tmp_path,
+        doc_id="doc-b",
+        citation="21 CFR 211.100",
+        text="Container closure system requirements for packaging.",
+    )
+    nt_by_doc = {chunk_a.doc_id: nt_a, chunk_b.doc_id: nt_b}
+    monkeypatch.setattr(store, "all_chunks", lambda db_path=store._DB_PATH: [chunk_a, chunk_b])
+    monkeypatch.setattr(
+        store,
+        "read_chunk_nt",
+        lambda doc_id, cache_dir=store.DEFAULT_RULEBOOK_CACHE_DIR: nt_by_doc.get(doc_id),
+    )
+
+    # a tiny, real, in-memory FAISS index -- no disk, no network.
+    dim = 2
+    embeddings = np.array([[1.0, 0.0], [0.0, 1.0]], dtype="float32")
+    faiss.normalize_L2(embeddings)
+    index = faiss.IndexFlatIP(dim)
+    index.add(embeddings)
+    monkeypatch.setattr(store, "_faiss_index", index)
+    monkeypatch.setattr(store, "_faiss_doc_ids", [chunk_a.doc_id, chunk_b.doc_id])
+    monkeypatch.setattr(store, "_ensure_faiss", lambda: None)  # index already "warm"
+    monkeypatch.setattr(vs_module, "embed_query", lambda text: np.array([1.0, 0.0], dtype="float32"))
+
+    results = store.rulebook_search("stability testing", top_k=5)
+
+    assert {c.doc_id for c in results} == {chunk_a.doc_id, chunk_b.doc_id}
+    assert results[0].doc_id == chunk_a.doc_id  # lexical leg still ranks the substring match first
+
+
+def test_rulebook_search_databricks_dispatch_fails_loudly_not_silently(tmp_path, monkeypatch):
+    """is_databricks=True but src/databricks/rulebook.py does not exist yet (lands in Plan
+    02-08) -- must raise, never silently fall back to the local branch (D-RB6 / T-02-08)."""
+    monkeypatch.setattr(config_module, "get_settings", lambda: Settings(environment="databricks"))
+
+    with pytest.raises((ImportError, ModuleNotFoundError)):
+        store.rulebook_search("stability testing", top_k=3)
