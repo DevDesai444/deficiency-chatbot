@@ -1,0 +1,142 @@
+- id: Q2-SPECIFICITY
+  family: 3.2.S.4.3
+  citation: 'ICH Q2(R2) -- Glossary: Specificity/Selectivity'
+  trigger: Analytical method validation must demonstrate specificity/selectivity -- the ability to measure
+    the analyte unequivocally in the presence of expected interferences (e.g. impurities, degradants,
+    matrix) -- including via stressed/degraded samples for a stability-indicating method.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 49702
+    end: 50179
+    hash: a38970d1605945a5
+- id: Q2-LINEARITY
+  family: 3.2.S.4.3
+  citation: ICH Q2(R2) -- 3.2 Linearity
+  trigger: Demonstrated linearity must be assessed across a range that covers the reportable specification
+    limits (e.g. impurity/assay acceptance criteria) -- not merely an arbitrarily chosen working range.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 30218
+    end: 30348
+    hash: a52a00f71b85e7b2
+- id: Q2-DETECTION-LIMIT
+  family: 3.2.S.4.3
+  citation: 'ICH Q2(R2) -- Glossary: Detection Limit (DL)'
+  trigger: Determination of the Limit of Detection must be supported by data (e.g. standard deviation
+    of the response and slope, signal-to-noise, or a dilution series) -- a stated DL with no underlying
+    calculation or data is unsupported.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 45055
+    end: 45194
+    hash: 44b296ac920e19ba
+- id: Q2-QUANTITATION-LIMIT
+  family: 3.2.S.4.3
+  citation: 'ICH Q2(R2) -- Glossary: Quantitation Limit (QL)'
+  trigger: Determination of the Limit of Quantitation must be supported by data, and precision at the
+    LOQ level must be demonstrated as adequate for reliable quantitation -- a marginal or unsupported
+    LOQ is incomplete.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 47069
+    end: 47212
+    hash: 6c8c4d2abb41380c
+- id: Q2-PRECISION
+  family: 3.2.S.4.3
+  citation: 'ICH Q2(R2) -- Glossary: Precision'
+  trigger: Method precision (repeatability) must be demonstrated for every reportable specification attribute
+    the method tests -- including impurity-related attributes such as Any Unspecified Impurity and Total
+    Impurities, not only the primary assay.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 46549
+    end: 46880
+    hash: a2654df6603eb484
+- id: Q2-ACCURACY
+  family: 3.2.S.4.3
+  citation: 'ICH Q2(R2) -- Glossary: Accuracy'
+  trigger: A narrative claim that accuracy/recovery was established at multiple concentration levels must
+    be supported by an actual accuracy result table or underlying recovery data -- an unsupported assertion
+    is incomplete.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 43021
+    end: 43244
+    hash: 60d50f2d3b321b0e
+- id: Q2-ROBUSTNESS
+  family: 3.2.S.4.3
+  citation: 'ICH Q2(R2) -- Glossary: Robustness'
+  trigger: Method robustness/ruggedness must be evaluated via deliberate variation of analytical procedure
+    parameters and documented.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 49454
+    end: 49667
+    hash: 5c61adee0977432d
+- id: Q2-SYSTEM-SUITABILITY
+  family: 3.2.S.4.3
+  citation: 'ICH Q2(R2) -- Glossary: System Suitability Test (SST)'
+  trigger: System suitability tests verifying the measurement system is fit for the intended purpose must
+    be defined and applied.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 50219
+    end: 50468
+    hash: 2293b47994d0ea0e
+- id: Q2-SOLUTION-STABILITY
+  family: 3.2.S.4.3
+  citation: 'ICH Q2(R2) -- Annex 1: Robustness / Other Considerations (Solution Stability)'
+  trigger: Solution stability of standard and sample preparations (i.e. that they remain valid for the
+    duration of the analysis) is a robustness/method-development consideration that must be assessed and
+    documented -- an unsupported storage condition assertion (e.g. 'stored at room temperature') is incomplete.
+  provenance_span_id:
+    doc_id: ich-Q2-R2
+    start: 61849
+    end: 61989
+    hash: 120144ab7a9d40ac
+- id: Q6A-REFSTD-WATER-CONTENT-BASIS
+  family: 3.2.S.5
+  citation: ICH Q6A -- 3.3(e) Water Content
+  trigger: Where drug-substance potency, purity, or specification/assay values are expressed on a water-content-corrected
+    (e.g. anhydrous) basis, the water content must be tested and the corresponding as-is/labeled-basis
+    figure must be reconciled -- an assigned potency or acceptance range that ignores reported water content,
+    or a corrected-basis value with no as-is equivalent, is incomplete.
+  provenance_span_id:
+    doc_id: ich-Q6A
+    start: 36045
+    end: 36239
+    hash: ff17fdca940f510a
+- id: CFR-211194-METHOD-IDENTIFICATION
+  family: 3.2.S.4.3
+  citation: 21 CFR 211.194(a)(2)
+  trigger: Laboratory/validation records must identify the specific test method(s) used (and the governing
+    protocol/SOP, including a locatable number or version) -- referencing 'the current in-house SOP' or
+    'the verification protocol' with no document identifier is incomplete.
+  provenance_span_id:
+    doc_id: ecfr-211.194
+    start: 481
+    end: 742
+    hash: e86c7ba6d52b1f31
+- id: Q3A-SPECIFIED-IMPURITY-COMPLETENESS
+  family: 3.2.S.4.1
+  citation: 'ICH Q3A(R2) -- Glossary: Specified Impurity'
+  trigger: Every impurity named or identified elsewhere in the submission (e.g. a compendial monograph's
+    specified-impurity list) must have a corresponding individually-listed test, acceptance limit, and
+    name-mapping entry in the drug-substance specification -- a named impurity with no corresponding limit
+    is an incomplete specification.
+  provenance_span_id:
+    doc_id: ich-Q3A-R2
+    start: 22927
+    end: 23139
+    hash: e07b0857b38af7dd
+- id: CFR-211166-STABILITY-PROGRAM
+  family: 3.2.P.7
+  citation: 21 CFR 211.166(a)
+  trigger: A written stability testing program (sample size/intervals, storage conditions, and reliable/specific
+    test methods) must be present and followed to support the drug product's storage conditions and expiration
+    date.
+  provenance_span_id:
+    doc_id: ecfr-211.166
+    start: 33
+    end: 260
+    hash: c04df0a9f8e47afb

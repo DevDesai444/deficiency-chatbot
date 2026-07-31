@@ -336,3 +336,75 @@ def test_enumerate_requirements_results_sorted_by_id(monkeypatch):
     result = ri.enumerate_requirements(manifest)
 
     assert [e.id for e in result] == ["Q2-ACCURACY", "Q2-LINEARITY"]
+
+
+# --- Task 2: ground-truth traceability test (D-RI1(2), the MS-04-lesson instrument) ---------
+#
+# Unlike every test above, this test does NOT monkeypatch load_requirement_index/edges.get_edges
+# -- it loads the REAL committed src/rulebook/requirement_index.yaml and the REAL edges Task 2
+# populated against the Plan 02-03 vendored rulebook store (data/rulebook_cache + data/defpredict.db,
+# rebuilt offline from the committed rulebook/** snapshot via rulebook.build). The autouse
+# `_clear_load_requirement_index_cache` fixture above ensures each call re-reads that real file.
+
+
+def _manifest(*family_guesses: str) -> CoverageManifest:
+    return CoverageManifest(
+        documents=[_doc_entry(fg, doc_id=f"doc-{i}") for i, fg in enumerate(family_guesses)]
+    )
+
+
+# One CoverageManifest per real eval doc_id, hand-constructed to match that document's plausible
+# content-derived classification -- mvr1381/minispec are analytical method-validation reports
+# (family 3.2.S.4.3); A-01/A-10's own section_hints point at Appendix 1/3 reference-standard
+# content within mvr1381, hence the added 3.2.S.5 document. spec32s41 is a drug-substance
+# specification (3.2.S.4.1) bundled with its reference-standard section (3.2.S.5), mirroring a
+# real multi-document eCTD 3.2.S.4/3.2.S.5 submission slice. These are the plan's sanctioned
+# "hand-construct... matching that document's real classified families" fixtures -- NOT a
+# re-run of the real content classifier.
+_MVR1381_MANIFEST = _manifest("3.2.S.4.3", "3.2.S.5")
+_MINISPEC_MANIFEST = _manifest("3.2.S.4.3")
+_SPEC32S41_MANIFEST = _manifest("3.2.S.4.1", "3.2.S.5")
+
+# The exact 14 absence_of_evidence eval items (this plan's <interfaces> block, cross-checked
+# directly against src/evals/dataset/{mvr1381,minispec,heldout32s41}.deficiencies.json) mapped to
+# the requirement-index entry id that must FIRE for them. A hardcoded literal naming all 14 ids --
+# not a wildcard/count-only check -- so a future edit that silently drops coverage for one
+# specific id fails loudly and by name (mirrors check_gate's discipline).
+_ABSENCE_ITEM_EXPECTATIONS = [
+    ("mvr1381/A-01 (water-content/anhydrous-basis correction for RS potency)", _MVR1381_MANIFEST, "Q6A-REFSTD-WATER-CONTENT-BASIS"),
+    ("mvr1381/A-03 (specificity: 3 of 5 solution types have no reported result)", _MVR1381_MANIFEST, "Q2-SPECIFICITY"),
+    ("mvr1381/A-04 (specificity shown only by spiking; no degradation samples)", _MVR1381_MANIFEST, "Q2-SPECIFICITY"),
+    ("mvr1381/A-07 (linearity range doesn't cover the 0.5% Total Impurities spec)", _MVR1381_MANIFEST, "Q2-LINEARITY"),
+    ("mvr1381/A-10 (working-standard area-percent purity ignores water content)", _MVR1381_MANIFEST, "Q6A-REFSTD-WATER-CONTENT-BASIS"),
+    ("mvr1381/A-11 (verification protocol/SOP referenced but never identified)", _MVR1381_MANIFEST, "CFR-211194-METHOD-IDENTIFICATION"),
+    ("mvr1381/B-02 (no supporting data for the LOD/LOQ determination)", _MVR1381_MANIFEST, "Q2-DETECTION-LIMIT"),
+    ("mvr1381/B-06 (sensitivity solution area below the LOD-level mean, unreported)", _MVR1381_MANIFEST, "Q2-DETECTION-LIMIT"),
+    ("mvr1381/B-07 (LOQ precision marginal for 3 of 4 analytes)", _MVR1381_MANIFEST, "Q2-QUANTITATION-LIMIT"),
+    ("mvr1381/B-08 (precision never demonstrated for Any Unspecified Impurity/Total Impurities)", _MVR1381_MANIFEST, "Q2-PRECISION"),
+    ("mvr1381/C-05 (room-temperature storage asserted but never documented)", _MVR1381_MANIFEST, "Q2-SOLUTION-STABILITY"),
+    ("minispec/MS-03 (accuracy narrative claim with no accuracy result table)", _MINISPEC_MANIFEST, "Q2-ACCURACY"),
+    ("spec32s41/H-01 (Ph.Eur. names 4 specified impurities, internal spec covers only 3)", _SPEC32S41_MANIFEST, "Q3A-SPECIFIED-IMPURITY-COMPLETENESS"),
+    ("spec32s41/H-03 (anhydrous-basis assay range with no as-is-basis acceptance criterion)", _SPEC32S41_MANIFEST, "Q6A-REFSTD-WATER-CONTENT-BASIS"),
+]
+
+
+def test_every_absence_family_deficiency_has_firing_entry():
+    """D-RI1(2) ground-truth traceability test: for every Phase-0 absence_of_evidence eval item
+    (all 14: 11 mvr1381 + 1 minispec + 2 spec32s41 -- 'heldout32s41' is only the dataset
+    FILENAME, spec32s41 is the real doc_id), at least one real, committed requirement-index
+    entry FIRES for that document's content-derived submission profile. A known-real deficiency
+    with no requirement to surface it means the v1 draft is incomplete BY MEASUREMENT -- the
+    requirement-index equivalent of the MS-04 lesson: the instrument must enumerate what the
+    eval actually contains.
+    """
+    assert len(_ABSENCE_ITEM_EXPECTATIONS) == 14, "must cover all 14 absence_of_evidence eval items"
+
+    missing = []
+    for item_id, manifest, expected_entry_id in _ABSENCE_ITEM_EXPECTATIONS:
+        result = ri.enumerate_requirements(manifest)
+        assert not isinstance(result, ToolRejected), f"{item_id}: enumerate_requirements rejected: {result}"
+        fired_ids = {e.id for e in result}
+        if expected_entry_id not in fired_ids:
+            missing.append(f"{item_id}: expected {expected_entry_id!r} to fire, got {sorted(fired_ids)}")
+
+    assert not missing, "requirement-index draft is incomplete by measurement:\n" + "\n".join(missing)
