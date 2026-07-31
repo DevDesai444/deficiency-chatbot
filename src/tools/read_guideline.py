@@ -11,6 +11,7 @@ from ingest.anchors import mint_span
 from ingest.manifest import CoverageManifest
 from rulebook.requirement_index import enumerate_requirements
 from rulebook.store import lookup_citation, rulebook_nt_for
+from schemas.documents import NormalizedText
 from tools.errors import ToolRejected
 from tools.ledger import RetrievalLedger
 from tools.oversized import advance_cursor, load_range, persist_range
@@ -35,13 +36,65 @@ def read_guideline(
     return _fetch_citation(citation, ledger, max_chars)
 
 
+def _render_annotated_rulebook(
+    nt: NormalizedText, doc_id: str, start: int, end: int, ledger: RetrievalLedger,
+) -> str:
+    """Same cat -n annotation shape as get_section._render_annotated (Plan 02-01), applied over
+    the RULEBOOK store's NormalizedText -- shared by the normal fetch path, the oversized-preview
+    path, and the handle-continuation path so all three annotate identically."""
+    out = []
+    for s_off, e_off in split_sentences(nt.canonical[start:end]):
+        s_abs, e_abs = start + s_off, start + e_off
+        span = mint_span(nt.canonical, s_abs, e_abs, doc_id, nt.normalizer_version)
+        ledger.record_span(span)
+        out.append(f"[{doc_id}:{s_abs}:{e_abs}] {nt.canonical[s_abs:e_abs]}")
+    return "\n".join(out)
+
+
 def _fetch_citation(citation: str, ledger: RetrievalLedger, max_chars: int) -> str | ToolRejected:
-    """Implemented in Task 2 of this plan (includes the TOOLS-04 persist+preview+handle
-    oversized branch, plan-checker Blocker 2)."""
-    raise NotImplementedError
+    chunk = lookup_citation(citation)
+    if chunk is None:
+        return ToolRejected(tool="read_guideline", reason_code="not_found",
+                             reason=f"citation {citation!r} does not resolve to any vendored rulebook chunk",
+                             hint="call read_guideline() with no citation to see the applicable requirement index and its usable citation strings")
+    nt = rulebook_nt_for(chunk.doc_id)
+    if nt is None:
+        return ToolRejected(tool="read_guideline", reason_code="not_found",
+                             reason=f"chunk {chunk.doc_id!r} has no persisted canonical text", hint="")
+
+    start, end = 0, len(nt.canonical)
+    if end - start > max_chars:
+        # TOOLS-04 persist+preview+handle (plan-checker Blocker 2): mirrors get_section's
+        # oversized branch (Plan 02-01) exactly -- never truncate, never make the agent invent
+        # a smaller range itself. Persist the full chunk under a handle, return a bounded,
+        # span-ID-annotated preview plus that handle.
+        preview_end = start + max_chars
+        h = persist_range("read_guideline", chunk.doc_id, start, end, nt.normalizer_version, cursor=preview_end)
+        preview_text = _render_annotated_rulebook(nt, chunk.doc_id, start, preview_end, ledger)
+        return ToolRejected(
+            tool="read_guideline", reason_code="range_too_large",
+            reason=f"{citation!r} is {end - start} chars, exceeds the {max_chars}-char bound",
+            hint=f"a bounded preview is attached; call read_guideline(ledger=ledger, citation={citation!r}, handle={h!r}) to page forward -- never recompute offsets yourself",
+            preview=preview_text, handle=h,
+        )
+
+    if ledger.check_and_mark_served(chunk.doc_id, start, end):
+        return f"[STILL_CURRENT] citation={citation!r} unchanged since your earlier retrieval -- refer back to that result, do not re-request it."
+
+    return _render_annotated_rulebook(nt, chunk.doc_id, start, end, ledger)
 
 
 def _resume_handle(handle: str, ledger: RetrievalLedger, max_chars: int) -> str | ToolRejected:
-    """Implemented in Task 2 of this plan -- mirrors get_section's handle branch (Plan 02-01)
-    exactly, applied to the rulebook store instead of the corpus store."""
-    raise NotImplementedError
+    descriptor = load_range(handle)
+    if descriptor is None:
+        return ToolRejected(tool="read_guideline", reason_code="not_found",
+                             reason=f"handle {handle!r} is unknown or expired",
+                             hint="re-issue the original oversized read_guideline(citation=...) call for a fresh handle")
+    doc_id, cursor, range_end = descriptor["doc_id"], descriptor["cursor"], descriptor["end"]
+    nt = rulebook_nt_for(doc_id)
+    if nt is None or cursor >= range_end:
+        return f"[STILL_CURRENT] handle={handle!r} range fully served -- nothing more to page forward."
+    chunk_end = min(cursor + max_chars, range_end)
+    text = _render_annotated_rulebook(nt, doc_id, cursor, chunk_end, ledger)
+    advance_cursor(handle, chunk_end)
+    return text
