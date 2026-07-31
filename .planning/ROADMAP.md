@@ -73,7 +73,16 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
   6. The rulebook exposes a compact **requirement index** (citation + one-line applicability trigger) that the agent can enumerate cheaply, distinct from full rule text fetched on demand. This is the mechanism for `absence_of_evidence` (measured **0/11** — the #1 recall gap): semantic search over a submission cannot surface a requirement the submission never mentions, so *what must be present* has to be enumerable independent of the corpus.
   7. Oversized tool results are persisted and returned as a bounded preview plus a re-openable handle; an over-large `get_section` **fails with a narrow-your-range error rather than truncating**.
   8. Re-retrieving an unchanged span returns a "still current — refer to your earlier retrieval" stub instead of the full text (read deduplication), with the hit rate reported. Built here, not in Phase 6: it lives inside the retrieval tools, and a reviewer re-opens the same spec table many times per run — every Phase 3–5 eval iteration pays for its absence.
-**Plans**: TBD
+**Plans**: 9 plans
+- [ ] 02-01-PLAN.md — Tool layer foundation: RetrievalLedger + ToolRejected + textsplit + open_doc/get_section/follow_reference (TOOLS-01/02/04, COST-04, D-FR)
+- [ ] 02-02-PLAN.md — Rulebook storage primitives: RuleChunk local store (SQLite+FAISS+BM25) + the generic edge table (RULES-04, D-RB3, D-RB6)
+- [ ] 02-03-PLAN.md — Rulebook sourcing: eCFR/ICH/FDA vendoring + build orchestration, real live-fetched content committed to rulebook/ (RULES-01/02/03/04, D-RB1, D-RB2, D-PREC)
+- [ ] 02-04-PLAN.md — search_corpus: local hybrid (FAISS+BM25+RRF) per-submission retrieval tool (TOOLS-01, D-RB5)
+- [ ] 02-05-PLAN.md — emit_finding: the dual byte-exact grounding gate, the only path a finding can exist through (TOOLS-03, D-EF1)
+- [ ] 02-06-PLAN.md — Requirement index: loader gate + authored v1 data + edges + ground-truth traceability + senior-reviewer checkpoint (RULES-05, D-RI1, D-RB4)
+- [ ] 02-07-PLAN.md — Eval harness extension: real search_corpus-driven recall@k + retrieval-gate CI command + committed SC4 baseline (D-SC4)
+- [ ] 02-08-PLAN.md — Databricks rulebook serving: Delta population + client-side-cosine query, completing the two-backend dispatch (D-RB2, D-RB6)
+- [ ] 02-09-PLAN.md — read_guideline: the 5th tool, dual enumerate/fetch mode tying store + requirement index together (TOOLS-01/04, RULES-05, COST-04, D-RI2)
 **Research flag**: Rulebook sourcing is its own de-risking sub-track — ICH exact license/notice wording, FDA-guidance completeness via regulations.gov, and eCFR version pinning have real external uncertainty. (`follow_reference`'s full reference-graph backing completes in Phase 4.)
 
 ### Phase 3: Drive-Loop Spike (GO/NO-GO)
@@ -137,7 +146,7 @@ Phase 0 (Eval Harness) is also the **continuous gate**: its recall-by-family met
 |-------|----------------|--------|-----------|
 | 0. Eval Harness | 4/4 | Complete   | 2026-07-30 |
 | 1. Ingestion Foundation | 0 / 9 | Not started | - |
-| 2. Retrieval, Navigation Tools & Rulebook | 0 / TBD | Not started | - |
+| 2. Retrieval, Navigation Tools & Rulebook | 0 / 9 | Not started | - |
 | 3. Drive-Loop Spike (GO/NO-GO) | 0 / TBD | Not started | - |
 | 4. Orchestrator + Sub-Agent Fan-Out | 0 / TBD | Not started | - |
 | 5. Grounded Adversarial Verifier | 0 / TBD | Not started | - |
