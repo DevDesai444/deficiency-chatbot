@@ -74,8 +74,8 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
   7. Oversized tool results are persisted and returned as a bounded preview plus a re-openable handle; an over-large `get_section` **fails with a narrow-your-range error rather than truncating**.
   8. Re-retrieving an unchanged span returns a "still current — refer to your earlier retrieval" stub instead of the full text (read deduplication), with the hit rate reported. Built here, not in Phase 6: it lives inside the retrieval tools, and a reviewer re-opens the same spec table many times per run — every Phase 3–5 eval iteration pays for its absence.
 **Plans**: 9 plans
-- [ ] 02-01-PLAN.md — Tool layer foundation: RetrievalLedger + ToolRejected + textsplit + open_doc/get_section/follow_reference (TOOLS-01/02/04, COST-04, D-FR)
-- [ ] 02-02-PLAN.md — Rulebook storage primitives: RuleChunk local store (SQLite+FAISS+BM25) + the generic edge table (RULES-04, D-RB3, D-RB6)
+- [x] 02-01-PLAN.md — Tool layer foundation: RetrievalLedger + ToolRejected + textsplit + open_doc/get_section/follow_reference (TOOLS-01/02/04, COST-04, D-FR)
+- [x] 02-02-PLAN.md — Rulebook storage primitives: RuleChunk local store (SQLite+FAISS+BM25) + the generic edge table (RULES-04, D-RB3, D-RB6)
 - [ ] 02-03-PLAN.md — Rulebook sourcing: eCFR/ICH/FDA vendoring + build orchestration, real live-fetched content committed to rulebook/ (RULES-01/02/03/04, D-RB1, D-RB2, D-PREC)
 - [ ] 02-04-PLAN.md — search_corpus: local hybrid (FAISS+BM25+RRF) per-submission retrieval tool (TOOLS-01, D-RB5)
 - [ ] 02-05-PLAN.md — emit_finding: the dual byte-exact grounding gate, the only path a finding can exist through (TOOLS-03, D-EF1)
