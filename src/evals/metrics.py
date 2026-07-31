@@ -97,6 +97,40 @@ def _retrieval_recall_at_k(report: FaultReport, eval_set: EvalSet, doc_id: str):
     return covered / len(doc_gts)
 
 
+def _search_corpus_recall_at_k(eval_set: EvalSet, doc_id: str, corpus, top_k: int = 10) -> dict | str:
+    """Real corpus-recall@k (Phase 2 upgrade of the Phase-0 proxy, per _retrieval_recall_at_k's
+    own docstring). Runs search_corpus once per non-held-out GT item for `doc_id`, checks
+    whether a top-k result's span overlaps evidence_anchor in the correct doc_id. Reports the
+    overall fraction AND the exact-identifier hard subset separately (D-SC4)."""
+    from evals.match import _TOKEN_RE
+    from tools.ledger import RetrievalLedger
+    from tools.search_corpus import search_corpus
+
+    doc_gts = [gt for gt in eval_set.deficiencies if gt.doc_id == doc_id]
+    if not doc_gts:
+        return "n/a_no_gt"
+
+    def _covered(gt) -> bool:
+        ledger = RetrievalLedger()
+        results = search_corpus(corpus, gt.title, ledger, top_k=top_k)
+        anchor_norm = re.sub(r"\s+", "", gt.evidence_anchor.lower())
+        for r in results:
+            if r["doc_id"] != doc_id:
+                continue
+            snippet_norm = re.sub(r"\s+", "", r["snippet"].lower())
+            if anchor_norm in snippet_norm:
+                return True
+        return False
+
+    hits = [(gt, _covered(gt)) for gt in doc_gts]
+    overall = sum(1 for _gt, ok in hits if ok) / len(hits)
+
+    hard = [(gt, ok) for gt, ok in hits if _TOKEN_RE.search(gt.evidence_anchor)]
+    hard_recall = (sum(1 for _gt, ok in hard if ok) / len(hard)) if hard else "n/a_no_hard_subset"
+
+    return {"overall": overall, "exact_identifier_subset": hard_recall, "n": len(hits), "n_hard": len(hard)}
+
+
 def _parse_fidelity(report: FaultReport) -> dict:
     return {"parsed_ok": len(report.parse_failures) == 0, "parse_failures": len(report.parse_failures)}
 
@@ -159,7 +193,9 @@ def _verifier_metrics(report: FaultReport, eval_set: EvalSet, doc_id: str):
     return {"precision": precision, "recall": recall}
 
 
-def compute_metrics(report: FaultReport, eval_set: EvalSet, doc_id: str, source_text: str = "") -> dict:
+def compute_metrics(
+    report: FaultReport, eval_set: EvalSet, doc_id: str, source_text: str = "", corpus=None
+) -> dict:
     """The full per-stage + by-family metrics dict for one scored detector run.
 
     `source_text` is the joined plain text of the (non-held-out) source document. Callers
@@ -167,11 +203,17 @@ def compute_metrics(report: FaultReport, eval_set: EvalSet, doc_id: str, source_
     table-cell text (checker note W1). Without it, `anchor_rate` reports the `"n/a_no_source"`
     sentinel since there is nothing to verbatim-check finding evidence against; WITH it,
     `anchor_rate` is a real, code-computed number.
+
+    `corpus` (optional, Phase 2/SC4) is an ingested `ingest.corpus.CorpusIndex` for `doc_id`. When
+    supplied, an ADDITIONAL `"search_corpus_recall_at_k"` key is computed via
+    `_search_corpus_recall_at_k` -- a real `search_corpus`-driven measurement -- alongside (never
+    replacing) the existing `retrieval_recall_at_k` Phase-0 proxy key. `corpus=None` (the default)
+    keeps every existing caller's signature/behavior byte-for-byte unchanged.
     """
     end_to_end = _end_to_end(report, eval_set, doc_id)
     end_to_end_by_family = _end_to_end_by_family(report, eval_set, doc_id)
 
-    return {
+    metrics = {
         "end_to_end": end_to_end,
         "end_to_end_by_family": end_to_end_by_family,
         "recall_by_family": {family: values["recall"] for family, values in end_to_end_by_family.items()},
@@ -180,6 +222,9 @@ def compute_metrics(report: FaultReport, eval_set: EvalSet, doc_id: str, source_
         "anchor_rate": _anchor_rate(report, source_text),
         "verifier": _verifier_metrics(report, eval_set, doc_id),
     }
+    if corpus is not None:
+        metrics["search_corpus_recall_at_k"] = _search_corpus_recall_at_k(eval_set, doc_id, corpus)
+    return metrics
 
 
 def recall_by_family(report: FaultReport, eval_set: EvalSet, doc_id: str) -> dict:
@@ -217,6 +262,8 @@ def format_table(metrics: dict) -> str:
     lines.append("")
     lines.append("=== Per-stage metrics (SC2 -- all five reported separately) ===")
     lines.append(f"retrieval_recall_at_k : {_fmt(metrics['retrieval_recall_at_k'])}")
+    if "search_corpus_recall_at_k" in metrics:
+        lines.append(f"search_corpus_recall_at_k : {_fmt(metrics['search_corpus_recall_at_k'])}")
     lines.append(f"parse_fidelity        : {_fmt(metrics['parse_fidelity'])}")
     lines.append(f"anchor_rate           : {_fmt(metrics['anchor_rate'])}")
     lines.append(f"verifier              : {_fmt(metrics['verifier'])}")

@@ -4,12 +4,27 @@ Pins the golden run's baseline (recall 2/28, reproducing docs/eval/MEASUREMENT.m
 LLM) and both checker-note fixes: W1 (anchor_rate is a real number when source_text is supplied,
 never a permanent sentinel) and W3 (all five per-stage metrics are surfaced separately, not only
 folded into the by-family table).
+
+Plan 02-07 (SC4) adds `TestSearchCorpusRecallAtK` + `TestComputeMetricsCorpusAdditive` below,
+exercising the real `search_corpus`-driven upgrade of the Phase-0 `_retrieval_recall_at_k` proxy.
+These deliberately do NOT route through `golden_report()`/`compute_metrics(...)` with a non-empty
+`FaultReport.faults` list for `mvr1381` -- `report.faults[i].cited_section_indices` is read by the
+UNTOUCHED Phase-0 proxy (`_retrieval_recall_at_k`, line ~90) and that field does not exist on the
+current (import-only, uncommitted-redesign) `schemas.faults.Fault` model, a PRE-EXISTING failure
+unrelated to this plan (see `TestRetrievalRecallAtK`/most of `TestComputeMetricsBaseline` above,
+already failing on `main` before this plan for the same reason). `schemas/faults.py` is
+import-only for this plan -- not touched here.
 """
 from __future__ import annotations
 
+import numpy as np
+
 from evals.capture import golden_report
-from evals.metrics import compute_metrics, format_table, recall_by_family
-from evals.schema import FailureFamily, load_eval_set
+from evals.match import _TOKEN_RE
+from evals.metrics import _search_corpus_recall_at_k, compute_metrics, format_table, recall_by_family
+from evals.schema import EvalSet, FailureFamily, GroundTruthDeficiency, load_eval_set
+from schemas.faults import FaultReport
+from tests.tools.conftest import build_corpus_index
 
 DOC_ID = "mvr1381"
 FIVE_PER_STAGE_KEYS = {
@@ -19,6 +34,10 @@ FIVE_PER_STAGE_KEYS = {
     "verifier",
     "end_to_end",
 }
+
+
+def _blk(text: str) -> dict:
+    return {"text": text, "page": 1, "reading_order": 0, "lines": []}
 
 
 class TestComputeMetricsBaseline:
@@ -128,6 +147,197 @@ class TestRetrievalRecallAtK:
         m = compute_metrics(golden_report(), load_eval_set(), DOC_ID)
         assert isinstance(m["retrieval_recall_at_k"], float)
         assert 0.0 <= m["retrieval_recall_at_k"] <= 1.0
+
+
+class TestSearchCorpusRecallAtK:
+    """SC4: `_search_corpus_recall_at_k` -- the real `search_corpus`-driven upgrade, additive to
+    the untouched Phase-0 `_retrieval_recall_at_k` proxy above. Uses a small REAL `CorpusIndex`
+    (`tests.tools.conftest.build_corpus_index` -- the same offline substrate-routing fixture Plan
+    02-04's own `tests/tools/test_search_corpus.py` uses) with the dense leg mocked to a fixed
+    vector for speed/determinism; the real BM25 lexical leg + real `reciprocal_rank_fusion`
+    combiner both still run for real.
+    """
+
+    SEARCH_DOC_ID = "sc07-doc"
+
+    def _corpus(self, tmp_path, text: str):
+        return build_corpus_index(tmp_path, self.SEARCH_DOC_ID, [_blk(text)])
+
+    def _mock_dense(self, monkeypatch):
+        import tools.search_corpus as sc_module
+
+        monkeypatch.setattr(
+            sc_module,
+            "embed_texts",
+            lambda texts, batch_size=8: np.array([[1.0, 0.0]] * len(texts), dtype=np.float32),
+        )
+        monkeypatch.setattr(
+            sc_module, "embed_query", lambda text: np.array([1.0, 0.0], dtype=np.float32)
+        )
+
+    def test_na_no_gt_sentinel_when_doc_has_no_gt_items(self, tmp_path):
+        eval_set = EvalSet(deficiencies=[])
+        corpus = self._corpus(tmp_path, "Irrelevant content unrelated to any deficiency.")
+        assert _search_corpus_recall_at_k(eval_set, self.SEARCH_DOC_ID, corpus) == "n/a_no_gt"
+
+    def test_numeric_anchor_is_covered_and_classified_as_hard_subset(self, tmp_path, monkeypatch):
+        """A numeric/identifier evidence_anchor (matches evals.match._TOKEN_RE, the SAME token
+        pattern reused verbatim, not reinvented) is both covered AND counted in the hard subset."""
+        self._mock_dense(monkeypatch)
+        assert _TOKEN_RE.search("11477")  # sanity: this anchor IS the hard-subset pattern
+        corpus = self._corpus(
+            tmp_path, "Table 20 Maximum theoretical plates recorded as 11477 in the summary row."
+        )
+        gt = GroundTruthDeficiency(
+            id="X-01",
+            doc_id=self.SEARCH_DOC_ID,
+            title="Table 20 Maximum theoretical plates cell disagreement",
+            evidence_anchor="11477",
+            failure_family=FailureFamily.CROSS_REFERENCE_INTEGRITY,
+        )
+        eval_set = EvalSet(deficiencies=[gt])
+
+        result = _search_corpus_recall_at_k(eval_set, self.SEARCH_DOC_ID, corpus)
+
+        assert result == {"overall": 1.0, "exact_identifier_subset": 1.0, "n": 1, "n_hard": 1}
+
+    def test_word_anchor_is_covered_but_excluded_from_hard_subset(self, tmp_path, monkeypatch):
+        self._mock_dense(monkeypatch)
+        assert not _TOKEN_RE.search("control sample")  # sanity: NOT the hard-subset pattern
+        corpus = self._corpus(tmp_path, "The control sample produced no reportable peak.")
+        gt = GroundTruthDeficiency(
+            id="X-02",
+            doc_id=self.SEARCH_DOC_ID,
+            title="No result reported for the control sample",
+            evidence_anchor="control sample",
+            failure_family=FailureFamily.ABSENCE_OF_EVIDENCE,
+        )
+        eval_set = EvalSet(deficiencies=[gt])
+
+        result = _search_corpus_recall_at_k(eval_set, self.SEARCH_DOC_ID, corpus)
+
+        assert result["overall"] == 1.0
+        assert result["exact_identifier_subset"] == "n/a_no_hard_subset"
+        assert result["n"] == 1
+        assert result["n_hard"] == 0
+
+    def test_hard_subset_is_computed_separately_from_a_mixed_gt_set(self, tmp_path, monkeypatch):
+        """Two GT items -- one numeric (hard, findable), one word-anchored (soft, NOT present in
+        the corpus at all) -- proves the hard-subset fraction is computed over ONLY the hard
+        items, independent of the overall fraction being dragged down by the unfindable item."""
+        self._mock_dense(monkeypatch)
+        corpus = self._corpus(tmp_path, "Batch 20038 showed 0.3 percent degradation after storage.")
+        hard_gt = GroundTruthDeficiency(
+            id="X-03",
+            doc_id=self.SEARCH_DOC_ID,
+            title="Batch degradation figure reported",
+            evidence_anchor="20038",
+            failure_family=FailureFamily.CROSS_REFERENCE_INTEGRITY,
+        )
+        unfindable_soft_gt = GroundTruthDeficiency(
+            id="X-04",
+            doc_id=self.SEARCH_DOC_ID,
+            title="Accuracy was never demonstrated for this batch",
+            evidence_anchor="accuracy demonstration",
+            failure_family=FailureFamily.ABSENCE_OF_EVIDENCE,
+        )
+        eval_set = EvalSet(deficiencies=[hard_gt, unfindable_soft_gt])
+
+        result = _search_corpus_recall_at_k(eval_set, self.SEARCH_DOC_ID, corpus)
+
+        assert result["n"] == 2
+        assert result["n_hard"] == 1
+        assert result["exact_identifier_subset"] == 1.0  # the hard item alone is covered
+        assert result["overall"] == 0.5  # 1 of 2 total GT items covered
+
+    def test_anchor_absent_from_corpus_is_not_covered(self, tmp_path, monkeypatch):
+        self._mock_dense(monkeypatch)
+        corpus = self._corpus(tmp_path, "This document mentions nothing relevant to any finding.")
+        gt = GroundTruthDeficiency(
+            id="X-05",
+            doc_id=self.SEARCH_DOC_ID,
+            title="A number that never appears anywhere in this document",
+            evidence_anchor="99999",
+            failure_family=FailureFamily.DERIVATION_PLAUSIBILITY,
+        )
+        eval_set = EvalSet(deficiencies=[gt])
+
+        result = _search_corpus_recall_at_k(eval_set, self.SEARCH_DOC_ID, corpus)
+
+        assert result["overall"] == 0.0
+        assert result["exact_identifier_subset"] == 0.0
+
+
+class TestComputeMetricsCorpusAdditive:
+    """`compute_metrics`'s new optional `corpus` param is ADDITIVE, never breaking: omitting it
+    (the default) reproduces the exact pre-existing dict shape; passing a corpus adds exactly one
+    new key on top. Uses an EMPTY-faults `FaultReport` so `_retrieval_recall_at_k` (unmodified,
+    still reads `fault.cited_section_indices` per-fault) never iterates a fault and so never hits
+    the pre-existing, out-of-scope `cited_section_indices` AttributeError documented at the top of
+    this file -- this test is about the additive `compute_metrics` contract, not about re-proving
+    the Phase-0 proxy's own (already broken, already tracked) behavior.
+    """
+
+    SEARCH_DOC_ID = "sc07-additive-doc"
+
+    def test_corpus_none_omits_the_new_key(self):
+        empty_report = FaultReport(faults=[])
+        eval_set = EvalSet(deficiencies=[])
+        metrics = compute_metrics(empty_report, eval_set, self.SEARCH_DOC_ID)
+        assert "search_corpus_recall_at_k" not in metrics
+        assert set(metrics) == {
+            "end_to_end",
+            "end_to_end_by_family",
+            "recall_by_family",
+            "retrieval_recall_at_k",
+            "parse_fidelity",
+            "anchor_rate",
+            "verifier",
+        }
+
+    def test_corpus_given_adds_the_new_key_without_removing_any_existing_key(self, tmp_path, monkeypatch):
+        import tools.search_corpus as sc_module
+
+        monkeypatch.setattr(
+            sc_module,
+            "embed_texts",
+            lambda texts, batch_size=8: np.array([[1.0, 0.0]] * len(texts), dtype=np.float32),
+        )
+        monkeypatch.setattr(
+            sc_module, "embed_query", lambda text: np.array([1.0, 0.0], dtype=np.float32)
+        )
+        corpus = build_corpus_index(
+            tmp_path, self.SEARCH_DOC_ID, [_blk("Impurity level recorded at 0.15 percent in the table.")]
+        )
+        gt = GroundTruthDeficiency(
+            id="Y-01",
+            doc_id=self.SEARCH_DOC_ID,
+            title="Impurity level table entry",
+            evidence_anchor="0.15",
+            failure_family=FailureFamily.CROSS_REFERENCE_INTEGRITY,
+        )
+        empty_report = FaultReport(faults=[])
+        eval_set = EvalSet(deficiencies=[gt])
+
+        metrics = compute_metrics(empty_report, eval_set, self.SEARCH_DOC_ID, corpus=corpus)
+
+        assert "search_corpus_recall_at_k" in metrics
+        assert metrics["search_corpus_recall_at_k"]["overall"] == 1.0
+        # every pre-existing key is still present, byte-for-byte the same keys as the no-corpus call
+        no_corpus_metrics = compute_metrics(empty_report, eval_set, self.SEARCH_DOC_ID)
+        assert set(no_corpus_metrics) < set(metrics)
+
+    def test_format_table_prints_the_new_key_only_when_present(self):
+        empty_report = FaultReport(faults=[])
+        eval_set = EvalSet(deficiencies=[])
+        no_corpus_metrics = compute_metrics(empty_report, eval_set, self.SEARCH_DOC_ID)
+        assert "search_corpus_recall_at_k" not in format_table(no_corpus_metrics)
+
+        with_key_metrics = dict(no_corpus_metrics)
+        with_key_metrics["search_corpus_recall_at_k"] = {
+            "overall": 1.0, "exact_identifier_subset": 1.0, "n": 1, "n_hard": 1,
+        }
+        assert "search_corpus_recall_at_k" in format_table(with_key_metrics)
 
 
 class TestRecallByFamilyTopLevelFunction:
