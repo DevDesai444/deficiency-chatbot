@@ -1,8 +1,8 @@
 ---
 phase: 3
 slug: drive-loop-spike-go-no-go
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-01
 ---
@@ -62,7 +62,7 @@ created: 2026-08-01
 | GROUND-01 | **Span-ID round-trip composition test** — render → parse → re-mint → `was_issued` → `open_span` byte-exact, over a real `build_corpus_index`, for all 5 rendering tools | T-03-SPAN | **composition** | `pytest tests/agents/review/test_spanref_roundtrip.py -x` | ❌ W0 | ⬜ pending |
 | GROUND-01 | Loop-side unresolvable span ref returns a **distinct** reason code, never `not_byte_exact` (a loop bug must not masquerade as model span-invention) | T-03-SPAN | unit | `pytest tests/agents/review/test_spanref_roundtrip.py::test_unresolvable_ref_is_not_span_invention -x` | ❌ W0 | ⬜ pending |
 | GROUND-01/03 | `emit_finding` rejections carry the correct `half` at all 7 rejection sites (D-TEL3) | — | unit | `pytest tests/tools/test_emit_finding.py -k half -x` | ⚠️ file exists, assertions ❌ | ⬜ pending |
-| GROUND-03 | `rule_span_id` + `verdict` survive onto the `Fault` | — | unit | `pytest tests/unit/test_schemas.py -k verdict -x` | ❌ W0 | ⬜ pending |
+| GROUND-03 | `rule_span_id` + `verdict` survive onto the `Fault` — node `test_verdict_and_span_ids_survive_onto_the_fault` (plan 03-02 Task 3(f)) | — | unit | `pytest tests/unit/test_schemas.py -k verdict -x` | ⚠️ file exists, assertion ❌ | ⬜ pending |
 | DETECT-03 | `run_oracles`-the-tool returns leads; **no span pre-recorded in the ledger** (D-ORC2) | T-03-ORACLE | unit | `pytest tests/agents/review/test_oracles_tool.py::test_no_prerecorded_spans -x` | ❌ W0 | ⬜ pending |
 | DETECT-03 | S9, S10, P10 each produce a lead on a fixture that omits the element | — | unit | `pytest tests/agents/review/test_oracles_tool.py::test_s9_s10_p10_leads -x` | ❌ W0 (**S10 does not exist in code today**) | ⬜ pending |
 | DETECT-04 | Verdict is enum-constrained; a free-text verdict is rejected | — | unit | `pytest tests/agents/review/test_tool_schemas.py::test_verdict_enum -x` | ❌ W0 | ⬜ pending |
@@ -106,6 +106,7 @@ Full code sketches live in `03-RESEARCH.md:1120-1184`. Summary of why each is no
 - [ ] `tests/agents/review/test_oracles_tool.py` — D-ORC1/D-ORC2 + S9/S10/P10
 - [ ] Extend `tests/tools/test_emit_finding.py` — `half` at all 7 rejection sites
 - [ ] Extend `tests/tools/test_contracts.py` — `KNOWN_REASON_CODES` coverage
+- [ ] Extend `tests/unit/test_schemas.py` — `test_verdict_and_span_ids_survive_onto_the_fault` (GROUND-03 / DETECT-04)
 - [ ] Extend `tests/unit/test_parse.py` — P2 fallback blocks
 - [ ] Extend `tests/ingest/test_store.py` — `PARSER_VERSION` in `cache_key`
 - [ ] *Optional but recommended:* `.github/workflows/test.yml` running pytest with no Databricks credentials — makes D-RB6 **checkable** rather than asserted
@@ -129,12 +130,16 @@ Full code sketches live in `03-RESEARCH.md:1120-1184`. Summary of why each is no
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or a Wave 0 dependency
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all ❌ MISSING references above
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s (quick) / 90s (full)
-- [ ] Every manual-only verification is listed above with instructions (live-model work cannot be automated)
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or a Wave 0 dependency
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all ❌ MISSING references above
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s (quick) / 90s (full)
+- [x] Every manual-only verification is listed above with instructions (live-model work cannot be automated)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-08-01
+
+> `wave_0_complete` stays `false` deliberately. The Wave 0 test files above genuinely do not exist
+> yet — that flag flips during **execution**, not planning. Everything else in this contract is
+> settled against the 19 plans as written.

@@ -1258,38 +1258,47 @@ Then assert the positive property for the path actually shipped: `len(review_res
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All six are dispositioned in the phase plan set. Q2 is **flagged by design** — it is a decision
+> reserved for the senior reviewer, not a question the planner was permitted to close.
 
 1. **The "uncommitted redesign" premise in STATE.md and CLAUDE.md is STALE — the work is committed.**
    - What we verified: `git status --porcelain` shows only `.planning/config.json` and `rulebook/manifest.yaml` modified. `git diff HEAD --stat -- src/` is **empty**. `git ls-files src/agents/detection/` lists **all 16 files including `planning.py`, `summarise.py`, `sandwich.py`, `workers.py`** as tracked. `git stash list` is empty. There are no untracked files.
    - What this means: there is no uncommitted work to build on or clobber. The redesign **is** `HEAD` (`9b68856`), it is exercised by `tests/agents/detection/test_planner_redesign.py` (338+ lines) and `tests/unit/test_detection.py`, and `pipeline.py:58-83` drives it (concurrent `run_planner` ∥ `summarise_sections`, then `run_workers`).
    - How the loop should relate to it: **leave it entirely alone.** It is the *baseline arm*. D-LOOP1 requires it stay runnable; D-LOOP2 re-runs it 3× to produce the governing reference. Building `src/agents/review/` as a sibling package touches none of it. No conflict exists with D-LOOP1, D-ORC1 or D-VER1 — those decisions describe what the **agent path** does differently, not edits to the legacy path.
    - **Recommendation:** correct `.planning/STATE.md:75` and the CLAUDE.md branch note as a small hygiene task, so no later agent re-derives a stale premise.
+   - **RESOLVED: → plan `03-03` Task 3(c)** — rewrites the stale STATE.md blocker entry (acceptance criterion asserts `committed and is HEAD` is present and `is uncommitted on branch` is gone). Task 3(d) deliberately leaves `CLAUDE.md` untouched — it is the project's own instruction file, outside the plan's file set — and surfaces the same stale premise in the plan SUMMARY for the reviewer to decide.
 
 2. **Is the held-out calibration corpus adequate? — FLAGGED, reviewer decision required.**
    - What we know: `spec32s41` is the only genuinely held-out real document, it is a single PDF, and it carries 3 GT deficiencies.
    - What's unclear: whether a single-document consumption figure can support a `3×` multiple over a multi-document review.
    - Recommendation: option (a) — source 2–4 unlabeled real submission documents into a `calibration/` corpus. Option (b) — synthesize with `make_docx_fixture.py`'s deterministic pattern and report the figure as a lower bound. **Do not substitute scored data.** Resolve before the pre-registration is committed.
+   - **RESOLVED: → plan `03-16` Task 1 — FLAGGED BY DESIGN, reviewer decision, deliberately NOT closed here.** The plan is a blocking `checkpoint:decision` that presents all three options and picks none, per CONTEXT.md's instruction to flag rather than substitute scored data. It is dispositioned, not answered: the answer is the senior reviewer's at execution time, and no plan may resolve it by using `mvr1381` or `minispec`.
 
 3. **Does Databricks report cache hits, and does the static prefix actually hit?**
    - What we know: caching is implicit and covers Llama 3.3 70B; `PromptTokensDetails.cached_tokens` exists in the SDK.
    - What's unclear: whether the field is populated by this provider.
    - Recommendation: a 3-line probe during the first smoke run. If absent, record `usage_present=False` and note in the report that D-LOOP4's invariant is asserted by test but its *payoff* is unmeasured until Phase 6. Do not let this block anything.
+   - **RESOLVED: → plan `03-18` Task 1** — the live smoke run settles assumption A1 (`usage.prompt_tokens_details.cached_tokens` populated or not) alongside A3 and A4, before the scored set begins. Either answer is acceptable and blocks nothing; only silence about it is not, and the reviewer must state the A1 outcome in the resume signal for the phase report.
 
 4. **Will P2 move the frozen baselines, and by how much?**
    - What we know: P2 recovers text on 5 anchors in `mvr1381`'s exact-identifier hard subset (SC4 7/12), and both `recall_by_family.json` and `retrieval_recall.json` are downstream.
    - What's unclear: the magnitude, and whether the D-LOOP2 `|median − 0.071| > 0.03` line trips.
    - Recommendation: measure and disclose per D-PRE1(a). If the line trips, the reviewer confirms a new reference **before** the agent arm runs — the sequence D-LOOP2 designed for precisely this.
+   - **RESOLVED: → plans `03-01` and `03-12`** — 03-01 produces `03-P2-BASELINE-SHIFT.md` (what the parse fix moved, so a parse shift is never read as variance, per D-PRE1(a)); 03-12 Task 2(b) evaluates the `|median − 0.071| > 0.03` line to the literal word `WITHIN` or `EXCEEDS`, and 03-12 Task 3 is the blocking reviewer confirmation of the governing reference before any agent run exists.
 
 5. **How large is the boundary-crossing hunt?**
    - What we know: 3 chains were found in Phase 2; this research surfaced 3 more candidates (span-ID round-trip, `run_oracles`→`get_section`→`emit_finding`, `cache_key`→parse output).
    - What's unclear: the total.
    - Recommendation: plan it as its own executor plan with the written-list deliverable D-PRE1(b) specifies, seeded with the three candidates above so it starts from evidence rather than a blank page.
+   - **RESOLVED: → plan `03-10`** — the boundary-crossing hunt is its own plan producing `03-BOUNDARY-CROSSING-AUDIT.md`, seeded with the three candidates named here, and it sits in D-PRE1's chain ahead of the baseline re-measurement (03-12) and the pre-registration (03-17).
 
 6. **Does S10 have a ground-truth item to hit at all?**
    - What we know: S10 (reference standards) does not exist in code, and `mvr1381`'s GT anchors include `'control sample'` (A-03) and `'current in-house SOP'` (A-11) which are plausibly reference-standard adjacent — but no anchor names a reference standard directly.
    - What's unclear: whether building S10 buys any measurable recall on the scored set.
    - Recommendation: build it (DETECT-03 names it), but **do not count on it for the D-GO1(a) family unlock**. `derivation_plausibility` and `regulatory_framing` (5/5 matchable each, both at 0.0) are the better-odds targets, and the report should say which mechanism produced the unlock.
+   - **RESOLVED: → plan `03-09`** — S10 is built because DETECT-03 names it, and the plan's `<interfaces>` records this open question verbatim as the honest caveat: do not count on S10 for the D-GO1(a) unlock; `derivation_plausibility` and `regulatory_framing` are the better-odds targets. Plan 03-19 §3 requires the report to name which mechanism produced any unlock.
 
 ---
 
