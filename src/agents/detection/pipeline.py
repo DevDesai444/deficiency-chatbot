@@ -6,18 +6,19 @@ Runs the four stages over the structured document and returns a FaultReport:
 """
 from __future__ import annotations
 
+import concurrent.futures
 import time
 
 import structlog
 
-from agents.detection.catalog import CANONICAL_DOMAINS
 from agents.detection.challenge import challenge_faults
 from agents.detection.checklists import run_checklists
 from agents.detection.ctd import describe_document, detect_ctd_section
 from agents.detection.oracles import run_oracles
-from agents.detection.selection import gather_precedents, select_domains
-from agents.detection.subagents import run_subagents
+from agents.detection.planning import run_planner
+from agents.detection.summarise import summarise_sections
 from agents.detection.verify import verify_and_tier
+from agents.detection.workers import run_workers
 from agents.event_bus import emit_sync
 from config import DETECTOR_MODELS, resolve_detector_model
 from schemas.faults import FaultReport
@@ -54,15 +55,32 @@ def run_detection(
         f"{len(oracle_faults)} code-verified, {len(checklist_faults)} checklist findings",
     )
 
-    # Stage 3 — selection (adaptive) then the sub-agent fan-out.
-    domains = select_domains(doc, sections, model=detector_model)
-    emit_sync(job_id, "detection", "selection", "Selector", f"Domains: {', '.join(domains) or 'none'}")
-    precedents = {d: gather_precedents(d, doc) for d in domains}
-    for d in domains:
-        emit_sync(job_id, "detection", "agent_spawned", f"specialist:{d}", CANONICAL_DOMAINS.get(d, "")[:80])
-    for g in groups:
-        emit_sync(job_id, "detection", "agent_spawned", f"reviewer:{g.get('group_id', '')}", "Open review of this region")
-    agent_faults, failures = run_subagents(sections, groups, domains, precedents, doc_desc, model=detector_model)
+    # Stage 3 — planner ∥ summariser (concurrent), then the two-pass worker fan-out.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        plan_future = pool.submit(run_planner, sections, doc, detector_model)
+        summary_future = pool.submit(summarise_sections, sections, detector_model)
+        plan = plan_future.result()
+        summaries = summary_future.result()
+
+    focused_headings: list[str] = []
+    for w in plan.workers:
+        for i in w.focused_section_indices:
+            if i < len(sections):
+                heading = sections[i].get("heading", "")
+                if heading and heading not in focused_headings:
+                    focused_headings.append(heading)
+    routed = sum(len(w.suspicions) for w in plan.workers)
+    emit_sync(
+        job_id, "detection", "selection", "Planner",
+        f"{len(plan.workers)} specialist workers, {routed} suspicions routed",
+    )
+    for w in plan.workers:
+        emit_sync(
+            job_id, "detection", "agent_spawned",
+            "specialist:" + ",".join(str(i) for i in w.focused_section_indices),
+            (w.instruction or "")[:80],
+        )
+    agent_faults, failures = run_workers(sections, summaries, plan, doc_desc, model=detector_model)
 
     # Stage 4 — verify + tier + dedup, then the grounded challenge (scores, never vetoes).
     faults = verify_and_tier(oracle_faults + checklist_faults + agent_faults, doc)
@@ -70,15 +88,15 @@ def run_detection(
     emit_sync(job_id, "detection", "agent_message", "Challenge", "Grounded-challenge pass complete")
     emit_sync(
         job_id, "detection", "layer_complete", "Detection",
-        f"{len(faults)} faults surfaced ({len(failures)} agent parse failures)",
+        f"{len(faults)} faults surfaced ({len(failures)} worker parse failures)",
     )
-    log.info("detection_complete", faults=len(faults), domains=len(domains), seconds=round(time.time() - start, 1))
+    log.info("detection_complete", faults=len(faults), workers=len(plan.workers), seconds=round(time.time() - start, 1))
 
     return FaultReport(
         job_id=job_id,
         faults=faults,
         faults_found=bool(faults),
-        domains_checked=domains,
+        domains_checked=focused_headings,
         parse_failures=failures,
         analysis_seconds=round(time.time() - start, 1),
     )

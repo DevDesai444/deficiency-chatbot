@@ -88,11 +88,12 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 ### Phase 3: Drive-Loop Spike (GO/NO-GO)
 **Goal**: Prove the central unknown — a **single** tool-using agent can navigate the corpus on Llama 3.3 70B / Qwen, ground every finding to a re-openable source quote **and** a cited rule, and stop within hard code budgets. If the loop can't ground reliably here, Phases 4–6 are moot; keep it one agent to isolate the risk before multiplying cost by N.
 **Depends on**: Phase 2
-**Requirements**: AGENT-01, AGENT-03, GROUND-01, GROUND-03, DETECT-03, DETECT-04
+**Requirements**: AGENT-01, AGENT-03, AGENT-04, GROUND-01, GROUND-03, DETECT-03, DETECT-04
 **Success Criteria** (what must be TRUE):
   1. Detection runs as a **model-driven, model-agnostic tool loop** (request evidence → reason → request more → stop on done/budget) that replaces the one-shot pre-rendered call, and it emits reliable tool-call arguments on **both** Llama 3.3 70B and Qwen (the go/no-go validation), with `structured.py` as the malformed-arg fallback.
   2. Every finding the agent emits is pinned to a **verbatim quote it actually retrieved** (re-opening the span reproduces it byte-for-byte) AND **dual-cited** to the specific FDA/ICH rule clause it violates, with a **compliance verdict** per finding tied to that rule.
   3. Hard per-run token/step/wall-clock budgets and a **circuit breaker** are enforced **in code, not prompt** — a runaway load test halts at the ceiling and returns the grounded partial, never crashing or overspending — **plus a diminishing-returns stop**: N consecutive steps yielding negligible new grounded evidence halt the loop *before* the ceiling, so budget buys progress rather than circling.
+  3b. The budget is **bidirectional**: when the model emits no tool call but is under budget and not in diminishing returns, the loop **refuses the stop** and injects a continuation nudge (`"Keep working — do not summarize"`), in code. The model's "I'm done" is not a termination condition. This is the anti-premature-stop mechanism the 2/28 baseline demands — a ceiling-only budget cannot prevent an agent from quitting after the easy findings — and the spike must report continuation count and whether nudged turns produced new grounded findings.
   4. Deterministic quick-win oracles (LOD/LOQ presence S9, reference standards S10, stability commitment P10) run as a **demoted seed pass** that feeds the loop — not as the primary source of findings.
   5. On the Phase 0 eval set, the grounded loop moves **recall-by-failure-family above the single-shot baseline** — the go signal that becoming-an-agent *adds missing check-kinds*, not just a nicer loop around the same 7% ceiling.
 **Plans**: TBD

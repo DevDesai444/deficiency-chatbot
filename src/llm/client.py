@@ -12,9 +12,22 @@ log = structlog.get_logger()
 
 _client: OpenAI | None = None
 
-_RETRYABLE = (APIConnectionError, APITimeoutError, RateLimitError)
-_MAX_RETRIES = 3
+_RETRYABLE = (APIConnectionError, APITimeoutError)
+_MAX_RETRIES = 5
 _BASE_DELAY = 1.0
+_RATE_LIMIT_BASE_DELAY = 8.0    # per-minute token limits need real waits, not 1-4s
+_RATE_LIMIT_MAX_DELAY = 60.0
+
+
+def _retry_after_seconds(exc) -> float | None:
+    """Read a Retry-After header off a rate-limit error, if the server sent one."""
+    resp = getattr(exc, "response", None)
+    headers = getattr(resp, "headers", None) or {}
+    value = headers.get("retry-after") or headers.get("Retry-After")
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 @dataclass
@@ -31,7 +44,7 @@ def get_client() -> OpenAI:
             _client = OpenAI(
                 base_url=f"{s.databricks_host}/serving-endpoints",
                 api_key=s.databricks_token,
-                timeout=60.0,
+                timeout=120.0,
             )
         else:
             _client = OpenAI(
@@ -98,6 +111,14 @@ def chat_completion_full(
                 continue
             log.error("llm_bad_request", error=str(exc))
             raise
+        except RateLimitError as exc:
+            if attempt == _MAX_RETRIES - 1:
+                log.error("llm_rate_limited_giving_up", attempts=_MAX_RETRIES)
+                raise
+            retry_after = _retry_after_seconds(exc)
+            delay = retry_after if retry_after else min(_RATE_LIMIT_BASE_DELAY * (2 ** attempt), _RATE_LIMIT_MAX_DELAY)
+            log.warning("llm_rate_limited_backoff", attempt=attempt + 1, delay=round(delay, 1))
+            time.sleep(delay)
         except _RETRYABLE as exc:
             if attempt == _MAX_RETRIES - 1:
                 log.error("llm_call_failed", error=str(exc), attempts=_MAX_RETRIES)

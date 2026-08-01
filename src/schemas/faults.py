@@ -59,6 +59,7 @@ class Fault(BaseModel):
     novel: bool = Field(default=False, description="No matching precedent in the KB.")
     out_of_distribution: bool = Field(default=False, description="Doc type the KB does not cover well (e.g. non-patch).")
     challenge_note: str = Field(default="", description="Grounded counter-evidence found by the challenge pass, if it lowered confidence.")
+    cited_section_indices: list[int] = Field(default_factory=list, description="Section indices a cross-section finding references, so the grounded challenge can see every cited section.")
 
 
 class FaultReport(BaseModel):

@@ -170,18 +170,18 @@ class TestRender:
 
 
 class TestChallenge:
-    def test_grounded_refutation_lowers_confidence(self):
+    def test_grounded_refutation_drops_finding(self):
         from agents.detection.challenge import ChallengeVerdict, _apply_verdict
         from agents.detection.verify import _doc_corpus
 
         doc = {"pages": [{"blocks": [{"text": "The absorptivity factor for Estradiol is 1.02."}], "tables": []}]}
         f = Fault(title="Missing absorptivity factor for Estradiol", confidence=0.4)
         verdict = ChallengeVerdict(refuted=True, counter_evidence="absorptivity factor for Estradiol is 1.02")
-        _apply_verdict(f, verdict, _doc_corpus(doc))
-        assert f.confidence < 0.4
+        dropped = _apply_verdict(f, verdict, _doc_corpus(doc))
+        assert dropped is True                 # grounded refutation removes the false positive
         assert f.challenge_note != ""
 
-    def test_ungrounded_refutation_does_not_lower(self):
+    def test_ungrounded_refutation_keeps_finding(self):
         from agents.detection.challenge import ChallengeVerdict, _apply_verdict
         from agents.detection.verify import _doc_corpus
 
@@ -189,7 +189,8 @@ class TestChallenge:
         f = Fault(title="Some finding", confidence=0.4)
         # claims refuted, but the counter-evidence is not in the document → not grounded → survives
         verdict = ChallengeVerdict(refuted=True, counter_evidence="a passage that is not in the document")
-        _apply_verdict(f, verdict, _doc_corpus(doc))
+        dropped = _apply_verdict(f, verdict, _doc_corpus(doc))
+        assert dropped is False
         assert f.confidence >= 0.4
         assert f.challenge_note == ""
 

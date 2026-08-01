@@ -11,7 +11,6 @@ Layers:
 """
 from __future__ import annotations
 
-import copy
 import json
 from typing import TypeVar
 
@@ -213,11 +212,14 @@ def repair_with_moderator(
     validation_error: str,
     model_cls: type[T],
     context: str = "",
+    model: str | None = None,
 ) -> tuple[T | None, ParseFailed | None]:
-    """L5: escalate to the 70B moderator for a one-shot repair.
+    """L5: one-shot schema repair.
 
-    The moderator gets: the failing text, the Pydantic error, the target schema,
-    and strict response_format. Called only in the ~0.5% failure tail.
+    Runs on the CALLER's model when one is given, so a run stays on the model the analyst
+    picked; only an unattributed call falls back to the configured moderator. The repairer gets:
+    the failing text, the Pydantic error, the target schema, and strict response_format.
+    Called only in the ~0.5% failure tail.
     """
     s = get_settings()
     if s.structured_output_max_repair_calls <= 0:
@@ -249,7 +251,7 @@ def repair_with_moderator(
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            model=s.moderator_model,
+            model=model or s.moderator_model,
             temperature=0.0,
             max_tokens=s.max_tokens_ceiling,
             response_format=build_response_format(model_cls),
@@ -305,6 +307,7 @@ def structured_call(
         validation_error=(failure.validation_error if failure else ""),
         model_cls=model_cls,
         context=repair_context,
+        model=model,
     )
     if repaired is not None:
         return repaired, None
