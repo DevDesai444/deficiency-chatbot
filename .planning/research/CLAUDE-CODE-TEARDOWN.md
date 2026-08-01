@@ -137,3 +137,67 @@ The likely resolution — to be confirmed during Phase 1 discussion, not assumed
 
 So: eager cheap pass (walk → classify → outline → manifest), lazy expensive pass (parse section text on
 `get_section`). Phase 1 should decide where exactly that line sits, and the eval harness should measure it.
+
+---
+
+# Second pass (2026-07-31) — the loop layers the first pass never read
+
+First pass read the tool/grounding/compaction contracts and flagged `query.ts`, `QueryEngine.ts`,
+and the sub-agent layer as **unread**. This pass read them (query.ts main loop in full,
+toolOrchestration/toolExecution, runAgent.ts, autoCompact triggers, todo-reminder mechanism) —
+timed for Phase 3 (drive loop) and Phase 4 (fan-out), which build exactly these layers.
+
+## Confirmations (our derived design independently matches the real loop)
+
+- **Loop shape:** `while(true)`; one API call per iteration; continue iff the assistant turn
+  contains tool_use blocks; a plain-text turn = done (then stop-hooks, then completion).
+  `maxTurns` is a hard cap. Matches Phase 3's planned loop exactly.
+- **Malformed tool input → the model sees** `<tool_use_error>InputValidationError: …</tool_use_error>`
+  as a normal `is_error` tool_result and the loop continues — the exact shape of our typed
+  self-correcting `ToolRejected`. Independent convergence, not imitation.
+- **Sub-agent = the same loop re-entered** with its own context, own read-state, own maxTurns;
+  its final text is the return value; per-message sidechain transcript. Matches Phase 4's plan.
+  Notably each sub-agent gets an **isolated readFileState** — the analog of our per-run
+  RetrievalLedger (02-01 already chose per-run; confirmed correct).
+
+## New lessons (4, all Phase-3-load-bearing)
+
+**L1 — Transcript repair on interruption (`yieldMissingToolResultBlocks`).** If the loop stops
+after tool_use blocks were emitted but before their results (abort, error, budget), CC
+synthesizes an error tool_result for every dangling tool_use so the conversation stays
+API-valid. OpenAI-compatible endpoints have the same constraint (400 on dangling tool_calls).
+**Phase 3 requirement: a budget/breaker stop that fires mid-tool-batch MUST synthesize results
+for dangling calls before the final grounded-partial report call** — or the report call itself 400s.
+
+**L2 — Recovery ladder with never-twice guards.** Every failure path has an escalating retry, a
+retry-count cap, and an explicit do-not-re-enter flag threaded through loop state
+(`hasAttemptedReactiveCompact` survives across stop-hook retries; stop hooks NEVER run on API
+errors — error→hook→retry→error is a named death spiral). **Phase 3 requirement: provider
+errors (Databricks 5xx/timeouts) get bounded backoff-retry DISTINCT from the budget stop;
+each recovery is attempted at most once per state; a run that dies on provider error after
+retries = a FAILING run per D-GO2(i), never silently re-rolled.**
+
+**L3 — Multi-tool-call turns are the norm, not the edge case.** CC partitions each assistant
+turn's tool_use blocks: concurrency-safe (read-only) batches run parallel (cap 10), unsafe
+serial, order preserved; malformed input → conservative serial. **Phase 3 requirement: the loop
+must answer EVERY tool_call in an assistant turn before the next API call (models emit parallel
+calls). Spike may execute serially (simpler; deterministic telemetry ordering) — but the
+read-only/write partition is pre-decided for later: 5 nav tools concurrency-safe,
+emit_finding serial.**
+
+**L4 — Long-loop discipline via periodic code-injected reminders.** CC injects a `todo_reminder`
+attachment when N turns pass without task-state updates — code decides, not the model. **Our
+analog for Phase 3: every N turns, inject a code-computed COVERAGE reminder (which applicable
+requirements are addressed / unaddressed so far, from the ledger + emitted findings) as a
+message attachment.** Cheap, targets exactly the 30-turn drift risk on weak models, and honors
+COST-01 (dynamic content in messages, never in the system prompt).
+
+Also noted for Phase 6: autoCompact triggers at context-window minus reserved-output-headroom
+(p99.99 of summary size), warning threshold 20k earlier — anchor compaction numbers to real
+window/output sizes, not intuition.
+
+## Verdict
+
+Direction CONFIRMED at the loop layer. No architectural change required anywhere in Phases 3–6.
+The four lessons are additive requirements inside Phase 3's already-planned areas (loop
+architecture + budgets), arriving before planning locks — exactly when they're free to adopt.
