@@ -146,4 +146,4 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 
 ---
 *Requirements defined: 2026-07-30*
-*Last updated: 2026-07-30 — +6 requirements (RULES-05, TOOLS-03/04, COST-03/04, AGENT-03 amended) derived from reading the Claude Code source; count 25 → 31*
+*Last updated: 2026-07-31 — count 33. Trail: 25 → 31 (2026-07-30, first Claude Code teardown: RULES-05, TOOLS-03/04, COST-03/04, AGENT-03 amended) → 32 (INGEST-04/05 span-anchor substrate + table addressing, less one reconciliation) → 33 (2026-07-31, second teardown of the loop layer: AGENT-04 bidirectional budget / continuation floor). RULES-01..05, TOOLS-01..04, COST-04 marked Complete after Phase 2 verification.*
