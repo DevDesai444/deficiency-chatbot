@@ -72,6 +72,7 @@ explicitly in § No Analog Found so the planner does not go looking.
 |------|--------|----------------------------|-------|
 | `tests/tools/test_emit_finding.py` | + `half` assertion at all 7 sites | `:52-83` and `:89-110` (one rejection, one honestly-named test) | **exact (self)** |
 | `tests/tools/test_contracts.py` | + `KNOWN_REASON_CODES` coverage | `:51-62` reason-code assertions | **exact (self)** |
+| `tests/unit/test_schemas.py` | + `test_verdict_and_span_ids_survive_onto_the_fault` (plan 03-02 Task 3(f) — the node `03-VALIDATION.md`'s GROUND-03 row selects) | `TestFaultSchemas::test_fault_roundtrips` (`:43-53`) — construct `Fault(...)`, dump, re-validate, assert the fields survive, **no tool involved**; `test_fault_defaults` (`:25-32`) is the shape for the companion all-`None` default assertion | **exact (self)** |
 | `tests/unit/test_parse.py` | + P2 fallback-blocks test | **NOT this file's shape** — it is sample-PDF-gated (`:8-18`). Use `tests/ingest/conftest.py:122-144`'s `fitz`-built synthetic PDF instead | inverted |
 | `tests/ingest/test_store.py` | + `PARSER_VERSION` in `cache_key` | `:16-39` `test_cache_resume_and_invalidate` — the bump→different-key→MISS assertion already exists for the normalizer | **exact (self)** |
 
