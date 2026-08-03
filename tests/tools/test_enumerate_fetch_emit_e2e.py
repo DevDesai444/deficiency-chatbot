@@ -149,7 +149,7 @@ def test_enumerate_fetch_emit_15_of_15_resolve_end_to_end(_self_contained_rulebo
 
         result = emit_finding(
             corpus=corpus, submission_span_id=submission_span, rule_span_id=rule_span,
-            ledger=ledger, verdict="fails",
+            ledger=ledger, verdict="violation",
             requirement_id=requirement_id, rule_citation=row["citation"],
         )
         if isinstance(result, ToolRejected):
