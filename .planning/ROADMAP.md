@@ -111,7 +111,7 @@ Plans:
 - [x] 03-10-PLAN.md — Boundary-crossing hunt: enumerated chain audit + a composition test per chain (D-PRE1 step 3)
 - [x] 03-11-PLAN.md — `registry.py`: 7 flat arg models, schema derivation, dispatch, pre/post-repair split, Pitfall-6 fallback
 - [ ] 03-12-PLAN.md — D-LOOP2 baseline re-measured 3x; median + variance + drift check; reviewer confirms the governing reference (D-PRE1 step 4)
-- [ ] 03-13-PLAN.md — `loop.py` + static `prompts.py` + `run_review`; D-LOOP4 prefix stability; tool-message protocol (AGENT-01)
+- [x] 03-13-PLAN.md — `loop.py` + static `prompts.py` + `run_review`; D-LOOP4 prefix stability; tool-message protocol (AGENT-01)
 - [ ] 03-14-PLAN.md — Stop-condition wiring, AGENT-04 continuation floor, D-LOOP5 rejection turns, D-BUD6 forced-runaway load test
 - [ ] 03-15-PLAN.md — `evals.run agent-run` subcommand (per-run budget, corpus-wide), D-VER1 non-dropping proof, additive UI events (D-LOOP1)
 - [ ] 03-16-PLAN.md — D-BUD1 budget calibration; **reviewer decides the calibration corpus** (held-out corpus flagged inadequate) then freezes the ceilings
