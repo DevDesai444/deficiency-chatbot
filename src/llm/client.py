@@ -36,6 +36,29 @@ class ChatResult:
     finish_reason: str
 
 
+@dataclass
+class ChatTurn:
+    """One tool-calling turn's result (AGENT-01). Sibling of ChatResult, not a replacement.
+
+    `raw_message` is `choice.message.model_dump()` and MUST be echoed back into the message list
+    verbatim (Pitfall 10): reconstructing the assistant message by hand -- dropping tool_calls or
+    mismatching tool_call_id -- produces 400s or silent context loss.
+
+    `usage_present=False` means the provider returned no usage object and the caller's token
+    figures are a DECLARED ESTIMATE, not a measurement (D-BUD5 / Pitfall 8). The run summary
+    surfaces this so no reader mistakes an estimate for a measured budget.
+    """
+
+    content: str
+    finish_reason: str
+    tool_calls: list
+    raw_message: dict
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cached_tokens: int = 0
+    usage_present: bool = False
+
+
 def get_client() -> OpenAI:
     global _client
     if _client is None:
@@ -128,3 +151,62 @@ def chat_completion_full(
             time.sleep(delay)
 
     return ChatResult(content="", finish_reason="error")
+
+
+def chat_completion_tools(
+    messages: list[dict],
+    tools: list[dict],
+    model: str | None = None,
+    temperature: float = 0.0,
+    max_tokens: int = 4096,
+    tool_choice: str = "auto",
+) -> ChatTurn:
+    """AGENT-01: a tool-calling turn using the same resilience layer as chat_completion_full."""
+    s = get_settings()
+    client = get_client()
+
+    kwargs: dict = {
+        "model": model or s.resolved_llm_model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "tools": tools,
+        "tool_choice": tool_choice,
+    }
+
+    for attempt in range(_MAX_RETRIES):
+        try:
+            response = client.chat.completions.create(**kwargs)
+            choice = response.choices[0]
+            usage = getattr(response, "usage", None)
+            details = getattr(usage, "prompt_tokens_details", None) if usage else None
+            return ChatTurn(
+                content=choice.message.content or "",
+                finish_reason=choice.finish_reason or "stop",
+                tool_calls=list(choice.message.tool_calls or []),
+                raw_message=choice.message.model_dump(),
+                prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+                completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+                cached_tokens=getattr(details, "cached_tokens", 0) or 0,
+                usage_present=usage is not None,
+            )
+        except BadRequestError as exc:
+            log.error("llm_bad_request", error=str(exc))
+            raise
+        except RateLimitError as exc:
+            if attempt == _MAX_RETRIES - 1:
+                log.error("llm_rate_limited_giving_up", attempts=_MAX_RETRIES)
+                raise
+            retry_after = _retry_after_seconds(exc)
+            delay = retry_after if retry_after else min(_RATE_LIMIT_BASE_DELAY * (2 ** attempt), _RATE_LIMIT_MAX_DELAY)
+            log.warning("llm_rate_limited_backoff", attempt=attempt + 1, delay=round(delay, 1))
+            time.sleep(delay)
+        except _RETRYABLE as exc:
+            if attempt == _MAX_RETRIES - 1:
+                log.error("llm_call_failed", error=str(exc), attempts=_MAX_RETRIES)
+                raise
+            delay = _BASE_DELAY * (2 ** attempt)
+            log.warning("llm_call_retry", error=str(exc), attempt=attempt + 1, delay=delay)
+            time.sleep(delay)
+
+    return ChatTurn(content="", finish_reason="error", tool_calls=[], raw_message={}, usage_present=False)
