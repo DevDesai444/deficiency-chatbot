@@ -1,129 +1,84 @@
 # Phase 03 Baseline Remeasurement
 
-This document records the D-LOOP2 baseline arm remeasurement performed before any agent-arm scored run exists.
+This document records the 03-12 baseline rerun status after the senior-reviewer P0 contamination ruling.
 
 ## Senior Reviewer Ruling
 
-RULING (senior reviewer, after independent diagnosis): **NEITHER number governs yet.** The `0.000` median from the first 03-12 attempt was not a baseline; it measured a broken detector. The redesigned planner/worker chain emitted zero findings (`/tmp/census.json`: `planner_workers=10`, `planner_suspicions=0`, `workers_emitted=0`, `worker_failures=0`, `pre_verify=0`, `post_verify=0`, `pre_challenge=0`, `post_challenge=0`). A direct specialist probe on the TP-bearing sections also returned a validly parsed `findings=[]` with no failure recorded.
+The previously reported `0.107` median is **VOID** for eval leakage. It was produced after the detector repair while prompt/planner examples still contained eval-shaped answers:
 
-Consequences:
+- Prompt leak inherited from the redesign: the table-summary example used the literal `C-01`/`C-02` answer shape.
+- Prompt leak added during repair: the product-spec exceedance example used `B-08`/`MS-04` exact values.
 
-- `0.071` remains the committed historical reference until the repaired 03-12 rerun is confirmed.
-- A blocking P0 repair task preceded `03-12` completion: `03-11-P0-PLAN.md`.
-- The repair fixed the redesigned chain without touching the matcher, harness, committed golden captures, or baseline file (D-GO1(iii)).
-- P0 acceptance passed: live single-shot runs re-found both `C-01` and `C-02` in 3 of 3 runs, and the planner->workers composition guard on the real TP-bearing sections emits a candidate finding.
-- This 03-12 rerun now freezes the repaired detector's measured median for senior-reviewer confirmation.
-- Do not proceed to Wave 6 (`03-14`) until this repaired baseline is confirmed.
+The committed historical `0.071` reference remains historical only. Nothing new is frozen here. The reviewer must confirm the governing D-LOOP2 reference before any pre-registration update or Wave 6 agent run.
 
-Amended D-PRE1 order: P2 -> P1 -> boundary hunt -> P0 repair -> `03-12` rerun -> pre-registration -> agent runs.
+## De-Leak Repair
 
-## Frozen Configuration
+- De-leak commit: `142bf922c09674c27b801efa44fe4488ec9395fd`
+- Protected principles retained: summary-cell consistency, spec-exceedance-over-equivalency-framing, and do-not-delete-supported-contradictions.
+- Prompt examples were replaced with synthetic values absent from eval anchors.
+- Static eval-shaped planner seeds were replaced with structural table scans:
+  - maximum-summary cells lower than a summarized row value
+  - same-section NMT specification exceedances found from table content
+- Leakage guard added: `tests/agents/detection/test_no_eval_leakage.py`.
+- Guard result: `.venv/bin/pytest tests/agents/detection/test_no_eval_leakage.py tests/agents/detection/test_baseline_regression_guard.py tests/agents/detection/test_planner_redesign.py -q` -> `29 passed, 5 warnings`.
+
+`src/evals/*`, the matcher, the harness, and committed golden captures were not changed.
+
+## Frozen Run Shape Used
 
 - Model id: `databricks-meta-llama-3-3-70b-instruct`
-- Temperature: `0` through the existing legacy detector structured-output path.
+- Temperature: `0` through the existing detector structured-output path.
 - Corpus attempted: non-held-out eval documents `mvr1381` and `minispec`; `spec32s41` remained held out.
-- Governing serialized report: `mvr1381`, matching the committed `src/evals/baseline/recall_by_family.json` reference generated from `golden:mvr1381_run3`.
-- Run-time git SHA before this repaired run set: `3dc5a8e05f2233becf74383b0a066876fa3755f3`
-- Command shape used for each run:
+- Serialized report: `mvr1381`.
+- Run-time git SHA: `142bf922c09674c27b801efa44fe4488ec9395fd`
+- Baseline artifacts:
+  - `.planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run1.json`
+  - `.planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run2.json`
+  - `.planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run3.json`
 
-```bash
-PYTHONPATH=src .venv/bin/python -u - <<'PY'
-# one-off runner equivalent to evals.run cmd_run:
-# load_eval_set; parse each non-held-out document; split/group sections;
-# run_detection(..., model="databricks-meta-llama-3-3-70b-instruct");
-# write the mvr1381 FaultReport to baseline-runN.json;
-# write capture_provenance(...) to baseline-runN-summary.json
-PY
-```
+The runner used the same parse -> split -> group -> `run_detection(..., model="databricks-meta-llama-3-3-70b-instruct")` sequence as the official detector arm, and wrote `capture_provenance(...)` sidecars. All three runs attempted both non-held-out documents and completed with `parse_failures={}`.
 
-The plan's nominal command, `.venv/bin/python -m evals.run run --model databricks-meta-llama-3-3-70b-instruct --out <path>`, writes metrics JSON rather than a serialized `FaultReport`. To keep `src/evals/run.py` and the legacy detector arm unchanged, the captures were produced from the one-off runner described above, using the same parse -> split -> group -> `run_detection` sequence as `cmd_run`.
+## Per-Run Found Sets
 
-Run 1 logged an OCR endpoint timeout on page 47 and continued through the parser fallback; no parse failure was recorded and no reroll was taken. All three runs completed with `parse_failures={}`.
+| Run | Faults emitted | `found_set` | Overall recall | Wall seconds | Notes |
+|---:|---:|---|---:|---:|---|
+| 1 | 2 | `["B-08", "C-01", "C-02"]` | 0.107 | 313.365 | Nonblank |
+| 2 | 0 | `[]` | 0.000 | 613.188 | Blank; logged truncation retries and one LLM timeout retry |
+| 3 | 2 | `["B-08", "C-01", "C-02"]` | 0.107 | 200.394 | Nonblank |
 
-## Re-Scoring Commands
+Protected baseline set `{C-01, C-02}` survived in 2 of 3 de-leaked runs.
 
-Each committed capture is re-scorable without an LLM call:
+## Recall By Family
 
-```bash
-PYTHONPATH=src .venv/bin/python -m evals.run score --captured .planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run1.json
-PYTHONPATH=src .venv/bin/python -m evals.run score --captured .planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run2.json
-PYTHONPATH=src .venv/bin/python -m evals.run score --captured .planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run3.json
-```
+Scored only through `evals.capture.load_captured` -> `evals.metrics.compute_metrics`.
 
-## Per-Family Recall
+| Family | run1 | run2 | run3 | min | median | max |
+|---|---:|---:|---:|---:|---:|---:|
+| `absence_of_evidence` | 0.091 | 0.000 | 0.091 | 0.000 | 0.091 | 0.091 |
+| `cross_reference_integrity` | 0.286 | 0.000 | 0.286 | 0.000 | 0.286 | 0.286 |
+| `derivation_plausibility` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| `regulatory_framing` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| overall | 0.107 | 0.000 | 0.107 | 0.000 | 0.107 | 0.107 |
 
-| Family | run1 | run2 | run3 | min | median | max | committed baseline |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| `absence_of_evidence` | 0.091 | 0.091 | 0.000 | 0.000 | 0.091 | 0.091 | 0.000 |
-| `derivation_plausibility` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
-| `cross_reference_integrity` | 0.286 | 0.286 | 0.000 | 0.000 | 0.286 | 0.286 | 0.286 |
-| `regulatory_framing` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
-| overall | 0.107 | 0.107 | 0.000 | 0.000 | 0.107 | 0.107 | 0.071 |
+This table is a report to the reviewer, not a frozen governing baseline.
 
-## Per-Run Metrics
+## Named Finding: Blank-Run Instability
 
-| Run | `tp` | `fp` | `fn` | `precision` | `anchor_rate` | `found_set` | faults emitted | wall seconds |
-|---:|---:|---:|---:|---:|---:|---|---:|---:|
-| 1 | 3 | 0 | 25 | 1.000 | 1.000 | `["B-08", "C-01", "C-02"]` | 2 | 314.060 |
-| 2 | 3 | 0 | 25 | 1.000 | 1.000 | `["B-08", "C-01", "C-02"]` | 2 | 238.356 |
-| 3 | 0 | 0 | 28 | 0.000 | 0.000 | `[]` | 0 | 455.986 |
+`BASELINE-BLANK-RUN-INSTABILITY`: The prior official 03-12 run set had one blank run (`min=0.000`, 1-in-3 blank rate). The de-leaked rerun also has one blank run: run 2 emitted zero final `mvr1381` faults, so the de-leaked blank rate is again 1-in-3.
 
-## Drift Check
+This instability is material for D-GO2. A later "above baseline" claim should be read against the median only with this variance disclosed.
 
-`EXCEEDS`
+## Frozen-Harness Metric Inconsistency
 
-- Committed overall reference: `0.071`
-- Repaired remeasured overall median: `0.107`
-- Absolute difference: `0.036`
-- Pre-registered materiality line: `0.030`
+Metric regeneration reproduced the reviewer-identified inconsistency under the frozen `evals.metrics` path:
 
-The repaired remeasured median is materially above the committed historical reference and requires senior-reviewer confirmation before any agent arm runs.
+- Nonblank runs have overall `fp=0`.
+- The same nonblank runs have per-family FP totals summing to `5`.
+- Nonblank runs report verifier `{precision: 1.0, recall: 1.0}`; the blank run reports `n/a_phase0`.
 
-## Protected Set
+This appears to be behavior of the frozen metric composition, not a P0 detector change. Per D-GO1(iii), no matcher or harness code was edited. Reviewer confirmation is required before treating these regenerated metrics as governing.
 
-The protected baseline set is `{C-01, C-02}`.
-
-| Run | `C-01` found? | `C-02` found? |
-|---:|---|---|
-| 1 | yes | yes |
-| 2 | yes | yes |
-| 3 | no | no |
-
-The repaired baseline arm preserves the protected set in 2 of 3 runs. Run 3 is a material variance finding about the reference itself: the worker path produced candidates, but the live run's final challenged report contained zero mvr1381 findings.
-
-## Baseline Variance Reading
-
-The overall recall spread was `min=0.000`, `median=0.107`, `max=0.107`, so the three-draw spread was `0.107`.
-
-"If the single-shot detector swings widely across its own 3 runs, 'above baseline' is a weaker claim than it looks, and the gate reading must say so."
-
-This set does swing widely: two runs find `["B-08", "C-01", "C-02"]`, while one run emits no final mvr1381 findings. Later "above baseline" claims should be read against the median, but the gate report must disclose that the single-shot reference has a zero-finding draw inside its own N=3 set.
-
-## Attribution
-
-`03-P2-BASELINE-SHIFT.md` states that parse/cache changes can move the baseline reference and must be attributed rather than folded silently into variance. The first 03-12 attempt then showed an additional detector-regression failure: the redesigned planner/worker chain could emit no findings. P0 repaired that detector path by restoring table-contradiction sensitivity, routing bounded Table 19/Table 20 suspicions, preserving untitled worker findings, and preventing challenge from refuting summary-cell contradictions merely because source rows have different labels.
-
-The observed overall shift is `+0.036` from the committed `0.071` to the repaired median `0.107`. The within-set spread is `0.107`, so this is not a stable point estimate. The median increase is attributable to the repaired detector once again finding the historical protected set in two runs, plus one additional absence-of-evidence TP (`B-08`) in those same runs; the zero third run remains a material variance/stability finding to surface at the gate.
-
-## What The Committed Baseline Could Not Record
-
-The committed baseline JSON records no model id. This remeasurement records `databricks-meta-llama-3-3-70b-instruct`, making the proposed governing reference model-specific.
-
-## Governing reference proposed for the pre-registration
-
-Proposed governing median values for plan 03-17:
-
-| Metric | Governing median |
-|---|---:|
-| `absence_of_evidence` | 0.091 |
-| `derivation_plausibility` | 0.000 |
-| `cross_reference_integrity` | 0.286 |
-| `regulatory_framing` | 0.000 |
-| overall | 0.107 |
-
-Run-set git SHA before this 03-12 rerun: `3dc5a8e05f2233becf74383b0a066876fa3755f3`
-
-Cross-arm provenance values the agent-run summaries must match:
+## Provenance
 
 | Field | Value |
 |---|---|
@@ -131,16 +86,9 @@ Cross-arm provenance values the agent-run summaries must match:
 | `matcher_version` | `1` |
 | `matcher_content_sha256` | `e7857edf3f5c1579e27d95f8cf5c086a9e20a443268ef35de01429c488f2c0ca` |
 | `baseline_sha256` | `e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3` |
-
-Additional provenance carried by all three baseline sidecars:
-
-| Field | Value |
-|---|---|
-| `baseline_path` | `src/evals/baseline/recall_by_family.json` |
 | `corpus_content_hash` | `e4df7729cdfb3c473b487e66b67404a7c58a7f05a02983fc140f2bd25501ade4` |
 | `normalizer_version` | `nfc-wscollapse-gdehyph-lig/1-lex1` |
 | `serializer_version` | `reading-order-cells/1` |
 | `parser_version` | `pymupdf-blocks/2` |
-| `prereg_commit_sha` | `""` |
 
-`src/evals/baseline/recall_by_family.json` was not edited.
+`src/evals/baseline/recall_by_family.json` was not edited. The pre-registration was not updated. Wave 6 was not started.

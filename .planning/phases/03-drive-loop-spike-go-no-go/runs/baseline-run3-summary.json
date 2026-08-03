@@ -1,6 +1,6 @@
 {
   "abort_reason": "",
-  "analysis_wall_seconds": 455.986,
+  "analysis_wall_seconds": 200.394,
   "baseline_path": "src/evals/baseline/recall_by_family.json",
   "baseline_sha256": "e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3",
   "captured_report_path": ".planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run3.json",

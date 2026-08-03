@@ -1,37 +1,37 @@
 {
   "anchor_rate": "n/a_no_source",
   "end_to_end": {
-    "fn": 25,
+    "fn": 28,
     "fp": 0,
-    "precision": 1.0,
-    "recall": 0.10714285714285714,
-    "tp": 3
+    "precision": 0.0,
+    "recall": 0.0,
+    "tp": 0
   },
   "end_to_end_by_family": {
     "absence_of_evidence": {
-      "fn": 10,
-      "fp": 1,
-      "precision": 0.5,
-      "recall": 0.09090909090909091,
-      "tp": 1
+      "fn": 11,
+      "fp": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0
     },
     "cross_reference_integrity": {
-      "fn": 5,
+      "fn": 7,
       "fp": 0,
-      "precision": 1.0,
-      "recall": 0.2857142857142857,
-      "tp": 2
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0
     },
     "derivation_plausibility": {
       "fn": 5,
-      "fp": 2,
+      "fp": 0,
       "precision": 0.0,
       "recall": 0.0,
       "tp": 0
     },
     "regulatory_framing": {
       "fn": 5,
-      "fp": 2,
+      "fp": 0,
       "precision": 0.0,
       "recall": 0.0,
       "tp": 0
@@ -42,14 +42,11 @@
     "parsed_ok": true
   },
   "recall_by_family": {
-    "absence_of_evidence": 0.09090909090909091,
-    "cross_reference_integrity": 0.2857142857142857,
+    "absence_of_evidence": 0.0,
+    "cross_reference_integrity": 0.0,
     "derivation_plausibility": 0.0,
     "regulatory_framing": 0.0
   },
   "retrieval_recall_at_k": 0.6071428571428571,
-  "verifier": {
-    "precision": 1.0,
-    "recall": 1.0
-  }
+  "verifier": "n/a_phase0"
 }
