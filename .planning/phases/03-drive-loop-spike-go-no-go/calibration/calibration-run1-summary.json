@@ -1,0 +1,62 @@
+{
+  "billed_tokens": 538401,
+  "cached_tokens": 0,
+  "continuation_count": 1,
+  "dedup_hit_rate": 0.0,
+  "embedding_time_s": 9.059518291149288,
+  "findings_before_after_each_nudge": [
+    [
+      1,
+      6
+    ]
+  ],
+  "first_malformed_turn_index": 0,
+  "has_unrecognized_reason_codes": false,
+  "malformed_trailing_turn_lines": 0,
+  "max_continuations_permitted": 5,
+  "model_time_s": 67.13463133212645,
+  "oracle_leads_emitted": 0,
+  "oracle_leads_reopened": 0,
+  "oracle_leads_surfaced": 0,
+  "post_repair_malformed": 0,
+  "post_repair_malformed_rate": 0.0,
+  "pre_repair_malformed": 0,
+  "pre_repair_malformed_rate": 0.0,
+  "provenance": {
+    "abort_reason": "",
+    "baseline_path": "src/evals/baseline/recall_by_family.json",
+    "baseline_sha256": "e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3",
+    "corpus_content_hash": "ed25710c1c95a8699a7a1697a34b814f6864f584479ce1520ecc614f1ef09f87",
+    "found_set": [
+      "H-03"
+    ],
+    "harness_version": "1",
+    "matcher_content_sha256": "e7857edf3f5c1579e27d95f8cf5c086a9e20a443268ef35de01429c488f2c0ca",
+    "matcher_version": "1",
+    "model_id": "databricks-meta-llama-3-3-70b-instruct",
+    "normalizer_version": "nfc-wscollapse-gdehyph-lig/1-lex1",
+    "parser_version": "pymupdf-blocks/2",
+    "prereg_commit_sha": "",
+    "run_completed": true,
+    "run_index": 1,
+    "serializer_version": "reading-order-cells/1"
+  },
+  "rejections_by_code_half": {
+    "not_found|": 4,
+    "range_too_large|": 3,
+    "span_ref_out_of_range|": 1
+  },
+  "rule_never_read_count": 0,
+  "span_invention_count": 0,
+  "stop_reason": "diminishing-returns",
+  "tokens_at_each_attempted_stop": [
+    74731
+  ],
+  "tool_execution_time_s": 9.409084415179677,
+  "total_tool_calls": 8,
+  "turns": 29,
+  "unrecognized_reason_codes": {},
+  "usage_missing_turns": 0,
+  "wall_clock_s": 76.94800304190721,
+  "which_bound_ended_nudging": "diminishing_returns"
+}
