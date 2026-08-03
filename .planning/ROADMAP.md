@@ -96,7 +96,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
   3b. The budget is **bidirectional**: when the model emits no tool call but is under budget and not in diminishing returns, the loop **refuses the stop** and injects a continuation nudge (`"Keep working — do not summarize"`), in code. The model's "I'm done" is not a termination condition. This is the anti-premature-stop mechanism the 2/28 baseline demands — a ceiling-only budget cannot prevent an agent from quitting after the easy findings — and the spike must report continuation count and whether nudged turns produced new grounded findings.
   4. Deterministic quick-win oracles (LOD/LOQ presence S9, reference standards S10, stability commitment P10) run as a **demoted seed pass** that feeds the loop — not as the primary source of findings.
   5. On the Phase 0 eval set, the grounded loop moves **recall-by-failure-family above the single-shot baseline** — the go signal that becoming-an-agent *adds missing check-kinds*, not just a nicer loop around the same 7% ceiling.
-**Plans**: 19 plans in 11 waves
+**Plans**: 20 plans in 11 waves
 
 Plans:
 - [x] 03-01-PLAN.md — P2: `pdf.py` embedded-text fallback fix + `PARSER_VERSION` in `cache_key` + cache purge/re-ingest + baseline-shift disclosure (D-PRE1 step 1)
@@ -110,6 +110,7 @@ Plans:
 - [x] 03-09-PLAN.md — `run_oracles` as the 7th tool; S10 built, P10 generalized; D-ORC2 no-pre-recorded-spans (DETECT-03)
 - [x] 03-10-PLAN.md — Boundary-crossing hunt: enumerated chain audit + a composition test per chain (D-PRE1 step 3)
 - [x] 03-11-PLAN.md — `registry.py`: 7 flat arg models, schema derivation, dispatch, pre/post-repair split, Pitfall-6 fallback
+- [ ] 03-12-P0-PLAN.md — **BLOCKING P0 repair**: fix redesigned single-shot detector regression; prove planner->workers on real TP sections emits a candidate and `{C-01,C-02}` are re-found in ≥2/3 live runs
 - [ ] 03-12-PLAN.md — D-LOOP2 baseline re-measured 3x; median + variance + drift check; reviewer confirms the governing reference (D-PRE1 step 4)
 - [x] 03-13-PLAN.md — `loop.py` + static `prompts.py` + `run_review`; D-LOOP4 prefix stability; tool-message protocol (AGENT-01)
 - [ ] 03-14-PLAN.md — Stop-condition wiring, AGENT-04 continuation floor, D-LOOP5 rejection turns, D-BUD6 forced-runaway load test

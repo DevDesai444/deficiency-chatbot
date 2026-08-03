@@ -2,6 +2,24 @@
 
 This document records the D-LOOP2 baseline arm remeasurement performed before any agent-arm scored run exists.
 
+## Senior Reviewer Ruling
+
+RULING (senior reviewer, after independent diagnosis): **NEITHER number governs yet.** The `0.000` median is not a baseline; it is a measurement of a broken detector. The redesigned planner/worker chain emitted zero findings (`/tmp/census.json`: `planner_workers=10`, `planner_suspicions=0`, `workers_emitted=0`, `worker_failures=0`, `pre_verify=0`, `post_verify=0`, `pre_challenge=0`, `post_challenge=0`). A direct specialist probe on the TP-bearing sections also returned a validly parsed `findings=[]` with no failure recorded.
+
+Consequences:
+
+- `0.071` remains the committed historical reference. Nothing new is frozen.
+- `03-12` stays OPEN.
+- A blocking P0 repair task precedes `03-12` completion: `03-12-P0-PLAN.md`.
+- The repair must fix the single-shot regression in the redesigned chain without touching the matcher, harness, committed golden captures, or baseline file (D-GO1(iii)).
+- Acceptance for P0 is pre-registered: a live single-shot run must re-find both `C-01` and `C-02` in at least 2 of 3 runs, and the missing planner->workers composition test on the real TP-bearing sections must emit at least one candidate finding.
+- After P0, `03-12` reruns all three baseline measurements from scratch and freezes whatever median the repaired detector produces, with any persistent `>0.03` divergence from `0.071` disclosed and attributed.
+- Do not proceed to Wave 6 (`03-14`) until the repaired baseline is frozen.
+
+Amended D-PRE1 order: P2 -> P1 -> boundary hunt -> P0 repair -> `03-12` rerun -> pre-registration -> agent runs.
+
+Own-error note for the record: the regression predates commit `8760665` in working-tree behavior, but `8760665` committed the redesign without eval validation. The pre-registration checkpoint caught it before agent runs, which is the discipline working as designed.
+
 ## Frozen Configuration
 
 - Model id: `databricks-meta-llama-3-3-70b-instruct`
