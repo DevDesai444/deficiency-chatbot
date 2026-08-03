@@ -1,0 +1,26 @@
+{
+  "abort_reason": "",
+  "analysis_wall_seconds": 226.139,
+  "baseline_path": "src/evals/baseline/recall_by_family.json",
+  "baseline_sha256": "e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3",
+  "captured_report_path": ".planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run2.json",
+  "corpus_content_hash": "e1e6a956399cbf313ff33b8738b870615a5a83ed90389aa0f252687d60f269f2",
+  "documents_attempted": [
+    "mvr1381",
+    "minispec"
+  ],
+  "documents_serialized_in_report": [
+    "mvr1381"
+  ],
+  "harness_version": "1",
+  "matcher_content_sha256": "e7857edf3f5c1579e27d95f8cf5c086a9e20a443268ef35de01429c488f2c0ca",
+  "matcher_version": "1",
+  "model_id": "databricks-meta-llama-3-3-70b-instruct",
+  "normalizer_version": "nfc-wscollapse-gdehyph-lig/1-lex1",
+  "parse_failures": {},
+  "parser_version": "pymupdf-blocks/2",
+  "prereg_commit_sha": "",
+  "run_completed": true,
+  "run_index": 2,
+  "serializer_version": "reading-order-cells/1"
+}

@@ -1,0 +1,31 @@
+{
+  "job_id": "",
+  "faults": [],
+  "faults_found": false,
+  "domains_checked": [
+    "1.1 Introduction",
+    "1.2 Standards and Samples Used in Verification Study",
+    "1.4.1 Specificity",
+    "1.4.2 Linearity",
+    "1.4.3 Limit of Detection",
+    "1.4.4 Limit of Quantitation",
+    "1.4.6.1 System Precision",
+    "1.4.6.2 Method Precision",
+    "1.4.8 Equivalency with the USP Method",
+    "1.4.9 System Suitability",
+    "Main Content",
+    "1 Verification of Analytical Procedure for related compounds",
+    "1.3 Protocol Deviation",
+    "1.4 Verification Parameters",
+    "1.4.5 Absorptivity Factor",
+    "1.4.6 Precision",
+    "1.4.6.3 Intermediate Precision (Ruggedness Study)",
+    "1.4.7 Stability of Analytical Solutions",
+    "1.5 Conclusions",
+    "1.6 History"
+  ],
+  "parse_failures": [],
+  "analysis_seconds": 33.7,
+  "stop_reason": "",
+  "budget_exhausted": false
+}
