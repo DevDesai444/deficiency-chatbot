@@ -39,12 +39,21 @@ _PATH = Path(__file__).parent / "requirement_index.yaml"
 # resolve in the rulebook store), and `read_guideline`'s fetch mode dual-resolves on
 # lookup_citation(arg) THEN rulebook_nt_for(arg)-as-doc_id. No entry content/family/id changed --
 # only the enumerate row shape gained a field, hence the version bump per D-24 discipline.
-REQUIREMENT_INDEX_VERSION = "3"
+# v3 -> v4: P1 real-ingestion proof showed mvr1381 classifies as 3.2.S.4.2 and spec32s41 as
+# 3.2.S.4.1, not the hardcoded-manifest 3.2.S.5 assumption. The two CFR corrected-basis entries
+# keep their reviewed primary family and citations, but gain explicit family linkage for the real
+# classified families so applicability is driven by production classification rather than fixtures.
+REQUIREMENT_INDEX_VERSION = "4"
 
 # ecfr-314.50 provenance spans (real, byte-exact re-open verified) that JUSTIFY the 2
 # profile_requires_family closure edges build_requirement_edges persists below.
 _DRUG_SUBSTANCE_STABILITY_SPAN = (6968, 7095)   # "(i) Drug substance. ... stability;"
 _DRUG_PRODUCT_STABILITY_SPAN = (8328, 8655)     # "the specifications necessary ... expiration dating."
+
+_SUPPLEMENTAL_FAMILY_REQUIREMENT_LINKS = {
+    "CFR-211160B-SOUND-BASIS": ("3.2.S.4.1", "3.2.S.4.2"),
+    "CFR-211194-CALCULATIONS": ("3.2.S.4.1", "3.2.S.4.2"),
+}
 
 
 class RequirementEntry(BaseModel):
@@ -106,6 +115,14 @@ def build_requirement_edges(db_path: str | None = None, cache_dir: str | None = 
             entry.provenance_span_id.model_dump_json(),
             **edge_kwargs,
         )
+        for family in _SUPPLEMENTAL_FAMILY_REQUIREMENT_LINKS.get(entry.id, ()):
+            edges.add_edge(
+                family,
+                entry.id,
+                "family_requires_requirement",
+                entry.provenance_span_id.model_dump_json(),
+                **edge_kwargs,
+            )
 
     nt = rulebook_nt_for("ecfr-314.50", **nt_kwargs)
     if nt is None:
@@ -171,11 +188,13 @@ def enumerate_requirements(
 
     entries_by_id = {e.id: e for e in load_requirement_index()}
     requirement_ids: set[str] = set()
+    families_by_requirement: dict[str, set[str]] = {}
     for fam in applicable_families:
         for _src, dst, _etype, _prov in edges.get_edges(src_id=fam, edge_type="family_requires_requirement"):
             requirement_ids.add(dst)
+            families_by_requirement.setdefault(dst, set()).add(fam)
 
     result = [entries_by_id[rid] for rid in requirement_ids if rid in entries_by_id]
     if family is not None:
-        result = [e for e in result if e.family == family]
+        result = [e for e in result if family in families_by_requirement.get(e.id, set())]
     return sorted(result, key=lambda e: e.id)

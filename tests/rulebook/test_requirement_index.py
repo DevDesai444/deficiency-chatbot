@@ -441,5 +441,7 @@ def test_requirement_index_version_bumped_for_this_revision():
     contract with consumers. v1 -> v2 was the reviewer-approved data reset (Q6A rename+re-family,
     FDA-SOLUTION-STABILITY FDA re-cite, 2 new CFR entries). v2 -> v3 is the verification-queue
     item 5 resolve: the enumerate output CONTRACT gained `rule_doc_id` per row (D-RI2/D-EF1(5)
-    enumerate->fetch->emit end-to-end fix) -- no entry content changed, only the row shape."""
-    assert ri.REQUIREMENT_INDEX_VERSION == "3"
+    enumerate->fetch->emit end-to-end fix). v3 -> v4 is the P1 real-ingestion linkage proof:
+    mvr1381/spec32s41 do not classify to the fixture-assumed 3.2.S.5, so the two corrected-basis
+    CFR entries gained explicit family links for the real classified families."""
+    assert ri.REQUIREMENT_INDEX_VERSION == "4"

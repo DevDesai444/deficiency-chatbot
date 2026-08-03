@@ -2,6 +2,62 @@
 
 This proof discharges the P1 classification precondition for D-PRE1 and records the material verification-queue item 5 finding before any scored drive-loop run.
 
+## Real Classification Results
+
+Real `ingest_corpus` was run against a temporary corpus containing:
+
+- `data/32s43-validation-related-compounds-method.pdf` (`mvr1381`)
+- `data/32s41-Specification.pdf` (`spec32s41`)
+
+The run used the production parser, normalizer, cache-entry writer, and content classifier, with manifest DB persistence disabled for the measurement. Both files parsed successfully and resolved at the deterministic regex tier.
+
+| doc_id | source file | classified family / CTD section | label | tier | confidence | matches the D-RI1(2) fixture assumption? |
+|---|---|---|---|---|---:|---|
+| `mvr1381` | `data/32s43-validation-related-compounds-method.pdf` | `3.2.S.4.2` | Drug Substance Analytical Procedures | regex | 0.99 | no |
+| `spec32s41` | `data/32s41-Specification.pdf` | `3.2.S.4.1` | Drug Substance Specification | regex | 0.99 | no |
+
+Measured output:
+
+```text
+REAL_INGEST_CLASSIFICATION
+spec32s41	32s41-Specification.pdf	doc_id=218cb269df8f4fc442d8df255632211b	status=parsed	family=3.2.S.4.1	label=Drug Substance Specification	tier=regex	confidence=0.99
+mvr1381	32s43-validation-related-compounds-method.pdf	doc_id=ae0ca3bc994c6a3fe32f0593fabed6a6	status=parsed	family=3.2.S.4.2	label=Drug Substance Analytical Procedures	tier=regex	confidence=0.99
+
+ENUMERATION_BY_REAL_FAMILY
+spec32s41	family=3.2.S.4.1	count=2	targets_present=[]
+mvr1381	family=3.2.S.4.2	count=0	targets_present=[]
+```
+
+## Requirement-Index Firing Under Real Families
+
+Because the two real classified families differ, a destructive one-family move would only repair one document. The fix keeps the reviewed entry data intact and changes only the family linkage in `src/rulebook/requirement_index.py`: the two corrected-basis CFR entries now have supplemental `family_requires_requirement` edges for both measured real families. `REQUIREMENT_INDEX_VERSION` was bumped from `"3"` to `"4"`.
+
+| requirement_id | citation unchanged? | rule_doc_id unchanged? | trigger unchanged? | before family linkage | after family linkage |
+|---|---|---|---|---|---|
+| `CFR-211160B-SOUND-BASIS` | yes | yes | yes | primary `3.2.S.5` only | primary `3.2.S.5`, plus real-family links `3.2.S.4.1` and `3.2.S.4.2` |
+| `CFR-211194-CALCULATIONS` | yes | yes | yes | primary `3.2.S.5` only | primary `3.2.S.5`, plus real-family links `3.2.S.4.1` and `3.2.S.4.2` |
+
+Targeted integration verification:
+
+```text
+.                                                                        [100%]
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:488
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1 passed, 5 warnings in 172.96s (0:02:52)
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+```
+
 ## Verification-Queue Item 5
 
 The existing boundary-crossing composition test passes on the committed rulebook fixture path:
