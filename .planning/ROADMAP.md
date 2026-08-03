@@ -102,7 +102,7 @@ Plans:
 - [x] 03-01-PLAN.md — P2: `pdf.py` embedded-text fallback fix + `PARSER_VERSION` in `cache_key` + cache purge/re-ingest + baseline-shift disclosure (D-PRE1 step 1)
 - [x] 03-02-PLAN.md — Grounding contract additions: `ToolRejected.half`, `KNOWN_REASON_CODES`, `ComplianceVerdict`, `Fault.rule_span_id`/`verdict`, harness versions (D-TEL2/3, D-VER2)
 - [x] 03-03-PLAN.md — `chat_completion_tools` + `ChatTurn`; Databricks-legal tool-schema derivation; dependency/STATE hygiene (AGENT-01, D-LOOP3)
-- [ ] 03-04-PLAN.md — P1: real-ingestion 3.2.S.5 classification proof + verification-queue item 5 closure check (D-PRE1 step 2)
+- [x] 03-04-PLAN.md — P1: real-ingestion 3.2.S.5 classification proof + verification-queue item 5 closure check (D-PRE1 step 2)
 - [x] 03-05-PLAN.md — Review package scaffold + Wave-0 offline test doubles (ScriptedChatClient / ForcedRunaway / ReplayClient, multi-doc corpus) + D-RB6 CI
 - [ ] 03-06-PLAN.md — `spanref.py` single parse/mint path + GROUND-01 round-trip composition test across all 5 rendering tools
 - [ ] 03-07-PLAN.md — `BudgetLedger`: every AGENT-03/AGENT-04 stop condition as code, with the frozen N values
