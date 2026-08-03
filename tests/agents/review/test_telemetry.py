@@ -47,6 +47,34 @@ def test_capture_provenance_has_required_keys():
     assert provenance["baseline_sha256"]
 
 
+def test_summary_carries_every_provenance_field(tmp_path):
+    expected = [
+        "run_index",
+        "model_id",
+        "prereg_commit_sha",
+        "harness_version",
+        "matcher_version",
+        "matcher_content_sha256",
+        "baseline_path",
+        "baseline_sha256",
+        "normalizer_version",
+        "serializer_version",
+        "parser_version",
+        "corpus_content_hash",
+        "run_completed",
+        "abort_reason",
+    ]
+    path = tmp_path / "summary.json"
+
+    RunSummary(provenance=_provenance()).write_json(path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+
+    for field in expected:
+        assert field in data["provenance"]
+        if field not in {"prereg_commit_sha", "abort_reason"}:
+            assert data["provenance"][field] != ""
+
+
 def test_git_sha_degrades_to_empty_string():
     assert _git_sha_of("/definitely/not/a/path") == ""
 
