@@ -8,5 +8,6 @@ from __future__ import annotations
 
 from tools.errors import ToolRejected
 from tools.ledger import RetrievalLedger
+from agents.review.oracles_tool import run_oracles_tool
 
-__all__ = ["RetrievalLedger", "ToolRejected"]
+__all__ = ["RetrievalLedger", "ToolRejected", "run_oracles_tool"]
