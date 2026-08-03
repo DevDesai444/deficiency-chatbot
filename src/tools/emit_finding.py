@@ -32,7 +32,7 @@ from ingest.anchors import HashMismatch, open_span
 from ingest.corpus import CorpusIndex
 from rulebook.store import DEFAULT_RULEBOOK_CACHE_DIR, rulebook_nt_for
 from schemas.documents import NormalizedText, OffsetRun, SpanID
-from schemas.faults import EvidenceClass, Fault, Tier
+from schemas.faults import ComplianceVerdict, EvidenceClass, Fault, Tier
 from tools.errors import ToolRejected
 from tools.ledger import RetrievalLedger
 
@@ -49,28 +49,42 @@ def emit_finding(
     detail: str = "",
     rulebook_cache_dir: str = DEFAULT_RULEBOOK_CACHE_DIR,
 ) -> Fault | ToolRejected:
+    try:
+        compliance_verdict = ComplianceVerdict(verdict)
+    except ValueError:
+        return ToolRejected(
+            tool="emit_finding", reason_code="invalid_verdict", half="",
+            reason=f"verdict must be one of {[m.value for m in ComplianceVerdict]}",
+            hint="re-call emit_finding with verdict set to violation, gap or ambiguous",
+        )
+
     if rule_span_id is None:
         return ToolRejected(tool="emit_finding", reason_code="no_rule_citation",
+                            half="rule",
                             reason="a finding must cite a specific rule clause span, none was provided",
                             hint="call read_guideline first, then pass its returned rule span-ID as rule_span_id")
 
     if not ledger.was_issued(submission_span_id):
         return ToolRejected(tool="emit_finding", reason_code="not_retrieved_this_session",
+                            half="submission",
                             reason="submission_span_id was never actually retrieved this session",
                             hint="re-fetch via get_section/search_corpus, then cite the span-ID it returns")
     if not ledger.was_issued(rule_span_id):
         return ToolRejected(tool="emit_finding", reason_code="not_retrieved_this_session",
+                            half="rule",
                             reason="rule_span_id was never actually retrieved this session",
                             hint="re-fetch via read_guideline, then cite the span-ID it returns")
 
     corpus_cache = corpus.cached_entry(submission_span_id.doc_id)
     if corpus_cache is None:
         return ToolRejected(tool="emit_finding", reason_code="wrong_store",
+                            half="submission",
                             reason=f"submission_span_id.doc_id={submission_span_id.doc_id!r} does not resolve in the CORPUS store",
                             hint="submission_span_id must come from get_section/search_corpus over THIS corpus")
     rule_nt = rulebook_nt_for(rule_span_id.doc_id, cache_dir=rulebook_cache_dir)
     if rule_nt is None:
         return ToolRejected(tool="emit_finding", reason_code="wrong_store",
+                            half="rule",
                             reason=f"rule_span_id.doc_id={rule_span_id.doc_id!r} does not resolve in the RULEBOOK store",
                             hint="rule_span_id must come from read_guideline, not get_section")
 
@@ -82,12 +96,14 @@ def emit_finding(
         submission_raw, _ = open_span(submission_span_id, submission_nt, submission_span_id.doc_id)
     except HashMismatch:
         return ToolRejected(tool="emit_finding", reason_code="not_byte_exact",
+                            half="submission",
                             reason="submission_span_id no longer re-opens byte-exact against the corpus store",
                             hint="re-fetch the current text via get_section and cite its freshly-issued span-ID")
     try:
         rule_raw, _ = open_span(rule_span_id, rule_nt, rule_span_id.doc_id)
     except HashMismatch:
         return ToolRejected(tool="emit_finding", reason_code="not_byte_exact",
+                            half="rule",
                             reason="rule_span_id no longer re-opens byte-exact against the rulebook store",
                             hint="re-fetch the current rule text via read_guideline and cite its freshly-issued span-ID")
 
@@ -112,6 +128,7 @@ def emit_finding(
     return Fault(
         title=title or "Deficiency", detail=detail_with_verdict,
         tier=Tier.CORROBORATED, evidence_class=EvidenceClass.QUOTE_ANCHORED, confidence=0.7,
+        verdict=compliance_verdict, rule_span_id=rule_span_id, submission_span_id=submission_span_id,
         evidence=submission_raw, source="tool:emit_finding",
         guidance_refs=[rule_citation or rule_span_id.doc_id] + ([requirement_id] if requirement_id else []),
     )

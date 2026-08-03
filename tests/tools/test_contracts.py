@@ -1,12 +1,13 @@
 """Contract tests for open_doc / get_section (Phase 2 Plan 01 Task 2, TOOLS-01/02)."""
 from __future__ import annotations
 
+from pathlib import Path
 import re
 
 from ingest.anchors import mint_span, open_span
 from schemas.documents import NormalizedText, OffsetRun, SpanID
 from tests.tools.conftest import build_corpus_index
-from tools.errors import ToolRejected
+from tools.errors import KNOWN_REASON_CODES, ToolRejected
 from tools.get_section import get_section
 from tools.open_doc import open_doc
 
@@ -107,3 +108,13 @@ def test_open_doc_outline_spans_are_issued_in_ledger(tmp_path, fresh_ledger):
     assert len(doc["outline"]) == 1
     span = SpanID.model_validate(doc["outline"][0]["span_id"])
     assert fresh_ledger.was_issued(span) is True
+
+
+def test_every_emitted_reason_codes_are_in_the_registry():
+    """D-TEL2: a code absent from KNOWN_REASON_CODES lands in telemetry's `unrecognized` bucket.
+    That bucket is a loud flag, not a silent absorb -- so this test keeps it empty by construction."""
+    tools_dir = Path(__file__).parents[2] / "src" / "tools"
+    source = "\n".join(path.read_text() for path in tools_dir.glob("*.py"))
+    emitted = set(re.findall(r'ToolRejected\([^)]*?reason_code="([a-z_]+)"', source, re.DOTALL))
+    assert emitted <= set(KNOWN_REASON_CODES), sorted(emitted - set(KNOWN_REASON_CODES))
+    assert "not_unique" not in emitted

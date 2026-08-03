@@ -6,9 +6,9 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from schemas.documents import ChunkGroup, CTDSection, ParsedSection
+from schemas.documents import ChunkGroup, CTDSection, ParsedSection, SpanID
 from schemas.events import AgentEvent, EventType
-from schemas.faults import EvidenceClass, Fault, FaultReport, Tier
+from schemas.faults import ComplianceVerdict, EvidenceClass, Fault, FaultReport, Tier
 from schemas.flaws import FlawCategory, Severity, SimilarDeficiency
 
 
@@ -51,6 +51,28 @@ class TestFaultSchemas:
         dumped = f.model_dump()
         assert Fault(**dumped).tier == Tier.VERIFIED
         assert Fault(**dumped).precedents[0].product_name == "X"
+
+    def test_verdict_and_span_ids_survive_onto_the_fault(self):
+        """GROUND-03 / DETECT-04: verdict and BOTH span-IDs persist onto Fault and survive a
+        model_dump_json -> model_validate_json round-trip. test_emit_finding asserts the TOOL
+        populates them; this asserts the SCHEMA carries them -- opposite ends of the same contract."""
+        rule_span = SpanID(doc_id="rule-doc", start=1, end=11, hash="rulehash")
+        submission_span = SpanID(doc_id="submission-doc", start=21, end=31, hash="subhash")
+        f = Fault(
+            title="x",
+            verdict=ComplianceVerdict.GAP,
+            rule_span_id=rule_span,
+            submission_span_id=submission_span,
+        )
+        back = Fault.model_validate_json(f.model_dump_json())
+        assert back.verdict is ComplianceVerdict.GAP
+        assert back.rule_span_id == f.rule_span_id
+        assert back.submission_span_id == f.submission_span_id
+
+        defaulted = Fault(title="x")
+        assert defaulted.verdict is None
+        assert defaulted.rule_span_id is None
+        assert defaulted.submission_span_id is None
 
 
 class TestAgentEvent:

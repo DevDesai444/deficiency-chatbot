@@ -52,4 +52,5 @@ KNOWN_REASON_CODES: dict[str, str] = {
     "wrong_store": "The span-ID resolved in the wrong store (submission span in the rulebook, or vice versa).",
     "family_not_in_registry": "The requested requirement family is not present in the requirement index.",
     "no_rule_citation": "emit_finding was called without a rule span-ID or rule citation.",
+    "invalid_verdict": "The verdict was not one of the enumerated ComplianceVerdict members.",
 }

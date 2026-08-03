@@ -13,7 +13,7 @@ from __future__ import annotations
 from ingest.anchors import mint_span, open_span, short_hash
 from rulebook.store import write_chunk
 from schemas.documents import NormalizedText, OffsetRun, SpanID
-from schemas.faults import EvidenceClass, Fault
+from schemas.faults import ComplianceVerdict, EvidenceClass, Fault
 from tests.rulebook.conftest import fixture_chunk
 from tests.tools.conftest import build_corpus_index
 from tools.emit_finding import emit_finding
@@ -49,7 +49,7 @@ def _build_rule(
 # --- the central proof: fabrication is REJECTED, never emitted-then-caught -------------------
 
 
-def test_fabricated_quote_cannot_be_emitted(tmp_path, fresh_ledger):
+def test_half_submission_not_byte_exact_fabricated_quote_cannot_be_emitted(tmp_path, fresh_ledger):
     text = "The assay method was validated using linear regression across five concentration levels."
     corpus = build_corpus_index(tmp_path, "sub-doc", [_block(text)])
     nt = _nt_from_cache(corpus.cached_entry("sub-doc"))
@@ -73,20 +73,20 @@ def test_fabricated_quote_cannot_be_emitted(tmp_path, fresh_ledger):
 
     result = emit_finding(
         corpus=corpus, submission_span_id=tampered_span, rule_span_id=rule_chunk.span,
-        ledger=fresh_ledger, verdict="fails", rulebook_cache_dir=rulebook_cache_dir,
+        ledger=fresh_ledger, verdict="violation", rulebook_cache_dir=rulebook_cache_dir,
     )
 
     # Proof of REJECTION, not "emitted then caught": assert the return TYPE, not a
     # side-channel flag -- no Fault object is ever constructed on this path.
     assert isinstance(result, ToolRejected)
-    assert result.reason_code == "not_byte_exact"
+    assert (result.reason_code, result.half) == ("not_byte_exact", "submission")
     assert not isinstance(result, Fault)
 
 
 # --- the five independently-tested D-EF1 rejection paths -------------------------------------
 
 
-def test_rejects_not_retrieved_this_session(tmp_path, fresh_ledger):
+def test_half_submission_not_retrieved_this_session(tmp_path, fresh_ledger):
     text = "Container closure integrity was confirmed by dye ingress testing."
     corpus = build_corpus_index(tmp_path, "sub-doc", [_block(text)])
     nt = _nt_from_cache(corpus.cached_entry("sub-doc"))
@@ -102,14 +102,14 @@ def test_rejects_not_retrieved_this_session(tmp_path, fresh_ledger):
 
     result = emit_finding(
         corpus=corpus, submission_span_id=never_issued_span, rule_span_id=rule_chunk.span,
-        ledger=fresh_ledger, verdict="fails", rulebook_cache_dir=rulebook_cache_dir,
+        ledger=fresh_ledger, verdict="violation", rulebook_cache_dir=rulebook_cache_dir,
     )
 
     assert isinstance(result, ToolRejected)
-    assert result.reason_code == "not_retrieved_this_session"
+    assert (result.reason_code, result.half) == ("not_retrieved_this_session", "submission")
 
 
-def test_rejects_no_rule_citation(tmp_path, fresh_ledger):
+def test_half_rule_no_rule_citation(tmp_path, fresh_ledger):
     text = "Batch records were reviewed for completeness prior to release."
     corpus = build_corpus_index(tmp_path, "sub-doc", [_block(text)])
     nt = _nt_from_cache(corpus.cached_entry("sub-doc"))
@@ -121,14 +121,36 @@ def test_rejects_no_rule_citation(tmp_path, fresh_ledger):
 
     result = emit_finding(
         corpus=corpus, submission_span_id=span, rule_span_id=None,
-        ledger=fresh_ledger, verdict="fails",
+        ledger=fresh_ledger, verdict="violation",
     )
 
     assert isinstance(result, ToolRejected)
-    assert result.reason_code == "no_rule_citation"
+    assert (result.reason_code, result.half) == ("no_rule_citation", "rule")
 
 
-def test_rejects_wrong_store_rule_span_from_corpus(tmp_path, fresh_ledger):
+def test_half_rule_not_retrieved_this_session(tmp_path, fresh_ledger):
+    text = "Cleaning validation acceptance criteria were predefined."
+    corpus = build_corpus_index(tmp_path, "sub-doc", [_block(text)])
+    nt = _nt_from_cache(corpus.cached_entry("sub-doc"))
+
+    start = nt.canonical.index("Cleaning validation")
+    end = start + len("Cleaning validation")
+    sub_span = mint_span(nt.canonical, start, end, "sub-doc", nt.normalizer_version)
+    fresh_ledger.record_span(sub_span)
+
+    rule_chunk, rulebook_cache_dir = _build_rule(tmp_path)
+    # The rule span is byte-exact and exists in the rulebook store, but was never issued.
+
+    result = emit_finding(
+        corpus=corpus, submission_span_id=sub_span, rule_span_id=rule_chunk.span,
+        ledger=fresh_ledger, verdict="violation", rulebook_cache_dir=rulebook_cache_dir,
+    )
+
+    assert isinstance(result, ToolRejected)
+    assert (result.reason_code, result.half) == ("not_retrieved_this_session", "rule")
+
+
+def test_half_rule_wrong_store_rule_span_from_corpus(tmp_path, fresh_ledger):
     text = "The excipient compatibility study used forced degradation conditions."
     corpus = build_corpus_index(tmp_path, "sub-doc", [_block(text)])
     nt = _nt_from_cache(corpus.cached_entry("sub-doc"))
@@ -144,14 +166,14 @@ def test_rejects_wrong_store_rule_span_from_corpus(tmp_path, fresh_ledger):
     # only in the CORPUS store, never the RULEBOOK store.
     result = emit_finding(
         corpus=corpus, submission_span_id=corpus_span, rule_span_id=corpus_span,
-        ledger=fresh_ledger, verdict="fails", rulebook_cache_dir=empty_rulebook_cache_dir,
+        ledger=fresh_ledger, verdict="violation", rulebook_cache_dir=empty_rulebook_cache_dir,
     )
 
     assert isinstance(result, ToolRejected)
-    assert result.reason_code == "wrong_store"
+    assert (result.reason_code, result.half) == ("wrong_store", "rule")
 
 
-def test_rejects_wrong_store_submission_span_from_rulebook(tmp_path, fresh_ledger):
+def test_half_submission_wrong_store_submission_span_from_rulebook(tmp_path, fresh_ledger):
     """The SYMMETRIC direction (plan-checker Warning 6): a submission_span_id whose doc_id
     only exists in the RULEBOOK store, never the CORPUS store."""
     # A real corpus that legitimately exists but does NOT contain the rulebook chunk's doc_id.
@@ -163,11 +185,75 @@ def test_rejects_wrong_store_submission_span_from_rulebook(tmp_path, fresh_ledge
     # A real, ISSUED rule span passed where the SUBMISSION span belongs.
     result = emit_finding(
         corpus=corpus, submission_span_id=rule_chunk.span, rule_span_id=rule_chunk.span,
-        ledger=fresh_ledger, verdict="fails", rulebook_cache_dir=rulebook_cache_dir,
+        ledger=fresh_ledger, verdict="violation", rulebook_cache_dir=rulebook_cache_dir,
     )
 
     assert isinstance(result, ToolRejected)
-    assert result.reason_code == "wrong_store"
+    assert (result.reason_code, result.half) == ("wrong_store", "submission")
+
+
+def test_half_rule_not_byte_exact(tmp_path, fresh_ledger):
+    text = "Process validation batches met predefined acceptance criteria."
+    corpus = build_corpus_index(tmp_path, "sub-doc", [_block(text)])
+    nt = _nt_from_cache(corpus.cached_entry("sub-doc"))
+
+    start = nt.canonical.index("predefined acceptance criteria")
+    end = start + len("predefined acceptance criteria")
+    sub_span = mint_span(nt.canonical, start, end, "sub-doc", nt.normalizer_version)
+    fresh_ledger.record_span(sub_span)
+
+    rule_chunk, rulebook_cache_dir = _build_rule(
+        tmp_path,
+        text="Laboratory controls shall include scientifically sound specifications.",
+    )
+    fresh_ledger.record_span(rule_chunk.span)
+    tampered_rule_span = SpanID(
+        doc_id=rule_chunk.span.doc_id,
+        start=rule_chunk.span.start,
+        end=rule_chunk.span.end,
+        hash=short_hash("tampered rule text", "not-the-rule-normalizer"),
+    )
+
+    result = emit_finding(
+        corpus=corpus, submission_span_id=sub_span, rule_span_id=tampered_rule_span,
+        ledger=fresh_ledger, verdict="violation", rulebook_cache_dir=rulebook_cache_dir,
+    )
+
+    assert isinstance(result, ToolRejected)
+    assert (result.reason_code, result.half) == ("not_byte_exact", "rule")
+
+
+def test_half_invalid_verdict_rejects_and_valid_verdict_populates_fault(tmp_path, fresh_ledger):
+    text = "The method validation report omitted robustness results."
+    corpus = build_corpus_index(tmp_path, "sub-doc", [_block(text)])
+    nt = _nt_from_cache(corpus.cached_entry("sub-doc"))
+
+    start = nt.canonical.index("omitted robustness results")
+    end = start + len("omitted robustness results")
+    sub_span = mint_span(nt.canonical, start, end, "sub-doc", nt.normalizer_version)
+    fresh_ledger.record_span(sub_span)
+
+    rule_chunk, rulebook_cache_dir = _build_rule(
+        tmp_path,
+        text="Analytical procedures shall be validated for intended use.",
+    )
+    fresh_ledger.record_span(rule_chunk.span)
+
+    rejected = emit_finding(
+        corpus=corpus, submission_span_id=sub_span, rule_span_id=rule_chunk.span,
+        ledger=fresh_ledger, verdict="fails", rulebook_cache_dir=rulebook_cache_dir,
+    )
+    assert isinstance(rejected, ToolRejected)
+    assert (rejected.reason_code, rejected.half) == ("invalid_verdict", "")
+
+    accepted = emit_finding(
+        corpus=corpus, submission_span_id=sub_span, rule_span_id=rule_chunk.span,
+        ledger=fresh_ledger, verdict="gap", rulebook_cache_dir=rulebook_cache_dir,
+    )
+    assert isinstance(accepted, Fault)
+    assert accepted.verdict is ComplianceVerdict.GAP
+    assert accepted.rule_span_id == rule_chunk.span
+    assert accepted.submission_span_id == sub_span
 
 
 def test_span_id_unique_by_construction(tmp_path, fresh_ledger):
@@ -215,7 +301,7 @@ def test_span_id_unique_by_construction(tmp_path, fresh_ledger):
 
     result = emit_finding(
         corpus=corpus, submission_span_id=span_b, rule_span_id=rule_chunk.span,
-        ledger=fresh_ledger, verdict="fails", rulebook_cache_dir=rulebook_cache_dir,
+        ledger=fresh_ledger, verdict="violation", rulebook_cache_dir=rulebook_cache_dir,
     )
 
     assert isinstance(result, Fault)
@@ -249,7 +335,7 @@ def test_success_path_constructs_grounded_fault(tmp_path, fresh_ledger):
 
     result = emit_finding(
         corpus=corpus, submission_span_id=sub_span, rule_span_id=rule_chunk.span,
-        ledger=fresh_ledger, verdict="fails", requirement_id="REQ-STAB-01",
+        ledger=fresh_ledger, verdict="violation", requirement_id="REQ-STAB-01",
         rule_citation=rule_chunk.citation, title="Missing stability justification",
         detail="No long-term data beyond 24 months was provided.",
         rulebook_cache_dir=rulebook_cache_dir,
@@ -257,6 +343,9 @@ def test_success_path_constructs_grounded_fault(tmp_path, fresh_ledger):
 
     assert isinstance(result, Fault)
     assert result.evidence_class == EvidenceClass.QUOTE_ANCHORED
+    assert result.verdict is ComplianceVerdict.VIOLATION
+    assert result.rule_span_id == rule_chunk.span
+    assert result.submission_span_id == sub_span
     assert result.evidence == expected_raw
     assert rule_chunk.citation in result.guidance_refs
     assert "REQ-STAB-01" in result.guidance_refs
