@@ -19,7 +19,7 @@ import structlog
 from pydantic import BaseModel
 
 from parse.docx import extract_docx
-from parse.pdf import extract_pdf
+from parse.pdf import PARSER_VERSION, extract_pdf
 from parse.section_splitter import split_document
 
 from ingest import limits
@@ -53,7 +53,7 @@ class CorpusIndex(BaseModel):
         """Fetch a document's persisted cache entry (full canonical text + offset map + index)."""
         for d in self.manifest.documents:
             if d.doc_id == doc_id:
-                key = cache_key(d.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION)
+                key = cache_key(d.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION, PARSER_VERSION)
                 return read_doc_cache(self.cache_dir, key)
         return None
 
@@ -118,7 +118,7 @@ def ingest_corpus(root: str | Path, cache_dir: str = DEFAULT_CACHE_DIR, model: s
             file_bytes = safe.read_bytes()
             chash = content_hash(file_bytes)
             doc_id = chash
-            key = cache_key(chash, NORMALIZER_VERSION, SERIALIZER_VERSION)
+            key = cache_key(chash, NORMALIZER_VERSION, SERIALIZER_VERSION, PARSER_VERSION)
             cached = read_doc_cache(cache_dir, key)
             if cached is not None and cached.get("doc_entry"):
                 entries.append(DocEntry.model_validate(cached["doc_entry"]))   # skip-unchanged (D-14)

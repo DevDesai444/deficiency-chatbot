@@ -16,8 +16,8 @@ from schemas.documents import DocClassification, SpanID
 def test_cache_resume_and_invalidate(tmp_path):
     cache_dir = tmp_path / "cache"
     h = content_hash(b"file-bytes-v1")
-    nv, sv = "nfc-.../1-lex1", "reading-order-cells/1"
-    key = cache_key(h, nv, sv)
+    nv, sv, pv = "nfc-.../1-lex1", "reading-order-cells/1", "pymupdf-blocks/2"
+    key = cache_key(h, nv, sv, pv)
     entry = {"canonical": "specification", "raw_serialized": "specifi-\ncation",
              "offset_map": [], "normalizer_version": nv, "serializer_version": sv}
 
@@ -29,14 +29,31 @@ def test_cache_resume_and_invalidate(tmp_path):
     assert list(cache_dir.glob("*.tmp")) == []
 
     # normalizer-version bump -> different key -> MISS (invalidation, D-24)
-    key_bumped = cache_key(h, "nfc-.../2-lex1", sv)
+    key_bumped = cache_key(h, "nfc-.../2-lex1", sv, pv)
     assert key_bumped != key
     assert read_doc_cache(cache_dir, key_bumped) is None
 
     # simulated crash BEFORE rename: only a .tmp exists -> read still returns None (no half entry)
-    crash_key = cache_key(content_hash(b"other"), nv, sv)
+    crash_key = cache_key(content_hash(b"other"), nv, sv, pv)
     (cache_dir / f"{crash_key}.tmp").write_text("{partial", encoding="utf-8")
     assert read_doc_cache(cache_dir, crash_key) is None
+
+
+def test_parser_version_bump_invalidates_cache(tmp_path):
+    """P2 / D-PRE1: a pdf.py change alters canonical text and every span offset. Before Phase 3
+    `cache_key` folded in no parser version, so a stale entry was served under an identical key
+    (RESEARCH.md Runtime State Inventory -- the silent-corruption seam)."""
+    cache_dir = tmp_path / "cache"
+    h = content_hash(b"file-bytes-v1")
+    nv, sv = "nfc-.../1-lex1", "reading-order-cells/1"
+    payload = {"canonical": "specification", "raw_serialized": "specification"}
+
+    key = cache_key(h, nv, sv, "pymupdf-blocks/2")
+    write_doc_cache(cache_dir, key, payload)
+    assert read_doc_cache(cache_dir, key) is not None
+    key_bumped = cache_key(h, nv, sv, "pymupdf-blocks/3")
+    assert key_bumped != key
+    assert read_doc_cache(cache_dir, key_bumped) is None
 
 
 def test_manifest_availability_tiers(tmp_path):

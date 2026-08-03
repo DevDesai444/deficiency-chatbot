@@ -23,6 +23,7 @@ from ingest.normalize import NORMALIZER_VERSION, normalize
 from ingest.serialize import SERIALIZER_VERSION, serialize_document
 from ingest.store import cache_key, write_doc_cache
 from ingest.tables import build_table_index
+from parse.pdf import PARSER_VERSION
 from tests.ingest.conftest import (
     make_doc_dict,  # noqa: F401 -- re-exported for tests/tools/* fixture builders
 )
@@ -72,7 +73,7 @@ def build_corpus_index(
     )
 
     cache_dir = str(tmp_path / "cache")
-    key = cache_key(entry.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION)
+    key = cache_key(entry.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION, PARSER_VERSION)
     write_doc_cache(cache_dir, key, {
         "canonical": nt.canonical, "raw_serialized": nt.raw_serialized,
         "offset_map": [r.model_dump() for r in nt.offset_map],

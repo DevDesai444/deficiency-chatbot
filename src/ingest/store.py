@@ -7,8 +7,9 @@ per-document parse cache (which retains the FULL canonical text, D-32) is one JS
 SQLite matches the established job store; a JSON-per-doc cache keyed by content-hash is trivially
 resumable and never writes under an attacker-controlled filename (T-01-03).
 
-The cache key folds in `normalizer_version` + `serializer_version` (D-14/D-24): a version bump is a
-clean cache MISS, so a normalizer change never serves stale canonical text (Pitfall 6).
+The cache key folds in `normalizer_version` + `serializer_version` + `parser_version`
+(D-14/D-24): a version bump is a clean cache MISS, so parser/normalizer/serializer changes
+never serve stale canonical text or stale span offsets (Pitfall 6).
 """
 from __future__ import annotations
 
@@ -32,11 +33,20 @@ def content_hash(file_bytes: bytes) -> str:
     return hashlib.blake2b(file_bytes, digest_size=16).hexdigest()
 
 
-def cache_key(content_hash: str, normalizer_version: str, serializer_version: str) -> str:
-    """A filesystem-safe key folding in both versions; a version bump invalidates (D-24, Pitfall 6)."""
+def cache_key(
+    content_hash: str, normalizer_version: str, serializer_version: str, parser_version: str
+) -> str:
+    """A filesystem-safe key folding in all three versions; a version bump invalidates (D-24, Pitfall 6).
+
+    `parser_version` was added in Phase 3 (P2 / D-PRE1). Before it, `content_hash` was a hash of
+    the FILE BYTES (ingest/corpus.py:119), so a parser change altered canonical text and every
+    span offset while the key stayed identical -- a stale entry was served indefinitely.
+    Deliberately has NO default: a missed call site must fail loudly, not emit a wrong key.
+    """
     nv = _UNSAFE.sub("_", normalizer_version)
     sv = _UNSAFE.sub("_", serializer_version)
-    return f"{content_hash}__{nv}__{sv}"
+    pv = _UNSAFE.sub("_", parser_version)
+    return f"{content_hash}__{nv}__{sv}__{pv}"
 
 
 def _cache_path(cache_dir, key: str) -> Path:

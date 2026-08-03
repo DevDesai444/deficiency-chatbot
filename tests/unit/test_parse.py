@@ -1,5 +1,6 @@
 import os
 
+import fitz
 import pytest
 
 from parse.pdf import extract_pdf
@@ -96,3 +97,32 @@ def test_flat_text_ocr_tagged_and_preserved():
     res2 = _reconstruct_prediction(boxed, page)
     assert res2[4] == "rapidocr"
     doc.close()
+
+
+def test_fallback_blocks_from_embedded_text_layer(tmp_path, monkeypatch):
+    """A scanned-looking PDF with embedded text must keep blocks when OCR is unavailable."""
+    import parse.pdf as pdf_parser
+
+    token = "MVR1381-FALLBACK-BLOCK-TOKEN"
+    pdf_path = tmp_path / "scanned_with_text_layer.pdf"
+
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 96), f"Validation Method {token}")
+
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 4, 4), False)
+    pix.clear_with(242)
+    page.insert_image(page.rect, stream=pix.tobytes("png"))
+
+    doc.save(pdf_path)
+    doc.close()
+
+    monkeypatch.setattr(pdf_parser, "ocr_page", lambda page: None)
+
+    parsed = extract_pdf(pdf_path)
+    page_doc = parsed["pages"][0]
+
+    assert page_doc["source"] == "rapidocr-fallback"
+    assert page_doc["is_scanned"] is True
+    assert len(page_doc["blocks"]) > 0
+    assert any(token in block["text"] for block in page_doc["blocks"])
