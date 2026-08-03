@@ -4,9 +4,11 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import Any
 
+from agents.event_bus import emit_sync
 from agents.review.budget import BudgetLedger
 from agents.review.prompts import NUDGE, SYSTEM_PROMPT
 from agents.review.registry import DispatchResult, ToolRegistry
@@ -166,6 +168,16 @@ def _is_cross_document_boundary(result: DispatchResult) -> bool:
     return result.tool == "follow_reference" and "cross_document_resolution_pending_phase_4" in str(result.result)
 
 
+def _emit_review_event(
+    job_id: str,
+    event_type: str,
+    message: str = "",
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    with suppress(Exception):
+        emit_sync(job_id, "review", event_type, "Review", message, metadata=metadata)
+
+
 def render_prefix(registry: Any) -> str:
     """Serialize the static provider prefix: system message plus tool schemas."""
     prefix = {
@@ -183,6 +195,7 @@ def run_review(
     telemetry: TurnLog,
     complete: CompleteFn,
     registry: ToolRegistry,
+    job_id: str = "",
 ) -> ReviewResult:
     """Run the model-driven review loop over injected collaborators."""
     started_at = time.monotonic()
@@ -219,8 +232,20 @@ def run_review(
         if pre_call_stop:
             return finish(pre_call_stop, aborted=pre_call_stop == "ceiling")
 
+        _emit_review_event(job_id, "agent_turn", "Review turn started", {"turn": budget.turns + 1})
         turn = complete(messages, tools)
         budget.record_turn(turn)
+        pct_of_ceiling = budget.billed_tokens / budget.max_tokens if budget.max_tokens else 0.0
+        _emit_review_event(
+            job_id,
+            "budget_update",
+            "Budget updated",
+            {
+                "billed_tokens": budget.billed_tokens,
+                "turns": budget.turns,
+                "pct_of_ceiling": round(pct_of_ceiling, 4),
+            },
+        )
         telemetry.turn(
             index=budget.turns,
             finish_reason=turn.finish_reason,
@@ -246,6 +271,15 @@ def run_review(
                 }
                 messages.append({"role": "user", "content": NUDGE})
                 budget.continuations += 1
+                _emit_review_event(
+                    job_id,
+                    "continuation",
+                    "Continuation requested",
+                    {
+                        "continuation_count": budget.continuations,
+                        "of_permitted": budget.max_continuations,
+                    },
+                )
                 budget.turns += 1
                 continue
             if budget.which_bound == "diminishing_returns":
@@ -260,6 +294,7 @@ def run_review(
         for call in list(turn.tool_calls):
             call_id = _call_id(call)
             tool_name, raw_args = _call_function(call)
+            _emit_review_event(job_id, "tool_call", "Tool call dispatched", {"tool": tool_name})
             try:
                 result = registry.dispatch(tool_name, raw_args)
             except Exception as exc:  # noqa: BLE001 - an aborted run must return its partial.

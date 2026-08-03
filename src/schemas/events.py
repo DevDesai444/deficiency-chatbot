@@ -14,9 +14,13 @@ EventType = Literal[
     "layer_complete",
     "pipeline_complete",
     "error",
+    "agent_turn",
+    "tool_call",
+    "budget_update",
+    "continuation",
 ]
 
-LayerName = Literal["parse", "detection"]
+LayerName = Literal["parse", "detection", "review"]
 
 
 class AgentEvent(BaseModel):

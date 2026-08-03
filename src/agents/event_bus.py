@@ -34,8 +34,22 @@ def emit(event: AgentEvent) -> None:
             q.put_nowait(event)
 
 
-def emit_sync(job_id: str, layer: str, event_type: str, agent_name: str = "", message: str = "") -> None:
-    event = AgentEvent(job_id=job_id, layer=layer, event_type=event_type, agent_name=agent_name, message=message)
+def emit_sync(
+    job_id: str,
+    layer: str,
+    event_type: str,
+    agent_name: str = "",
+    message: str = "",
+    metadata: dict | None = None,
+) -> None:
+    event = AgentEvent(
+        job_id=job_id,
+        layer=layer,
+        event_type=event_type,
+        agent_name=agent_name,
+        message=message,
+        metadata=metadata or {},
+    )
     try:
         loop = asyncio.get_running_loop()
         loop.call_soon_threadsafe(emit, event)

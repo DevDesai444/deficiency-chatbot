@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -44,6 +45,7 @@ class Settings(BaseSettings):
     max_consensus_rounds: int = 3
     max_inner_loops: int = 3
     max_outer_loops: int = 1
+    detection_mode: Literal["legacy", "agent"] = "legacy"
 
     # structured output (defense-in-depth for LLM JSON parsing)
     structured_output_strict: bool = True

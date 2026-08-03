@@ -39,7 +39,10 @@ gitignored (see `data/README.md`), so this keeps `score`/`gate` usable without i
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shutil
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
@@ -302,6 +305,123 @@ def cmd_run(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def cmd_agent_run(args: argparse.Namespace) -> int:
+    """`agent-run`: LIVE model-driven tool loop (AGENT-01) over the whole non-held-out corpus.
+
+    Sibling of cmd_run, NOT a branch inside it: run_detection is PER-DOCUMENT (pipeline.py:37-39)
+    while D-BUD5's budget is PER-RUN. Forcing the flag inside run_detection would either smuggle a
+    per-document budget back in -- "2/28 by a different route" -- or corrupt the legacy arm, which
+    D-LOOP1 requires stay byte-identical so the baseline is re-derivable at gate time.
+    """
+    from agents.review import run_review
+    from agents.review.budget import BudgetLedger
+    from agents.review.registry import ToolRegistry
+    from agents.review.telemetry import RunSummary, TurnLog, capture_provenance, read_turns
+    from config import resolve_detector_model
+    from evals.match import score
+    from ingest.corpus import ingest_corpus
+    from llm.client import chat_completion_tools
+    from tools.ledger import RetrievalLedger
+
+    out_dir = Path(args.out_dir)
+    run_prefix = args.run_prefix
+    artifact_stem = f"{run_prefix}{args.run_index}"
+    report_path = out_dir / f"{artifact_stem}.json"
+    turn_log_path = out_dir / f"{artifact_stem}.jsonl"
+    summary_path = out_dir / f"{artifact_stem}-summary.json"
+
+    resolved_model = resolve_detector_model(args.model)
+    budget = BudgetLedger(
+        max_tokens=args.max_tokens,
+        max_wall_clock_s=args.max_wall_clock,
+        max_turns=args.max_turns,
+    )
+    ledger = RetrievalLedger()
+    telemetry = TurnLog(turn_log_path)
+    report = FaultReport()
+    result = None
+    abort_reason = ""
+    corpus_hash = ""
+    found_set: set[str] = set()
+    turn_log_path.parent.mkdir(parents=True, exist_ok=True)
+    turn_log_path.touch(exist_ok=True)
+
+    try:
+        eval_set = load_eval_set()
+        with tempfile.TemporaryDirectory(prefix="eval-agent-corpus-") as tmp:
+            corpus_root = Path(tmp)
+            for doc in eval_set.documents:
+                if doc.held_out:
+                    continue
+                source = Path(doc.path)
+                target = corpus_root / source.name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+
+            corpus = ingest_corpus(corpus_root)
+            relabeled = []
+            for entry in corpus.manifest.documents:
+                matching_doc = next(
+                    (
+                        doc
+                        for doc in eval_set.documents
+                        if not doc.held_out and Path(doc.path).name == entry.filename
+                    ),
+                    None,
+                )
+                relabeled.append(entry.model_copy(update={"doc_id": matching_doc.doc_id}) if matching_doc else entry)
+            manifest = corpus.manifest.model_copy(update={"documents": relabeled})
+            corpus = corpus.model_copy(update={"manifest": manifest})
+            corpus_hash = hashlib.sha256(
+                json.dumps(manifest.model_dump(mode="json"), sort_keys=True).encode("utf-8")
+            ).hexdigest()
+
+            registry = ToolRegistry(corpus=corpus, manifest=manifest, ledger=ledger, budget=budget)
+
+            def complete(messages: list[dict], tools: list[dict]):
+                return chat_completion_tools(messages, tools, model=resolved_model, temperature=0.0)
+
+            result = run_review(corpus, manifest, ledger, budget, telemetry, complete, registry, job_id="")
+            report = result.report
+            for doc in eval_set.documents:
+                if doc.held_out:
+                    continue
+                found_set.update(score([f.model_dump() for f in report.faults], eval_set.deficiencies, doc.doc_id).matched_gt_ids)
+    except Exception as exc:  # noqa: BLE001 -- an aborted run must still leave artifacts.
+        abort_reason = f"{type(exc).__name__}: {exc}"
+        report = report.model_copy(update={"stop_reason": "aborted", "budget_exhausted": False})
+
+    run_completed = result is not None and not result.aborted and not abort_reason
+    if result is not None and result.aborted:
+        abort_reason = result.error or result.stop_reason or "aborted"
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(report.model_dump_json(indent=2))
+    records, malformed = read_turns(turn_log_path)
+    provenance = capture_provenance(
+        run_index=args.run_index,
+        model_id=resolved_model,
+        corpus_content_hash=corpus_hash,
+        run_completed=run_completed,
+        abort_reason="" if run_completed else (abort_reason or "aborted"),
+        found_set=found_set,
+        prereg_path=args.prereg,
+    )
+    summary = RunSummary.from_turns(
+        provenance=provenance,
+        records=records,
+        malformed_trailing_turn_lines=malformed,
+        budget_ledger=budget,
+        retrieval_ledger=ledger,
+        max_continuations_permitted=budget.max_continuations,
+        which_bound_ended_nudging=budget.which_bound,
+        stop_reason=report.stop_reason,
+        wall_clock_s=budget.wall_clock_s(),
+    )
+    summary.write_json(summary_path)
+    return 0 if run_completed else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m evals.run", description="DefPredict eval harness CI-style CLI."
@@ -325,6 +445,21 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("--gate", action="store_true", help="Also apply the zero-TP-lost gate.")
     run_p.add_argument("--out", default=DEFAULT_RUN_OUT)
     run_p.set_defaults(func=cmd_run)
+
+    agent_run_p = subparsers.add_parser("agent-run", help="LIVE: model-driven review loop over the non-held-out corpus.")
+    agent_run_p.add_argument("--model", default=None, help="Detector model id (validated by resolve_detector_model).")
+    agent_run_p.add_argument("--run-index", type=int, required=True, help="Run index recorded in provenance.")
+    agent_run_p.add_argument("--run-prefix", default="agent-run", help="Artifact filename prefix (default: agent-run).")
+    agent_run_p.add_argument("--max-tokens", type=int, required=True, help="Per-run token ceiling.")
+    agent_run_p.add_argument("--max-wall-clock", type=float, required=True, help="Per-run wall-clock ceiling in seconds.")
+    agent_run_p.add_argument("--max-turns", type=int, default=50, help="Per-run turn ceiling.")
+    agent_run_p.add_argument("--out-dir", required=True, help="Directory for FaultReport, JSONL, and RunSummary artifacts.")
+    agent_run_p.add_argument(
+        "--prereg",
+        default=".planning/phases/03-drive-loop-spike-go-no-go/03-GO-NOGO-PREREGISTRATION.md",
+        help="Pre-registration path whose commit SHA is captured.",
+    )
+    agent_run_p.set_defaults(func=cmd_agent_run)
 
     retrieval_gate_p = subparsers.add_parser(
         "retrieval-gate", help="SC4 retrieval recall@k gate (measure -> record -> ratchet, D-SC4)."
