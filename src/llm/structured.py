@@ -87,6 +87,37 @@ def build_response_format(model_cls: type[BaseModel], name: str | None = None) -
     }
 
 
+def _inline_refs(node, defs: dict):
+    """Resolve $ref against $defs and drop the $defs block (D-LOOP3)."""
+    if isinstance(node, dict):
+        if "$ref" in node:
+            name = node["$ref"].rsplit("/", 1)[-1]
+            return _inline_refs(defs[name], defs)
+        return {k: _inline_refs(v, defs) for k, v in node.items() if k != "$defs"}
+    if isinstance(node, list):
+        return [_inline_refs(v, defs) for v in node]
+    return node
+
+
+def tool_schema_for_databricks(model_cls: type[BaseModel]) -> dict:
+    """Derive a Databricks-legal tool-argument schema from the validating model."""
+    raw = model_cls.model_json_schema()
+    defs = raw.get("$defs", {})
+    return _sanitize(_inline_refs(raw, defs))
+
+
+def build_tool_schema(model_cls: type[BaseModel], name: str, description: str) -> dict:
+    """Build the OpenAI-compatible tool wrapper; response_format uses a different shape."""
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": tool_schema_for_databricks(model_cls),
+        },
+    }
+
+
 def _extract_json_blob(text: str) -> str:
     """Strip common wrappers: markdown fences, leading prose."""
     if not text:
