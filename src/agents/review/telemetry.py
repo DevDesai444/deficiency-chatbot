@@ -191,14 +191,14 @@ class TurnLog:
     def turn(self, **fields: Any) -> None:
         self._append("turn", fields)
 
-    def continuation(self, tokens_at_stop: int, findings_before: int) -> None:
-        self._append(
-            "continuation",
-            {
-                "tokens_at_stop": tokens_at_stop,
-                "findings_before": findings_before,
-            },
-        )
+    def continuation(self, tokens_at_stop: int, findings_before: int, findings_after: int | None = None) -> None:
+        fields = {
+            "tokens_at_stop": tokens_at_stop,
+            "findings_before": findings_before,
+        }
+        if findings_after is not None:
+            fields["findings_after"] = findings_after
+        self._append("continuation", fields)
 
     def rejection(self, tool: str, reason_code: str, half: str) -> None:
         self._append(

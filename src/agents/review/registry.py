@@ -244,8 +244,6 @@ class ToolRegistry:
         raw_result = self._call_tool(name, parsed)
         if isinstance(raw_result, ToolRejected):
             return self._rejected(name, args, raw_result, repair_layer)
-        if self.budget is not None:
-            self.budget.record_tool_success()
         return DispatchResult(
             result=_render_result(raw_result),
             turn_consumed=True,
@@ -282,8 +280,6 @@ class ToolRegistry:
         rejected: ToolRejected,
         repair_layer: Literal["none", "pre", "post"],
     ) -> DispatchResult:
-        if self.budget is not None:
-            self.budget.record_rejection(rejected.reason_code, rejected.half)
         return DispatchResult(
             result=render_rejection(rejected),
             turn_consumed=True,

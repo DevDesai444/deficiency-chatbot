@@ -135,6 +135,9 @@ class BudgetLedger:
             return "diminishing-returns"
         return "completed"
 
+    def wall_clock_s(self) -> float:
+        return self.clock() - self.started_at
+
     def _estimate_tokens(self, turn: ChatTurn) -> int:
         text = turn.content or ""
         if not text and turn.raw_message:

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agents.review.budget import BudgetLedger
-from agents.review.prompts import SYSTEM_PROMPT
+from agents.review.prompts import NUDGE, SYSTEM_PROMPT
 from agents.review.registry import DispatchResult, ToolRegistry
 from agents.review.telemetry import TurnLog
 from ingest.corpus import CorpusIndex
@@ -124,6 +124,22 @@ def _finalize(
     )
 
 
+def _pre_call_stop_reason(budget: BudgetLedger) -> str:
+    if budget.over_ceiling():
+        return "ceiling"
+    if budget.over_wall_clock():
+        return "ceiling"
+    if budget.breaker_tripped():
+        return "breaker"
+    if budget.over_turns():
+        return "max-turns"
+    if budget.in_diminishing_returns():
+        if budget.continuations:
+            budget.which_bound = "diminishing_returns"
+        return "diminishing-returns"
+    return ""
+
+
 def _count_requirement_ids(value: object, seen: set[str]) -> int:
     rows = value if isinstance(value, list) else []
     count = 0
@@ -144,6 +160,10 @@ def _record_dispatch_telemetry(telemetry: TurnLog, result: DispatchResult) -> No
         telemetry.rejection(result.tool, result.raw_result.reason_code, result.raw_result.half)
     elif result.tool == "run_oracles" and isinstance(result.raw_result, list):
         telemetry.oracle_leads(len(result.raw_result))
+
+
+def _is_cross_document_boundary(result: DispatchResult) -> bool:
+    return result.tool == "follow_reference" and "cross_document_resolution_pending_phase_4" in str(result.result)
 
 
 def render_prefix(registry: Any) -> str:
@@ -168,10 +188,37 @@ def run_review(
     started_at = time.monotonic()
     findings: list[Fault] = []
     seen_requirement_ids: set[str] = set()
+    pending_continuation: dict[str, int] | None = None
     messages = build_messages(_corpus_brief(corpus, manifest))
     tools = registry.schemas()
 
+    def flush_pending_continuation() -> None:
+        nonlocal pending_continuation
+        if pending_continuation is None:
+            return
+        telemetry.continuation(
+            tokens_at_stop=pending_continuation["tokens_at_stop"],
+            findings_before=pending_continuation["findings_before"],
+            findings_after=len(findings),
+        )
+        pending_continuation = None
+
+    def finish(stop_reason: str, *, aborted: bool = False, error: str = "") -> ReviewResult:
+        flush_pending_continuation()
+        return _finalize(
+            findings=findings,
+            stop_reason=stop_reason,
+            messages=messages,
+            started_at=started_at,
+            aborted=aborted,
+            error=error,
+        )
+
     while True:
+        pre_call_stop = _pre_call_stop_reason(budget)
+        if pre_call_stop:
+            return finish(pre_call_stop, aborted=pre_call_stop == "ceiling")
+
         turn = complete(messages, tools)
         budget.record_turn(turn)
         telemetry.turn(
@@ -184,32 +231,26 @@ def run_review(
         )
 
         if turn.finish_reason == "error":
-            return _finalize(
-                findings=findings,
-                stop_reason="aborted",
-                messages=messages,
-                started_at=started_at,
-                aborted=True,
-                error="completion finish_reason=error",
-            )
+            return finish("aborted", aborted=True, error="completion finish_reason=error")
 
         hard_stop = budget.stop_reason()
         if hard_stop != "completed":
-            return _finalize(
-                findings=findings,
-                stop_reason=hard_stop,
-                messages=messages,
-                started_at=started_at,
-                aborted=hard_stop == "ceiling",
-            )
+            return finish(hard_stop, aborted=hard_stop == "ceiling")
 
         if not turn.tool_calls:
-            return _finalize(
-                findings=findings,
-                stop_reason="completed",
-                messages=messages,
-                started_at=started_at,
-            )
+            flush_pending_continuation()
+            if budget.may_nudge():
+                pending_continuation = {
+                    "tokens_at_stop": budget.billed_tokens,
+                    "findings_before": len(findings),
+                }
+                messages.append({"role": "user", "content": NUDGE})
+                budget.continuations += 1
+                budget.turns += 1
+                continue
+            if budget.which_bound == "diminishing_returns":
+                return finish("diminishing-returns")
+            return finish("completed")
 
         messages.append(turn.raw_message)
         span_keys_before = _span_keys(ledger)
@@ -226,18 +267,16 @@ def run_review(
                 messages.append({"role": "tool", "tool_call_id": call_id, "content": content})
                 telemetry.turn(index=budget.turns, dispatch_exception=type(exc).__name__, tool=tool_name)
                 budget.record_productivity(0, 0, 0)
-                return _finalize(
-                    findings=findings,
-                    stop_reason="aborted",
-                    messages=messages,
-                    started_at=started_at,
-                    aborted=True,
-                    error=content,
-                )
+                return finish("aborted", aborted=True, error=content)
 
             _record_dispatch_telemetry(telemetry, result)
             if isinstance(result.raw_result, Fault):
                 findings.append(result.raw_result)
+            if result.turn_consumed and not _is_cross_document_boundary(result):
+                if isinstance(result.raw_result, ToolRejected):
+                    budget.record_rejection(result.raw_result.reason_code, result.raw_result.half)
+                else:
+                    budget.record_tool_success()
 
             _count_requirement_ids(result.raw_result, seen_requirement_ids)
             messages.append({"role": "tool", "tool_call_id": call_id, "content": str(result.result)})
