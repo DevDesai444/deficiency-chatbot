@@ -1,4 +1,4 @@
-# 03-12-P0 Summary: Single-Shot Detector Regression Repair
+# 03-11-P0 Summary: Single-Shot Detector Regression Repair
 
 ## Outcome
 
