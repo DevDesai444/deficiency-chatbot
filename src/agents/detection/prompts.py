@@ -82,10 +82,10 @@ Rules:
 
 ARITHMETIC CHECK — fill these whenever the finding claims a measured value breaks a limit:
 - claims_limit_violation: true if the finding asserts that a value violates an acceptance criterion
-  (e.g. "X exceeds NMT 10.0%", "tailing 1.2 contradicts 0.9-1.5", "RSD violates the limit").
-- criterion_quote: the acceptance criterion EXACTLY as written in the document ("NMT 33.0%",
-  "0.9 - 1.5", "NLT 7000").
-- observed_quote: the measured value EXACTLY as written ("1.2", "9.1", "18.9").
+  (e.g. "X exceeds NMT 66.0%", "tailing 2.4 contradicts 1.0-3.0", "RSD violates the limit").
+- criterion_quote: the acceptance criterion EXACTLY as written in the document ("NMT 66.0%",
+  "1.0 - 3.0", "NLT 8200").
+- observed_quote: the measured value EXACTLY as written ("2.4", "5.5", "73.4").
 Copy both verbatim from the document — do not reformat, round, or infer them. Do NOT decide whether
 the value passes: the comparison is computed in code. Just report the two cells accurately. Leave
 these fields empty when the finding is not about a numeric limit."""
@@ -105,9 +105,10 @@ Produce a review plan as JSON (a list of workers). EVERY section must be owned b
 
 A SUSPICION MUST ALLEGE A SPECIFIC DEFECT — something you believe is WRONG. It is not a task list.
 Do NOT raise a suspicion that merely names a check to perform, and do NOT raise one whose own
-reasoning concludes the data is fine. Wrong: "Table 1 requires RSD NMT 33.0% and Table 8 shows
-18.9% — verify this" (that is compliant; there is nothing to allege). Right: "Table 20 states
-Maximum plates 11477, but the rows above it contain 12601 — the summary contradicts its own data."
+reasoning concludes the data is fine. Wrong: "A criteria table requires RSD NMT 66.0% and a results
+table shows 54.0% — verify this" (that is compliant; there is nothing to allege). Right: "A summary
+states Maximum plates 8200, but a row in the same summarized set shows 9400 — the summary
+contradicts its own data."
 If a comparison looks compliant, stay silent: raising zero suspicions is a correct plan.
 
 Your HIGHEST-priority target is INTERSECTION faults — a fact in one section that another section must
@@ -146,7 +147,7 @@ Do two things and return them as JSON:
 2. suspicion_verdicts: for each routed suspicion return verdict = confirmed / refuted / unclear with
    the deciding evidence, AND `deficiency_exists` — true ONLY if a real deficiency is actually present.
    These are different questions: a suspicion may be factually true yet describe a COMPLIANT result
-   (e.g. "the criterion is NMT 33.0% and the value is 18.9%" is true, and means the document PASSES).
+   (e.g. "the criterion is NMT 66.0% and the value is 54.0%" is true, and means the document PASSES).
    In that case set verdict=confirmed and deficiency_exists=FALSE. Never report compliance as a fault.
 
 Cross-referencing — do this ACTIVELY, it is where the important faults hide:
@@ -172,10 +173,10 @@ finding: it costs a reviewer more time to disprove than a real one saves. Never 
 
 BEFORE YOU REPORT, run each candidate through these five checks and DELETE it unless it survives ALL:
 1. ARITHMETIC. Claiming a value breaks a limit? Write the limit and the value and check the direction.
-   Is 1.2 outside 0.9-1.5? No, it is inside. Is 9.1 above NMT 10.0? No. Is 18.9 above NMT 33.0? No.
+   Is 2.4 outside 1.0-3.0? No, it is inside. Is 5.5 above NMT 6.0? No. Is 54.0 above NMT 66.0? No.
    If the finding is only a limit-violation claim and the value SATISFIES that limit, DELETE it.
    But keep table-summary contradictions (e.g. a Maximum below a listed row) and product-specification
-   exceedances (e.g. 0.15% vs NMT 0.10%) when the evidence supports them.
+   exceedances (e.g. 0.42% vs NMT 0.30%) when the evidence supports them.
 2. SELF-CONSISTENCY. Re-read your own `detail`. If it concedes compliance ("within limit", "meets the
    criterion", "all values are below", "this is not a violation"), then your title is wrong — DELETE
    the finding, unless the detail then identifies a separate contradiction or specification exceedance.
@@ -229,7 +230,7 @@ real one saves. Never pad the list to look thorough.
 
 BEFORE YOU REPORT, run each candidate through these five checks and DELETE it unless it survives ALL:
 1. ARITHMETIC. Claiming a value breaks a limit? Write the limit and the value and check the direction.
-   Is 1.2 outside 0.9-1.5? No, it is inside. Is 9.1 above NMT 10.0? No. If the finding is only a
+   Is 2.4 outside 1.0-3.0? No, it is inside. Is 5.5 above NMT 6.0? No. If the finding is only a
    limit-violation claim and the value SATISFIES that limit, DELETE it. But keep table-summary
    contradictions and product-specification exceedances when the evidence supports them.
 2. SELF-CONSISTENCY. Re-read your own `detail`. If it concedes compliance ("within limit", "meets the

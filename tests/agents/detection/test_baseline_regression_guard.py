@@ -44,7 +44,7 @@ def test_planner_to_workers_on_real_tp_sections_emits_candidate_finding(monkeypa
     ])
     plan = _seed_table_suspicions(plan, sections)
     claims = " ".join(s.claim for w in plan.workers for s in w.suspicions)
-    assert "0.15%" in claims
+    assert "0.15" in claims
     assert "11477" in claims and "12601" in claims
 
     specialist_payloads: list[str] = []

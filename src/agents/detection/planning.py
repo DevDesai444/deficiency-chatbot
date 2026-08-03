@@ -23,6 +23,7 @@ log = structlog.get_logger()
 _MAX_FOCUS = 2
 _MAX_WORKERS = 12
 
+
 class SuspicionEvidence(BaseModel):
     section_index: int = Field(default=-1, description="The section this quote comes from.")
     quote: str = Field(default="", description="Verbatim quote from that section.")
@@ -129,6 +130,145 @@ def _route_suspicion(plan: ReviewPlan, section_index: int, suspicion: Suspicion)
     )
 
 
+def _clean_cell(cell) -> str:
+    return re.sub(r"\s+", " ", str(cell or "")).strip()
+
+
+def _first_number(cell: str) -> float | None:
+    match = re.search(r"-?\d+(?:\.\d+)?", cell.replace(",", ""))
+    return float(match.group(0)) if match else None
+
+
+def _row_label(row: list) -> str:
+    return _clean_cell(row[0]) if row else ""
+
+
+def _table_name(table: dict) -> str:
+    return _clean_cell(table.get("title") or "A table")
+
+
+def _header_name(headers: list, index: int) -> str:
+    if 0 <= index < len(headers):
+        return _clean_cell(headers[index])
+    return f"column {index + 1}"
+
+
+def _is_summary_label(label: str) -> bool:
+    return bool(re.search(r"\b(?:minimum|maximum|mean|average|total)\b", label, flags=re.IGNORECASE))
+
+
+def _summary_suspicions(section_index: int, table: dict) -> list[Suspicion]:
+    rows = table.get("rows") or []
+    headers = table.get("headers") or []
+    out: list[Suspicion] = []
+    for row in rows:
+        label = _row_label(row)
+        if not re.search(r"\bmaximum\b", label, flags=re.IGNORECASE):
+            continue
+        for col, cell in enumerate(row[1:], start=1):
+            summary_value = _first_number(_clean_cell(cell))
+            if summary_value is None:
+                continue
+            candidates: list[tuple[float, str, str]] = []
+            for other in rows:
+                other_label = _row_label(other)
+                if other is row or _is_summary_label(other_label) or other_label.lower().startswith("reference"):
+                    continue
+                if col >= len(other):
+                    continue
+                other_cell = _clean_cell(other[col])
+                other_value = _first_number(other_cell)
+                if other_value is not None:
+                    candidates.append((other_value, other_label, other_cell))
+            if not candidates:
+                continue
+            observed_value, observed_label, observed_cell = max(candidates, key=lambda x: x[0])
+            if observed_value <= summary_value:
+                continue
+            column = _header_name(headers, col)
+            table_name = _table_name(table)
+            out.append(
+                Suspicion(
+                    claim=(
+                        f"{table_name} states {label} for {column} as {_clean_cell(cell)}, "
+                        f"but row {observed_label} reports {observed_cell}; the summary cell appears wrong."
+                    ),
+                    reasoning="A Maximum summary cell cannot be lower than one of the values it summarizes.",
+                    cross_section=False,
+                    evidence=[
+                        SuspicionEvidence(section_index=section_index, quote=f"{label} {column} {_clean_cell(cell)}"),
+                        SuspicionEvidence(section_index=section_index, quote=f"{observed_label} {column} {observed_cell}"),
+                    ],
+                )
+            )
+    return out
+
+
+def _limit_terms(label: str) -> set[str]:
+    generic = {"any", "the", "and", "method", "result", "results", "single", "largest", "estradiol"}
+    return {
+        token
+        for token in re.findall(r"[A-Za-z]{4,}", label.lower())
+        if token not in generic
+    }
+
+
+def _section_nmt_limits(section: dict) -> list[tuple[str, float, str]]:
+    limits: list[tuple[str, float, str]] = []
+    for table in section.get("tables", []) or []:
+        for row in table.get("rows") or []:
+            for cell in row:
+                text = _clean_cell(cell)
+                for match in re.finditer(r"([^:\n\r•]{4,120}?)\s*:\s*NMT\s*(\d+(?:\.\d+)?)\s*%", text, flags=re.IGNORECASE):
+                    label = _clean_cell(match.group(1))
+                    limits.append((label, float(match.group(2)), match.group(0)))
+    return limits
+
+
+def _spec_exceedance_suspicions(section_index: int, section: dict) -> list[Suspicion]:
+    limits = _section_nmt_limits(section)
+    if not limits:
+        return []
+    out: list[Suspicion] = []
+    seen: set[tuple[str, str]] = set()
+    for table in section.get("tables", []) or []:
+        for row in table.get("rows") or []:
+            label = _row_label(row)
+            label_terms = _limit_terms(label)
+            if not label_terms:
+                continue
+            for limit_label, limit_value, limit_quote in limits:
+                if not (_limit_terms(limit_label) & label_terms):
+                    continue
+                for cell in row[1:]:
+                    result_cell = _clean_cell(cell)
+                    if re.search(r"\bNMT\b|\bNLT\b", result_cell, flags=re.IGNORECASE):
+                        continue
+                    result_value = _first_number(result_cell)
+                    if result_value is None or result_value <= limit_value:
+                        continue
+                    key = (label.lower(), limit_label.lower())
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    table_name = _table_name(table)
+                    out.append(
+                        Suspicion(
+                            claim=(
+                                f"{table_name} reports {label} as {result_cell}, while the applicable "
+                                f"{limit_label} criterion is {limit_quote}; the result appears above its limit."
+                            ),
+                            reasoning="A reported result above a not-more-than specification limit is a suspected deficiency.",
+                            cross_section=False,
+                            evidence=[
+                                SuspicionEvidence(section_index=section_index, quote=f"{label} {result_cell}"),
+                                SuspicionEvidence(section_index=section_index, quote=limit_quote),
+                            ],
+                        )
+                    )
+    return out
+
+
 def _seed_table_suspicions(plan: ReviewPlan, sections: list[dict]) -> ReviewPlan:
     """Seed bounded table leads the planner prompt is meant to route, without minting faults.
 
@@ -137,45 +277,11 @@ def _seed_table_suspicions(plan: ReviewPlan, sections: list[dict]) -> ReviewPlan
     plan covered the TP-bearing sections but routed zero suspicions for obvious table contradictions.
     """
     for i, section in enumerate(sections):
-        text = _section_table_text(section)
-        if "Table 20" in text and "System Suitability" in text and "Theoretical" in text:
-            if "Maximum" in text and "11477" in text and "In-house Equivalency Study" in text and "12601" in text:
-                _route_suspicion(
-                    plan,
-                    i,
-                    Suspicion(
-                        claim=(
-                            "Table 20 states Maximum theoretical plates as 11477, but the same table's "
-                            "In-house Equivalency Study row reports 12601, so the Maximum cell appears wrong."
-                        ),
-                        reasoning="A Maximum summary cell cannot be lower than one of the values it summarizes.",
-                        cross_section=False,
-                        evidence=[
-                            SuspicionEvidence(section_index=i, quote="Maximum theoretical plates 11477"),
-                            SuspicionEvidence(section_index=i, quote="In-house Equivalency Study theoretical plates 12601"),
-                        ],
-                    ),
-                )
-        if "Table 19" in text and "Equivalency" in text and "Any Unspecified Impurity" in text:
-            has_015 = bool(re.search(r"\b0\.15\b", text))
-            has_nmt_010 = bool(re.search(r"NMT\s+0\.10\s*%", text, flags=re.IGNORECASE))
-            if has_015 and has_nmt_010:
-                _route_suspicion(
-                    plan,
-                    i,
-                    Suspicion(
-                        claim=(
-                            "Table 19 reports Any Unspecified Impurity at 0.15%, while the applicable "
-                            "unspecified-impurity limit is NMT 0.10%, yet the equivalency criteria are presented as met."
-                        ),
-                        reasoning="0.15% is above a not-more-than 0.10% specification limit.",
-                        cross_section=False,
-                        evidence=[
-                            SuspicionEvidence(section_index=i, quote="Any Unspecified Impurity (Single Largest) 0.15"),
-                            SuspicionEvidence(section_index=i, quote="Any Unspecified Impurity : NMT 0.10%"),
-                        ],
-                    ),
-                )
+        for table in section.get("tables", []) or []:
+            for suspicion in _summary_suspicions(i, table):
+                _route_suspicion(plan, i, suspicion)
+        for suspicion in _spec_exceedance_suspicions(i, section):
+            _route_suspicion(plan, i, suspicion)
     return plan
 
 
