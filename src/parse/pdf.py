@@ -12,6 +12,11 @@ from schemas.documents import ExtractedTable, LayoutBlock, LayoutFigure
 
 log = structlog.get_logger()
 
+# Parser identity, folded into ingest.store.cache_key (D-24 version-stamping discipline).
+# "/1" was the pre-P2 behavior that discarded the embedded text layer on the rapidocr-fallback
+# branch; "/2" recovers it, which changes canonical text and therefore every span offset.
+PARSER_VERSION = "pymupdf-blocks/2"
+
 # An image covering less than this fraction of the page is a logo, not a figure.
 _MIN_FIGURE_COVERAGE = 0.03
 _PAGE_LABEL_RE = re.compile(r"page\s+(\d+)\s+of\s+\d+", re.IGNORECASE)
@@ -229,8 +234,17 @@ def extract_pdf(path: str | Path) -> dict:
                 tables = tables + ocr_tables
                 ocr_count += 1
             else:
+                # P2 / D-PRE1: a scan carrying an invisible embedded text layer is flagged
+                # `scanned` by is_scanned_page (image coverage OR glyphless font, ocr.py:53-72),
+                # and ocr_page returns None offline (ocr.py:80-82). Before this fix the embedded
+                # layer was computed and discarded, stranding 5 mvr1381 anchors (SC4 7/12).
+                # _digital_blocks reads page.get_text("dict") (pdf.py:123), which returns the
+                # embedded layer regardless of a full-page image; on a genuinely image-only scan
+                # it yields zero blocks, i.e. identical to the pre-fix behavior.
                 source = "rapidocr-fallback"
                 text = page.get_text("text")
+                blocks = _digital_blocks(page, tables)
+                figures = _digital_figures(page, blocks)
         else:
             text = page.get_text("text")
             blocks = _digital_blocks(page, tables)
