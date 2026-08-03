@@ -5,6 +5,8 @@ the CALLING MODEL as a message, not unwind a Python call stack (RESEARCH.md Patt
 """
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -20,9 +22,34 @@ class ToolRejected(BaseModel):
     reason_code: str
     reason: str
     hint: str = ""
+    # D-TEL3: WHICH half of the dual citation failed. Populated by emit_finding only; every
+    # other tool leaves it "". Telemetry groups by (reason_code, half) because the two halves
+    # are OPPOSITE diagnoses and must never be summed into one "rejections" count:
+    #   half="submission" + not_byte_exact          => SPAN INVENTION (grounding-discipline failure)
+    #   half="rule"       + not_retrieved_this_session => NEVER CALLED read_guideline (loop-behavior failure)
+    # Different remedies (swap the model vs. fix the loop), hence separate reporting.
+    half: Literal["submission", "rule", ""] = ""
     # TOOLS-04 persist+preview+handle (plan-checker Blocker 2): populated on an oversized-range
     # rejection (reason_code="range_too_large") -- `preview` is a bounded, span-ID-annotated
     # string; `handle` is the re-openable key for a follow-up page-forward call. Both default to
     # "" for every OTHER rejection reason, where they don't apply.
     preview: str = ""
     handle: str = ""
+
+
+# D-TEL2: the OPEN registry telemetry joins against. `reason_code` on ToolRejected stays a plain
+# `str` (see above) so later plans add codes without editing this file's model; this mapping is
+# the human-readable index of the ones we know about. A code absent from here is NOT an error --
+# telemetry buckets it under "unrecognized" and the run summary flags it loudly, which is how a
+# newly-added code announces itself instead of silently disappearing into a total.
+# A telemetry-side COPY of this mapping is forbidden (RESEARCH.md Anti-Patterns): it would drift
+# from the gate and mislabel the single most diagnostic signal the spike produces.
+KNOWN_REASON_CODES: dict[str, str] = {
+    "not_found": "The requested document, heading, handle or citation does not exist.",
+    "range_too_large": "The requested span exceeds max_chars; a preview and a page-forward handle are supplied.",
+    "not_byte_exact": "The cited span did not re-open byte-for-byte (hash mismatch).",
+    "not_retrieved_this_session": "The cited span-ID was never issued to the model this session.",
+    "wrong_store": "The span-ID resolved in the wrong store (submission span in the rulebook, or vice versa).",
+    "family_not_in_registry": "The requested requirement family is not present in the requirement index.",
+    "no_rule_citation": "emit_finding was called without a rule span-ID or rule citation.",
+}
