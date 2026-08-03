@@ -28,6 +28,18 @@ _VALIDATION_REQUIRED: dict[str, list[str]] = {
     "solution stability": ["solution stability", "stability of standard", "stability of sample", "stability of analytical"],
 }
 
+# DETECT-03 / S10: reference-standard qualification. Built in Phase 3 -- grep for
+# "reference standard" across src/ returned NOTHING before this (RESEARCH.md D6).
+# ICH Q6A and 21 CFR 211.194 require the identity, source, lot/batch, purity/assigned
+# potency and expiry/re-test date of the reference standard used, plus qualification basis.
+_REFERENCE_STANDARD_REQUIRED: dict[str, list[str]] = {
+    "reference standard": ["reference standard", "reference material", "reference substance"],
+    "lot number": ["lot number", "batch number"],
+    "purity": ["purity", "assigned potency"],
+    "expiry": ["expiry", "re-test date", "retest date"],
+    "qualification": ["qualification", "certificate of analysis", "coa"],
+}
+
 # These CTDSection values equal registry family ids (D-05, ingest.registry is the single
 # source of truth for the CTD-family vocabulary). Kept as enum members here so membership
 # resolution is unchanged; do NOT renumber the enum or these ids drift from the registry.
@@ -44,6 +56,23 @@ _CCS_COMPONENTS = ["backing film", "release liner", "pouch"]
 _COMMITMENT_RE = re.compile(
     r"commit|continue\s+to\s+monitor|ongoing\s+monitor|monitor[a-z ]{0,30}shelf\s*life"
     r"|monitor[a-z ]{0,30}through\s+the\s+proposed",
+    re.I,
+)
+
+# DETECT-03 / P10: stability commitment. RESEARCH.md D6: the only analogue in the codebase was
+# `leachable_commitment`, an E&L LEACHABLE-monitoring commitment gated on is_el_report -- not a
+# general stability commitment. This is the general form. ICH Q1A(R2) requires a commitment to
+# continue/complete long-term studies and to place production batches on stability.
+_STABILITY_COMMITMENT_PATTERNS = (
+    r"stability\s+commitment",
+    r"commit(?:s|ment|ted)?\s+to\s+(?:place|continue|complete)\b[^.]{0,120}stability",
+    r"long[- ]term\s+stability\s+stud(?:y|ies)\b[^.]{0,120}(?:continue|complete|commit)",
+    r"first\s+(?:three|3)\s+production\s+batches\b[^.]{0,120}stability",
+)
+_STABILITY_COMMITMENT_RE = re.compile("|".join(_STABILITY_COMMITMENT_PATTERNS), re.I)
+_STABILITY_DISCUSSION_RE = re.compile(
+    r"stability\s+(?:data|study|studies|protocol|condition|results?|batch|batches)"
+    r"|long[- ]term\s+stability|accelerated\s+stability",
     re.I,
 )
 
@@ -94,6 +123,60 @@ def _validation_checklist(doc: dict) -> list[Fault]:
             )
         )
     return faults
+
+
+def reference_standard_checklist(doc: dict) -> list[Fault]:
+    """DETECT-03 / S10: flag missing reference-standard qualification elements."""
+    text = _reading_order_text(doc)
+    faults: list[Fault] = []
+    for element, keys in _REFERENCE_STANDARD_REQUIRED.items():
+        if any(k in text for k in keys):
+            continue
+        faults.append(
+            Fault(
+                title=f"Reference standard element not addressed: {element}",
+                detail=(
+                    "Reference-standard use is expected to identify and qualify the material; "
+                    f"no evidence of {element} was found in the document."
+                ),
+                category=FlawCategory.REFERENCE_STANDARD,
+                severity=Severity.MEDIUM,
+                tier=Tier.CORROBORATED,
+                evidence_class=EvidenceClass.CHECKLIST,
+                confidence=0.6,
+                evidence=f"No mention of reference standard {element} (searched for: {', '.join(keys)}).",
+                source="checklist:reference_standard",
+            )
+        )
+    return faults
+
+
+def stability_commitment(doc: dict) -> list[Fault]:
+    """DETECT-03 / P10: flag stability data with no general stability commitment."""
+    text = _reading_order_text(doc)
+    if not _STABILITY_DISCUSSION_RE.search(text):
+        return []
+    if _STABILITY_COMMITMENT_RE.search(text):
+        return []
+    return [
+        Fault(
+            title="No commitment to continue or complete stability studies",
+            detail=(
+                "The document discusses stability data but includes no commitment to continue or "
+                "complete long-term studies or place production batches on stability."
+            ),
+            category=FlawCategory.COMMITMENT_MISSING,
+            severity=Severity.MEDIUM,
+            tier=Tier.CORROBORATED,
+            evidence_class=EvidenceClass.CHECKLIST,
+            confidence=0.6,
+            evidence=(
+                "No stability commitment language found (searched for: "
+                f"{', '.join(_STABILITY_COMMITMENT_PATTERNS)})."
+            ),
+            source="checklist:stability_commitment",
+        )
+    ]
 
 
 def usp88_component_coverage(doc: dict) -> list[Fault]:
@@ -188,4 +271,25 @@ def run_checklists(doc: dict, ctd: CTDSection) -> list[Fault]:
     if is_el_report(doc):
         faults.extend(usp88_component_coverage(doc))
         faults.extend(leachable_commitment(doc))
+    return faults
+
+
+def run_seed_checks(doc: dict) -> list[Fault]:
+    """DETECT-03 seed pass (S9 LOD/LOQ, S10 reference standards, P10 stability commitment).
+
+    Invokable on demand regardless of the CTD/E&L gating that run_checklists applies. D-ORC1:
+    the agent decides when to run the seed, so the gate belongs to the agent, not to a section
+    guess. Per-check try/except like oracles.py:221 -- one bad check never sinks the battery.
+    """
+    faults: list[Fault] = []
+    seed_checks = (
+        _validation_checklist,
+        reference_standard_checklist,
+        stability_commitment,
+    )
+    for check in seed_checks:
+        try:
+            faults.extend(check(doc))
+        except Exception:  # noqa: BLE001 - one bad check must not sink the seed battery
+            continue
     return faults
