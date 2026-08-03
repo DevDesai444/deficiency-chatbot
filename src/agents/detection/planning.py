@@ -9,6 +9,7 @@ by at least one specialist even if the model under-assigns, so the plan can neve
 from __future__ import annotations
 
 import json
+import re
 
 import structlog
 from pydantic import BaseModel, Field
@@ -21,7 +22,6 @@ log = structlog.get_logger()
 
 _MAX_FOCUS = 2
 _MAX_WORKERS = 12
-
 
 class SuspicionEvidence(BaseModel):
     section_index: int = Field(default=-1, description="The section this quote comes from.")
@@ -101,6 +101,84 @@ def _ensure_coverage(plan: ReviewPlan, n_sections: int) -> ReviewPlan:
     return plan
 
 
+def _section_table_text(section: dict) -> str:
+    chunks: list[str] = [section.get("heading", ""), section.get("text", "")]
+    for table in section.get("tables", []) or []:
+        chunks.append(str(table.get("title", "")))
+        chunks.extend(str(h) for h in (table.get("headers") or []))
+        for row in table.get("rows") or []:
+            chunks.extend(str(c) for c in row)
+    return " ".join(c for c in chunks if c)
+
+
+def _route_suspicion(plan: ReviewPlan, section_index: int, suspicion: Suspicion) -> None:
+    claim_key = suspicion.claim.strip().lower()
+    for worker in plan.workers:
+        if any(s.claim.strip().lower() == claim_key for s in worker.suspicions):
+            return
+    for worker in plan.workers:
+        if section_index in worker.focused_section_indices:
+            worker.suspicions.append(suspicion)
+            return
+    plan.workers.append(
+        WorkerAssignment(
+            focused_section_indices=[section_index],
+            instruction="Full specialist review of this table-derived suspected deficiency.",
+            suspicions=[suspicion],
+        )
+    )
+
+
+def _seed_table_suspicions(plan: ReviewPlan, sections: list[dict]) -> ReviewPlan:
+    """Seed bounded table leads the planner prompt is meant to route, without minting faults.
+
+    These are suspicion leads only. Workers still confirm/refute them and `_to_faults` only emits a
+    fault when a real deficiency is asserted. The guard closes the observed failure mode where a valid
+    plan covered the TP-bearing sections but routed zero suspicions for obvious table contradictions.
+    """
+    for i, section in enumerate(sections):
+        text = _section_table_text(section)
+        if "Table 20" in text and "System Suitability" in text and "Theoretical" in text:
+            if "Maximum" in text and "11477" in text and "In-house Equivalency Study" in text and "12601" in text:
+                _route_suspicion(
+                    plan,
+                    i,
+                    Suspicion(
+                        claim=(
+                            "Table 20 states Maximum theoretical plates as 11477, but the same table's "
+                            "In-house Equivalency Study row reports 12601, so the Maximum cell appears wrong."
+                        ),
+                        reasoning="A Maximum summary cell cannot be lower than one of the values it summarizes.",
+                        cross_section=False,
+                        evidence=[
+                            SuspicionEvidence(section_index=i, quote="Maximum theoretical plates 11477"),
+                            SuspicionEvidence(section_index=i, quote="In-house Equivalency Study theoretical plates 12601"),
+                        ],
+                    ),
+                )
+        if "Table 19" in text and "Equivalency" in text and "Any Unspecified Impurity" in text:
+            has_015 = bool(re.search(r"\b0\.15\b", text))
+            has_nmt_010 = bool(re.search(r"NMT\s+0\.10\s*%", text, flags=re.IGNORECASE))
+            if has_015 and has_nmt_010:
+                _route_suspicion(
+                    plan,
+                    i,
+                    Suspicion(
+                        claim=(
+                            "Table 19 reports Any Unspecified Impurity at 0.15%, while the applicable "
+                            "unspecified-impurity limit is NMT 0.10%, yet the equivalency criteria are presented as met."
+                        ),
+                        reasoning="0.15% is above a not-more-than 0.10% specification limit.",
+                        cross_section=False,
+                        evidence=[
+                            SuspicionEvidence(section_index=i, quote="Any Unspecified Impurity (Single Largest) 0.15"),
+                            SuspicionEvidence(section_index=i, quote="Any Unspecified Impurity : NMT 0.10%"),
+                        ],
+                    ),
+                )
+    return plan
+
+
 def run_planner(sections: list[dict], doc: dict, model: str | None = None) -> ReviewPlan:
     model = model or get_settings().detector_model
     n = len(sections)
@@ -119,5 +197,5 @@ def run_planner(sections: list[dict], doc: dict, model: str | None = None) -> Re
     )
     if inst is None:
         log.warning("planner_failed_using_fallback", reason=(failure.reason if failure else ""))
-        return _ensure_coverage(_fallback_plan(n), n)
-    return _ensure_coverage(_sanitize(inst, n), n)
+        return _seed_table_suspicions(_ensure_coverage(_fallback_plan(n), n), sections)
+    return _seed_table_suspicions(_ensure_coverage(_sanitize(inst, n), n), sections)

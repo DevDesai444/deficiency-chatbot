@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import re
 
 import structlog
 from pydantic import BaseModel, Field
@@ -27,6 +28,7 @@ from schemas.flaws import Severity
 log = structlog.get_logger()
 
 _MAX_WORKERS = 10
+_TITLE_MAX = 140
 
 
 class WorkerFinding(BaseModel):
@@ -77,7 +79,7 @@ def _precedents_for(assignment, sections: list[dict]):
 
 def _finding_to_fault(f: WorkerFinding, source: str, precedents) -> Fault:
     return Fault(
-        title=(f.title or "").strip(),
+        title=_finding_title(f),
         detail=f.detail,
         severity=f.severity,
         evidence=f.evidence,
@@ -93,11 +95,21 @@ def _finding_to_fault(f: WorkerFinding, source: str, precedents) -> Fault:
     )
 
 
+def _finding_title(f: WorkerFinding) -> str:
+    title = (f.title or "").strip()
+    if title:
+        return title
+
+    for raw in (f.detail, f.evidence, f.rule_cited, f.table_ref):
+        text = re.sub(r"\s+", " ", (raw or "")).strip()
+        if text:
+            return text[:_TITLE_MAX]
+    return "Untitled worker finding"
+
+
 def _to_faults(out: WorkerOutput, source: str, precedents, suspicions) -> list[Fault]:
     faults: list[Fault] = []
     for f in out.findings:
-        if not (f.title or "").strip():
-            continue
         faults.append(_finding_to_fault(f, source, precedents))
 
     # A suspicion becomes a fault only when the worker asserts an actual deficiency — not merely

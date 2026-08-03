@@ -53,6 +53,13 @@ class ChallengeVerdict(BaseModel):
 
 
 _TABLE_NUM = re.compile(r"table\s*(\d+)", re.I)
+_SUMMARY_CELL_RE = re.compile(r"\b(?:minimum|maximum|mean|average|total|criteria met)\b", re.I)
+_CONTRADICTION_RE = re.compile(r"\b(?:contradict|wrong|inconsisten|less than|lower than|higher than|exceeds?)\b", re.I)
+_SUMMARY_RESOLUTION_RE = re.compile(
+    r"\b(?:excludes?|excluded|not included|does not include|outside the summary|not part of the summary|"
+    r"summary is correct|correct summary|computed summary matches|calculated summary matches)\b",
+    re.I,
+)
 
 
 def _table_num(text: str) -> str:
@@ -133,6 +140,16 @@ def _arithmetic_refutation(verdict: ChallengeVerdict, corpus: str) -> str:
     return f"Recomputed: observed {observed_text} satisfies the criterion {criterion_text}."
 
 
+def _is_summary_cell_contradiction(fault: Fault) -> bool:
+    text = " ".join((fault.title or "", fault.detail or "", fault.evidence or "", fault.table_ref or ""))
+    return bool(_SUMMARY_CELL_RE.search(text) and _CONTRADICTION_RE.search(text))
+
+
+def _summary_refutation_resolves(verdict: ChallengeVerdict) -> bool:
+    text = " ".join((verdict.counter_evidence or "", verdict.reasoning or ""))
+    return bool(_SUMMARY_RESOLUTION_RE.search(text))
+
+
 def _apply_verdict(fault: Fault, verdict: ChallengeVerdict, corpus: str) -> bool:
     """Gate. Returns True when the finding is grounded-refuted and should be DROPPED as a confirmed
     false positive; otherwise the finding survives with a small confidence bump.
@@ -146,6 +163,9 @@ def _apply_verdict(fault: Fault, verdict: ChallengeVerdict, corpus: str) -> bool
         and _anchored(verdict.counter_evidence, corpus)
     )
     if quoted:
+        if _is_summary_cell_contradiction(fault) and not _summary_refutation_resolves(verdict):
+            fault.confidence = min(round(fault.confidence + 0.1, 2), 0.9)
+            return False
         fault.challenge_note = verdict.counter_evidence.strip()[:300]
         return True
 

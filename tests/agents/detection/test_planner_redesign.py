@@ -140,6 +140,24 @@ class TestWorkerConversion:
         assert len(faults) == 1
         assert "ICH Q2" in faults[0].guidance_refs
 
+    def test_untitled_worker_finding_is_not_silently_dropped(self):
+        from agents.detection.workers import WorkerFinding, WorkerOutput, _to_faults
+
+        out = WorkerOutput(findings=[
+            WorkerFinding(
+                title="",
+                detail="Table 20 Maximum theoretical plates 11477 contradicts row value 12601.",
+                evidence="Maximum 11477; In-house Equivalency Study 12601",
+                rule_cited="Table 20 Maximum summary cell",
+            )
+        ])
+
+        faults = _to_faults(out, "specialist:17", [], [])
+
+        assert len(faults) == 1
+        assert faults[0].title
+        assert "11477" in faults[0].title
+
 
 class TestChallengeIntersectionAware:
     def test_sections_for_includes_cited_indices(self):
@@ -226,6 +244,30 @@ class TestArithmeticChallengeGate:
         verdict = ChallengeVerdict(refuted=False, claims_limit_violation=False)
         assert _apply_verdict(fault, verdict, _doc_corpus(doc)) is False
         assert fault.confidence == 0.6   # unrefuted findings still get the small bump
+
+    def test_summary_cell_contradiction_not_refuted_by_different_row_labels(self):
+        from agents.detection.challenge import ChallengeVerdict, _apply_verdict
+        from agents.detection.verify import _doc_corpus
+        from schemas.faults import Fault
+
+        doc = self._doc(
+            "Table 20 System Suitability Results. Specificity 11400. Linearity 11477. "
+            "In-house Equivalency Study 12601. Maximum theoretical plates 11477."
+        )
+        fault = Fault(
+            title="Table 20 Maximum theoretical plates 11477 contradicts In-house Equivalency Study row 12601",
+            detail="Maximum is a summary cell and cannot be lower than a row it summarizes.",
+            evidence="Maximum theoretical plates 11477; In-house Equivalency Study 12601",
+            confidence=0.5,
+        )
+        verdict = ChallengeVerdict(
+            refuted=True,
+            counter_evidence="Specificity 11400. Linearity 11477. In-house Equivalency Study 12601.",
+            reasoning="These are different studies and are expected to differ.",
+        )
+
+        assert _apply_verdict(fault, verdict, _doc_corpus(doc)) is False
+        assert fault.confidence == 0.6
 
 
 class TestNonDeficiencyGate:
@@ -336,3 +378,4 @@ class TestTrailingConcessionGate:
         )
         out = verify_and_tier([f], self._doc())
         assert len(out) == 1, "the real cross-table contradiction must survive the concession gate"
+

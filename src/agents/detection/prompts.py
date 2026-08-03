@@ -71,6 +71,11 @@ Rules:
   Analyst B), replicate injections, separate studies, methods, or timepoints (intermediate precision,
   ruggedness, system vs method precision). Quote verbatim the label or heading that shows they are
   different sources. Only two different statements of the SAME single measurement are a real inconsistency.
+- Exception: summary cells such as Minimum, Maximum, Mean/Average, Total, or "criteria met" are meant
+  to summarize rows that may come from different studies, analysts, methods, or timepoints. Do NOT
+  refute a summary-cell contradiction merely because the summarized rows have different labels. Refute
+  it only if the excerpt quotes that the row is excluded from the summary, or quotes/copies the summary
+  value showing it is actually correct.
 - If you cannot find one, the finding STANDS: refuted = false, counter_evidence empty. Do NOT
   refute on general grounds ("seems fine", "probably justified") — that is not a refutation.
 - Never argue the finding is more severe; you are only testing whether it survives.
@@ -150,6 +155,17 @@ Cross-referencing — do this ACTIVELY, it is where the important faults hide:
   another section is a finding. When a finding spans sections, list ALL section indices it uses in
   `cited_section_indices`.
 
+Protected table-contradiction tripwires — these are REAL findings when evidenced:
+- A table summary cell (Minimum, Maximum, Mean, Total, "criteria met") must agree with the rows or
+  criteria it summarizes. If Maximum is lower than a listed row value, report it even when every row
+  value separately passes its acceptance limit.
+- An impurity/result that exceeds a product/specification limit is a finding even if the surrounding
+  method-comparison section concludes equivalency or says criteria were met. Judge the result against
+  the applicable product/specification limit, not only against method-specific system-suitability
+  criteria.
+- Do not delete an internal contradiction just because one of its numbers is also compliant with a
+  different acceptance criterion. The defect is the contradiction or exceeded specification.
+
 MOST SECTIONS ARE COMPLIANT. An empty findings list is the EXPECTED result for a clean section — it is
 a complete, correct, valuable answer, not a failure to find something. A wrong finding is worse than no
 finding: it costs a reviewer more time to disprove than a real one saves. Never pad the list.
@@ -157,10 +173,13 @@ finding: it costs a reviewer more time to disprove than a real one saves. Never 
 BEFORE YOU REPORT, run each candidate through these five checks and DELETE it unless it survives ALL:
 1. ARITHMETIC. Claiming a value breaks a limit? Write the limit and the value and check the direction.
    Is 1.2 outside 0.9-1.5? No, it is inside. Is 9.1 above NMT 10.0? No. Is 18.9 above NMT 33.0? No.
-   If the value SATISFIES its limit, DELETE the finding.
+   If the finding is only a limit-violation claim and the value SATISFIES that limit, DELETE it.
+   But keep table-summary contradictions (e.g. a Maximum below a listed row) and product-specification
+   exceedances (e.g. 0.15% vs NMT 0.10%) when the evidence supports them.
 2. SELF-CONSISTENCY. Re-read your own `detail`. If it concedes compliance ("within limit", "meets the
    criterion", "all values are below", "this is not a violation"), then your title is wrong — DELETE
-   the finding. Never report a compliance statement as a deficiency.
+   the finding, unless the detail then identifies a separate contradiction or specification exceedance.
+   Never report a pure compliance statement as a deficiency.
 3. SAME MEASUREMENT? Two numbers conflict only when they measure the SAME thing the SAME way. These
    are EXPECTED to differ and are NOT findings: different analysts (Analyst A vs B); system vs method
    vs intermediate precision; spiked vs unspiked samples; different concentration levels (LOD vs LOQ);
@@ -195,16 +214,27 @@ section(s) against the OTHER sections (especially their verbatim tables). A focu
 or contradicts a fact in another section is a finding; list ALL section indices it uses in
 `cited_section_indices`.
 
+Protected table-contradiction tripwires — these are REAL findings when evidenced:
+- A table summary cell (Minimum, Maximum, Mean, Total, "criteria met") must agree with the rows or
+  criteria it summarizes. If Maximum is lower than a listed row value, report it even when every row
+  value separately passes its acceptance limit.
+- An impurity/result that exceeds a product/specification limit is a finding even if the surrounding
+  method-comparison section concludes equivalency or says criteria were met.
+- Do not delete an internal contradiction just because one of its numbers is also compliant with a
+  different acceptance criterion.
+
 MOST SECTIONS ARE COMPLIANT. An empty findings list is the EXPECTED result for a clean section — a
 complete, correct answer, not a failure. A wrong finding costs a reviewer more time to disprove than a
 real one saves. Never pad the list to look thorough.
 
 BEFORE YOU REPORT, run each candidate through these five checks and DELETE it unless it survives ALL:
 1. ARITHMETIC. Claiming a value breaks a limit? Write the limit and the value and check the direction.
-   Is 1.2 outside 0.9-1.5? No, it is inside. Is 9.1 above NMT 10.0? No. If the value SATISFIES its
-   limit, DELETE the finding.
+   Is 1.2 outside 0.9-1.5? No, it is inside. Is 9.1 above NMT 10.0? No. If the finding is only a
+   limit-violation claim and the value SATISFIES that limit, DELETE it. But keep table-summary
+   contradictions and product-specification exceedances when the evidence supports them.
 2. SELF-CONSISTENCY. Re-read your own `detail`. If it concedes compliance ("within limit", "meets the
-   criterion", "this is not a violation"), your title is wrong — DELETE the finding.
+   criterion", "this is not a violation"), your title is wrong — DELETE the finding, unless the detail
+   then identifies a separate contradiction or specification exceedance.
 3. SAME MEASUREMENT? Numbers conflict only when they measure the SAME thing the SAME way. EXPECTED to
    differ, and NOT findings: different analysts; system vs method vs intermediate precision; spiked vs
    unspiked samples; different concentration levels; different timepoints; and a different method
