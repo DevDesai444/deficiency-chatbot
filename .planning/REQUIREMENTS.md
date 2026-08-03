@@ -32,23 +32,23 @@
 
 ### Agentic Loop
 
-- [ ] **AGENT-01**: Detection runs as a model-driven, model-agnostic tool loop (reviewer requests evidence → reasons → requests more → stops on done/budget), replacing the one-shot pre-rendered call
+- [x] **AGENT-01**: Detection runs as a model-driven, model-agnostic tool loop (reviewer requests evidence → reasons → requests more → stops on done/budget), replacing the one-shot pre-rendered call
 - [ ] **AGENT-02**: An orchestrator decomposes a review into objectives and fans out isolated sub-agents that each return a distilled, cited finding set
 - [ ] **AGENT-03**: Hard per-run budgets and a circuit breaker are enforced in code (stop conditions are code gates, not prompt instructions), **plus a diminishing-returns stop** — N consecutive steps yielding negligible new grounded evidence halts the loop before the ceiling, so budget is spent on progress rather than circling
 - [ ] **AGENT-04**: The budget is **bidirectional — a FLOOR as well as a ceiling.** When the model emits no tool call (i.e. declares itself finished) but is still well under budget AND has not hit the diminishing-returns condition, the loop **does not accept the stop**: it injects a continuation nudge and runs another turn. The model's self-assessment of "done" is **not** a termination condition. Rationale (this is the recall requirement): our measured failure is 2/28 — an agent that stops after finding a few obvious faults reproduces exactly that ceiling, and no ceiling-only budget can prevent it. Verbatim precedent — Claude Code `query.ts:1338` `token_budget_continuation` + `utils/tokenBudget.ts:72`: *"Stopped at {pct}% of token target. Keep working — do not summarize."* Enforced in code, never as a prompt instruction. **Anti-abuse:** the nudge is bounded by the same diminishing-returns rule (AGENT-03) so it cannot loop forever, and every continuation is recorded in telemetry (count + tokens-at-stop + whether new grounded findings followed) so the spike measures whether nudging actually buys recall or just burns budget.
 
 ### Grounding & Verification
 
-- [ ] **GROUND-01**: Every claimed deficiency is pinned to a verbatim, re-openable source quote the agent actually retrieved
+- [x] **GROUND-01**: Every claimed deficiency is pinned to a verbatim, re-openable source quote the agent actually retrieved
 - [ ] **GROUND-02**: A grounded adversarial verifier confirms or refutes each candidate against the source; an ungrounded challenge lowers confidence but never vetoes (recall invariant preserved)
-- [ ] **GROUND-03**: Each finding is dual-cited — the submission passage AND the specific FDA/ICH rule clause it violates
+- [x] **GROUND-03**: Each finding is dual-cited — the submission passage AND the specific FDA/ICH rule clause it violates
 
 ### Detection (v1 compliance check-kinds)
 
 - [ ] **DETECT-01**: System detects cross-document specification mismatch (X1: Quality Overall Summary 2.3 vs Module 3.2 body) — the flagship check
 - [ ] **DETECT-02**: System detects cross-document value contradictions (X2)
 - [ ] **DETECT-03**: System runs deterministic quick-win oracles: LOD/LOQ presence (S9), reference standards (S10), stability commitment (P10)
-- [ ] **DETECT-04**: System emits a compliance verdict per finding tied to a cited FDA/ICH rule
+- [x] **DETECT-04**: System emits a compliance verdict per finding tied to a cited FDA/ICH rule
 - [ ] **DETECT-05**: System emits a coverage manifest so a "no deficiencies found" result is meaningful (states what was reviewed)
 
 ### Evaluation (harness first & continuous)
@@ -117,13 +117,13 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 | TOOLS-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
 | TOOLS-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
 | TOOLS-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
-| AGENT-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| AGENT-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
 | AGENT-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
 | AGENT-04 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
-| GROUND-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
-| GROUND-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| GROUND-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
+| GROUND-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
 | DETECT-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
-| DETECT-04 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
+| DETECT-04 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
 | AGENT-02 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
 | DETECT-01 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
 | DETECT-02 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
