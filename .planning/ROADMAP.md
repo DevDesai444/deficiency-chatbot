@@ -108,8 +108,8 @@ Plans:
 - [x] 03-07-PLAN.md — `BudgetLedger`: every AGENT-03/AGENT-04 stop condition as code, with the frozen N values
 - [x] 03-08-PLAN.md — `telemetry.py`: per-turn JSONL, provenanced `RunSummary`, all five D-TEL signal groups, atomic writes
 - [x] 03-09-PLAN.md — `run_oracles` as the 7th tool; S10 built, P10 generalized; D-ORC2 no-pre-recorded-spans (DETECT-03)
-- [ ] 03-10-PLAN.md — Boundary-crossing hunt: enumerated chain audit + a composition test per chain (D-PRE1 step 3)
-- [ ] 03-11-PLAN.md — `registry.py`: 7 flat arg models, schema derivation, dispatch, pre/post-repair split, Pitfall-6 fallback
+- [x] 03-10-PLAN.md — Boundary-crossing hunt: enumerated chain audit + a composition test per chain (D-PRE1 step 3)
+- [x] 03-11-PLAN.md — `registry.py`: 7 flat arg models, schema derivation, dispatch, pre/post-repair split, Pitfall-6 fallback
 - [ ] 03-12-PLAN.md — D-LOOP2 baseline re-measured 3x; median + variance + drift check; reviewer confirms the governing reference (D-PRE1 step 4)
 - [ ] 03-13-PLAN.md — `loop.py` + static `prompts.py` + `run_review`; D-LOOP4 prefix stability; tool-message protocol (AGENT-01)
 - [ ] 03-14-PLAN.md — Stop-condition wiring, AGENT-04 continuation floor, D-LOOP5 rejection turns, D-BUD6 forced-runaway load test
