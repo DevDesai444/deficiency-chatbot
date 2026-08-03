@@ -19,6 +19,14 @@ _RATE_LIMIT_BASE_DELAY = 8.0    # per-minute token limits need real waits, not 1
 _RATE_LIMIT_MAX_DELAY = 60.0
 
 
+def _request_safe_message(message) -> dict:
+    """Return the assistant message shape that can be sent back on the next request."""
+    payload = message.model_dump(exclude_none=True, exclude_unset=True)
+    for response_only in ("annotations", "audio", "refusal"):
+        payload.pop(response_only, None)
+    return payload
+
+
 def _retry_after_seconds(exc) -> float | None:
     """Read a Retry-After header off a rate-limit error, if the server sent one."""
     resp = getattr(exc, "response", None)
@@ -40,9 +48,9 @@ class ChatResult:
 class ChatTurn:
     """One tool-calling turn's result (AGENT-01). Sibling of ChatResult, not a replacement.
 
-    `raw_message` is `choice.message.model_dump()` and MUST be echoed back into the message list
-    verbatim (Pitfall 10): reconstructing the assistant message by hand -- dropping tool_calls or
-    mismatching tool_call_id -- produces 400s or silent context loss.
+    `raw_message` is the request-safe assistant message and MUST be echoed back into the message
+    list verbatim (Pitfall 10): reconstructing the assistant message by hand -- dropping
+    tool_calls or mismatching tool_call_id -- produces 400s or silent context loss.
 
     `usage_present=False` means the provider returned no usage object and the caller's token
     figures are a DECLARED ESTIMATE, not a measurement (D-BUD5 / Pitfall 8). The run summary
@@ -184,7 +192,7 @@ def chat_completion_tools(
                 content=choice.message.content or "",
                 finish_reason=choice.finish_reason or "stop",
                 tool_calls=list(choice.message.tool_calls or []),
-                raw_message=choice.message.model_dump(),
+                raw_message=_request_safe_message(choice.message),
                 prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
                 completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
                 cached_tokens=getattr(details, "cached_tokens", 0) or 0,
