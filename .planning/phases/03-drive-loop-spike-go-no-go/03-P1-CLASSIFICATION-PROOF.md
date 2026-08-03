@@ -2,7 +2,13 @@
 
 This proof discharges the P1 classification precondition for D-PRE1 and records the material verification-queue item 5 finding before any scored drive-loop run.
 
-## Real Classification Results
+## 1. D-PRE1 Position
+
+P2 (03-01) -> **P1 (this document)** -> boundary-crossing hunt (03-10) -> D-LOOP2 baseline (03-12) -> pre-registration (03-17) -> the 3 agent runs (03-18).
+
+P1 exists because the earlier D-RI1(2) traceability test proved only that the two corrected-basis CFR entries fire if a hand-built manifest says `3.2.S.5`. It did not prove production ingestion classifies the real PDFs into a family that makes those requirements applicable.
+
+## 2. Real Classification Results
 
 Real `ingest_corpus` was run against a temporary corpus containing:
 
@@ -11,10 +17,10 @@ Real `ingest_corpus` was run against a temporary corpus containing:
 
 The run used the production parser, normalizer, cache-entry writer, and content classifier, with manifest DB persistence disabled for the measurement. Both files parsed successfully and resolved at the deterministic regex tier.
 
-| doc_id | source file | classified family / CTD section | label | tier | confidence | matches the D-RI1(2) fixture assumption? |
-|---|---|---|---|---|---:|---|
-| `mvr1381` | `data/32s43-validation-related-compounds-method.pdf` | `3.2.S.4.2` | Drug Substance Analytical Procedures | regex | 0.99 | no |
-| `spec32s41` | `data/32s41-Specification.pdf` | `3.2.S.4.1` | Drug Substance Specification | regex | 0.99 | no |
+| doc_id | source file | classified family / CTD section | label | tier | trigger text | matches the D-RI1(2) fixture assumption? |
+|---|---|---|---|---|---|---|
+| `mvr1381` | `data/32s43-validation-related-compounds-method.pdf` | `3.2.S.4.2` | Drug Substance Analytical Procedures | regex | `3.2.S.4.2` | no |
+| `spec32s41` | `data/32s41-Specification.pdf` | `3.2.S.4.1` | Drug Substance Specification | regex | `3.2. S.4.1` | no |
 
 Measured output:
 
@@ -28,7 +34,7 @@ spec32s41	family=3.2.S.4.1	count=2	targets_present=[]
 mvr1381	family=3.2.S.4.2	count=0	targets_present=[]
 ```
 
-## Requirement-Index Firing Under Real Families
+## 3. Requirement-Index Firing
 
 Because the two real classified families differ, a destructive one-family move would only repair one document. The fix keeps the reviewed entry data intact and changes only the family linkage in `src/rulebook/requirement_index.py`: the two corrected-basis CFR entries now have supplemental `family_requires_requirement` edges for both measured real families. `REQUIREMENT_INDEX_VERSION` was bumped from `"3"` to `"4"`.
 
@@ -36,6 +42,8 @@ Because the two real classified families differ, a destructive one-family move w
 |---|---|---|---|---|---|
 | `CFR-211160B-SOUND-BASIS` | yes | yes | yes | primary `3.2.S.5` only | primary `3.2.S.5`, plus real-family links `3.2.S.4.1` and `3.2.S.4.2` |
 | `CFR-211194-CALCULATIONS` | yes | yes | yes | primary `3.2.S.5` only | primary `3.2.S.5`, plus real-family links `3.2.S.4.1` and `3.2.S.4.2` |
+
+After the linkage fix, `tests/rulebook/test_requirement_index_integration.py` builds the corpus through real ingestion and asserts both `CFR-211160B-SOUND-BASIS` and `CFR-211194-CALCULATIONS` enumerate for each measured real family.
 
 Targeted integration verification:
 
@@ -58,7 +66,7 @@ Targeted integration verification:
 sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
 ```
 
-## Verification-Queue Item 5
+## 4. Verification-Queue Item 5
 
 The existing boundary-crossing composition test passes on the committed rulebook fixture path:
 
@@ -104,6 +112,21 @@ Total: `0/15 resolved`.
 
 ## BLOCKER: verification-queue item 5 is NOT closed on real data
 
-The composed `read_guideline(rule_doc_id)` path is green, but direct `lookup_citation(entry.citation)` on the authored requirement-index citation strings resolves `0/15` against the real local rulebook store. Under this plan's strict item-5 check, `absence_of_evidence` does not yet have a proven live path from requirement enumeration through rule fetch to `emit_finding`. A `0.0` on that family in the spike would be attributable to this rulebook citation-resolution gap rather than to the agent loop.
+The composed `read_guideline(rule_doc_id)` path is green, but direct `lookup_citation(entry.citation)` on the authored requirement-index citation strings resolves `0/15` against the real local rulebook store. Under this plan's strict item-5 check, the direct citation lookup chain remains blocked.
+
+## 5. What This Means for the Gate
+
+The classification-to-requirement portion of the `absence_of_evidence` path is now proven for the two corrected-basis CFR entries: real ingestion produces `3.2.S.4.2` and `3.2.S.4.1`, and those families enumerate `CFR-211160B-SOUND-BASIS` plus `CFR-211194-CALCULATIONS`.
+
+The full `absence_of_evidence` live path is not proven because direct requirement-index citation strings still do not resolve through `rulebook.store.lookup_citation`. A `0.0` on that family in the spike would be attributable to this rulebook citation-resolution gap, not to the agent loop alone. This preserves the same attribution discipline as D-PRE1(a)'s parse-shift disclosure.
 
 `git status --porcelain rulebook/manifest.yaml` reported ` M rulebook/manifest.yaml` before this task and after this task; the file was already dirty and was not staged or intentionally modified by this plan.
+
+## 6. Post-P2 Note
+
+The measured classification did not depend on the old `3.2.S.5` assumption or on a hand-authored manifest. Both documents classified at the regex tier from explicit CTD section strings in canonical text:
+
+- `mvr1381`: trigger span `8403:8412`, text `3.2.S.4.2`
+- `spec32s41`: trigger span `1146:1156`, text `3.2. S.4.1`
+
+P1 still correctly ran after P2 because P2 changed parser/cache behavior and could have affected which canonical text was available for classification. In this measured repo state, the ordering mattered as a precondition discipline, but the final family labels came from explicit section-number text rather than from recovered `3.2.S.5` reference-standard text.
