@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 3 context gathered
-last_updated: "2026-08-01T19:50:49.218Z"
-last_activity: 2026-08-01 -- Phase 03 planning complete
+last_updated: "2026-08-03T07:55:43.168Z"
+last_activity: 2026-08-03 -- Phase 03 execution started
 progress:
   total_phases: 7
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** Given any directory of submission documents, reliably find the real FDA/ICH compliance deficiencies — all faults and only faults that exist — each cited to the exact passage that proves it.
-**Current focus:** Phase 02 — retrieval-navigation-tools-rulebook
+**Current focus:** Phase 03 — drive-loop-spike-go-no-go
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-08-01 -- Phase 03 planning complete
+Phase: 03 (drive-loop-spike-go-no-go) — EXECUTING
+Plan: 1 of 19
+Status: Executing Phase 03
+Last activity: 2026-08-03 -- Phase 03 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -72,7 +72,7 @@ None yet.
 ### Blockers/Concerns
 
 - **Requirement count correction:** REQUIREMENTS.md footer (and the roadmap task) stated "24 v1 requirements," but the enumerated IDs total **25** (INGEST 3 + RULES 4 + TOOLS 2 + AGENT 3 + GROUND 3 + DETECT 5 + EVAL 3 + COST 2). All 25 are mapped; coverage counts updated to 25/25.
-- **Uncommitted working tree:** a partial planner/summariser/sandwich/workers redesign is uncommitted on branch `CLI_for_folders` — build on it, do not clobber. Roadmapper made no commits.
+- **Corrected (Phase 3 research):** the planner/summariser/sandwich/workers redesign is **committed and is HEAD** — `git diff HEAD --stat -- src/` is empty, all 16 `src/agents/detection/` files are tracked, `git stash list` is empty. It is exercised by `tests/agents/detection/test_planner_redesign.py` and driven by `pipeline.py:58-83`. Phase 3 **leaves it entirely alone**: it is the *baseline arm* (D-LOOP1 requires it stay runnable; D-LOOP2 re-runs it 3x to produce the governing reference). `src/agents/review/` is built as a sibling package and touches none of it.
 - **Stale docs debt:** repo README/PIPELINE/DIAGNOSIS/RELIABILITY/PHASES describe a removed 3-layer AutoGen design — trust code, not those docs.
 
 ## Deferred Items
