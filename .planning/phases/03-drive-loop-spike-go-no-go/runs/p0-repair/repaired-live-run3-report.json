@@ -1,0 +1,122 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Table 19 reports Any Unspecified Impurity at 0.15%, while the applicable unspecified-impurity limit is NMT 0.10%, yet the equivalency criteria are presented as met.",
+      "detail": "0.15% is above a not-more-than 0.10% specification limit.",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "model_judgment",
+      "confidence": 0.6,
+      "verdict": null,
+      "rule_span_id": null,
+      "submission_span_id": null,
+      "evidence": "Table 19 reports Any Unspecified Impurity at 0.15%, which exceeds the applicable unspecified-impurity limit of NMT 0.10%.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "specialist:16,17:suspicion",
+      "guidance_refs": [],
+      "precedents": [
+        {
+          "anda_number": "213950",
+          "product_name": "Norelgestromin and Ethinyl Estradiol Transdermal System, 150/35 mcg per day",
+          "deficiency_text": "1. We acknowledge that your specifications for ethinyl estradiol and norelgestromin (specification nos. 01-1579-01 and 01-1459-03, respectively) direct use of the relevant current USP monograph methods. However, procedures outlined in the USP monographs and general chapters do not include sufficient detail to ensure that the testing is consistently or adequately performed with your samples at your facility. Revise Modules 3.2.S.4 of your application to include standard testing procedures for all tests listed in the drug substance specifications.",
+          "similarity_score": 0.7098797559738159
+        },
+        {
+          "anda_number": "",
+          "product_name": "",
+          "deficiency_text": "3. We acknowledge your submission of data for the system suitability test for\nresolution between impurity J and the drug substance. We however note that\nthere is not adequate resolution between impurities H, F and A. Perform the revalidation\nof system suitability and demonstrate that there is adequate resolution between these impurities or alternatively, improve on your analytical method for\nadequate resolution.",
+          "similarity_score": 0.688450276851654
+        },
+        {
+          "anda_number": "218384",
+          "product_name": "Scopolamine Transdermal System, 1mg/3days",
+          "deficiency_text": "9. We acknowledge that you proposed an in-process test for Drug content homogeneity in the Scotchpak 9723 and Celgard laminates. We recommend that you establish a sampling plan and statistical test-based acceptance criteria which includes the confidence level (e.g., 90%) and coverage (e.g., 95%) to pass USP <905> based on standards such as ASTM E2709/E2810 for content uniformity of in-process samples (e.g., collected during the coating/ drying/ laminating or converting process). You may provide additional justifications to support your sampling plan to support the proposed statistical in-process control. Update relevant documents including section 3.2.P.3.4 accordingly.",
+          "similarity_score": 0.6805379986763
+        }
+      ],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": [
+        16,
+        16
+      ]
+    },
+    {
+      "title": "Table 20 states Maximum theoretical plates as 11477, but the same table's In-house Equivalency Study row reports 12601, so the Maximum cell appears wrong.",
+      "detail": "A Maximum summary cell cannot be lower than one of the values it summarizes.",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "model_judgment",
+      "confidence": 0.6,
+      "verdict": null,
+      "rule_span_id": null,
+      "submission_span_id": null,
+      "evidence": "The Maximum theoretical plates in Table 20 is 11477, which is lower than the theoretical plates reported in the In-house Equivalency Study row (12601).",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "specialist:16,17:suspicion",
+      "guidance_refs": [],
+      "precedents": [
+        {
+          "anda_number": "213950",
+          "product_name": "Norelgestromin and Ethinyl Estradiol Transdermal System, 150/35 mcg per day",
+          "deficiency_text": "1. We acknowledge that your specifications for ethinyl estradiol and norelgestromin (specification nos. 01-1579-01 and 01-1459-03, respectively) direct use of the relevant current USP monograph methods. However, procedures outlined in the USP monographs and general chapters do not include sufficient detail to ensure that the testing is consistently or adequately performed with your samples at your facility. Revise Modules 3.2.S.4 of your application to include standard testing procedures for all tests listed in the drug substance specifications.",
+          "similarity_score": 0.7098797559738159
+        },
+        {
+          "anda_number": "",
+          "product_name": "",
+          "deficiency_text": "3. We acknowledge your submission of data for the system suitability test for\nresolution between impurity J and the drug substance. We however note that\nthere is not adequate resolution between impurities H, F and A. Perform the revalidation\nof system suitability and demonstrate that there is adequate resolution between these impurities or alternatively, improve on your analytical method for\nadequate resolution.",
+          "similarity_score": 0.688450276851654
+        },
+        {
+          "anda_number": "218384",
+          "product_name": "Scopolamine Transdermal System, 1mg/3days",
+          "deficiency_text": "9. We acknowledge that you proposed an in-process test for Drug content homogeneity in the Scotchpak 9723 and Celgard laminates. We recommend that you establish a sampling plan and statistical test-based acceptance criteria which includes the confidence level (e.g., 90%) and coverage (e.g., 95%) to pass USP <905> based on standards such as ASTM E2709/E2810 for content uniformity of in-process samples (e.g., collected during the coating/ drying/ laminating or converting process). You may provide additional justifications to support your sampling plan to support the proposed statistical in-process control. Update relevant documents including section 3.2.P.3.4 accordingly.",
+          "similarity_score": 0.6805379986763
+        }
+      ],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": [
+        17,
+        17
+      ]
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [
+    "1.1 Introduction",
+    "1.2 Standards and Samples Used in Verification Study",
+    "1.4.1 Specificity",
+    "1.4.2 Linearity",
+    "1.4.3 Limit of Detection",
+    "1.4.4 Limit of Quantitation",
+    "1.4.6.1 System Precision",
+    "1.4.6.2 Method Precision",
+    "1.4.8 Equivalency with the USP Method",
+    "1.4.9 System Suitability",
+    "Main Content",
+    "1 Verification of Analytical Procedure for related compounds",
+    "1.3 Protocol Deviation",
+    "1.4 Verification Parameters",
+    "1.4.5 Absorptivity Factor",
+    "1.4.6 Precision",
+    "1.4.6.3 Intermediate Precision (Ruggedness Study)",
+    "1.4.7 Stability of Analytical Solutions",
+    "1.5 Conclusions",
+    "1.6 History"
+  ],
+  "parse_failures": [],
+  "analysis_seconds": 39.9,
+  "stop_reason": "",
+  "budget_exhausted": false
+}

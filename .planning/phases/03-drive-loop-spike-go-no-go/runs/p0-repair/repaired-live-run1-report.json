@@ -1,0 +1,122 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Table 19 reports Any Unspecified Impurity at 0.15%, while the applicable unspecified-impurity limit is NMT 0.10%, yet the equivalency criteria are presented as met.",
+      "detail": "0.15% is above a not-more-than 0.10% specification limit.",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "model_judgment",
+      "confidence": 0.6,
+      "verdict": null,
+      "rule_span_id": null,
+      "submission_span_id": null,
+      "evidence": "The value of Any Unspecified Impurity (0.15%) exceeds the specified limit (NMT 0.10%) in Table 19.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "specialist:15,16:suspicion",
+      "guidance_refs": [],
+      "precedents": [
+        {
+          "anda_number": "213950",
+          "product_name": "Norelgestromin and Ethinyl Estradiol Transdermal System, 150/35 mcg per day",
+          "deficiency_text": "1. We acknowledge that your specifications for ethinyl estradiol and norelgestromin (specification nos. 01-1579-01 and 01-1459-03, respectively) direct use of the relevant current USP monograph methods. However, procedures outlined in the USP monographs and general chapters do not include sufficient detail to ensure that the testing is consistently or adequately performed with your samples at your facility. Revise Modules 3.2.S.4 of your application to include standard testing procedures for all tests listed in the drug substance specifications.",
+          "similarity_score": 0.7171551585197449
+        },
+        {
+          "anda_number": "",
+          "product_name": "",
+          "deficiency_text": "3. We acknowledge your submission of data for the system suitability test for\nresolution between impurity J and the drug substance. We however note that\nthere is not adequate resolution between impurities H, F and A. Perform the revalidation\nof system suitability and demonstrate that there is adequate resolution between these impurities or alternatively, improve on your analytical method for\nadequate resolution.",
+          "similarity_score": 0.7036717534065247
+        },
+        {
+          "anda_number": "218384",
+          "product_name": "Scopolamine Transdermal System, 1mg/3days",
+          "deficiency_text": "9. We acknowledge that you proposed an in-process test for Drug content homogeneity in the Scotchpak 9723 and Celgard laminates. We recommend that you establish a sampling plan and statistical test-based acceptance criteria which includes the confidence level (e.g., 90%) and coverage (e.g., 95%) to pass USP <905> based on standards such as ASTM E2709/E2810 for content uniformity of in-process samples (e.g., collected during the coating/ drying/ laminating or converting process). You may provide additional justifications to support your sampling plan to support the proposed statistical in-process control. Update relevant documents including section 3.2.P.3.4 accordingly.",
+          "similarity_score": 0.6938488483428955
+        }
+      ],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": [
+        16,
+        16
+      ]
+    },
+    {
+      "title": "Table 20 states Maximum theoretical plates as 11477, but the same table's In-house Equivalency Study row reports 12601, so the Maximum cell appears wrong.",
+      "detail": "A Maximum summary cell cannot be lower than one of the values it summarizes.",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "model_judgment",
+      "confidence": 0.6,
+      "verdict": null,
+      "rule_span_id": null,
+      "submission_span_id": null,
+      "evidence": "Table 20 states Maximum theoretical plates as 11477, but the same table's In-house Equivalency Study row reports 12601",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "specialist:17,18:suspicion",
+      "guidance_refs": [],
+      "precedents": [
+        {
+          "anda_number": "",
+          "product_name": "",
+          "deficiency_text": "3. We acknowledge your submission of data for the system suitability test for\nresolution between impurity J and the drug substance. We however note that\nthere is not adequate resolution between impurities H, F and A. Perform the revalidation\nof system suitability and demonstrate that there is adequate resolution between these impurities or alternatively, improve on your analytical method for\nadequate resolution.",
+          "similarity_score": 0.694063127040863
+        },
+        {
+          "anda_number": "",
+          "product_name": "",
+          "deficiency_text": "5. In your response letter dated March 03, 2018, you provided the Comparative Evaluation of\nLeachable Study Report which summarizes the analytical method (791-LS3) used for\ndetermination of leachables in the proposed drug product. You mentioned the analytical\nmethod has been validated. Provide the method validation report for review.",
+          "similarity_score": 0.6619093418121338
+        },
+        {
+          "anda_number": "206463",
+          "product_name": "Lidocaine Patch, 5%",
+          "deficiency_text": "b. Additionally, as part of your response, compare leachable results observed from previous leachable and extractable studies with those in your new study. Provide justification for qualitative and quantitative differences.",
+          "similarity_score": 0.65494704246521
+        }
+      ],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": [
+        17,
+        17
+      ]
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [
+    "1.1 Introduction",
+    "1.4.1 Specificity",
+    "1.4.2 Linearity",
+    "1.4.3 Limit of Detection",
+    "1.4.4 Limit of Quantitation",
+    "1.4.5 Absorptivity Factor",
+    "1.4.6 Precision",
+    "1.4.6.1 System Precision",
+    "1.4.6.2 Method Precision",
+    "1.4.6.3 Intermediate Precision (Ruggedness Study)",
+    "1.4.7 Stability of Analytical Solutions",
+    "1.4.8 Equivalency with the USP Method",
+    "1.4.9 System Suitability",
+    "1.5 Conclusions",
+    "Main Content",
+    "1 Verification of Analytical Procedure for related compounds",
+    "1.2 Standards and Samples Used in Verification Study",
+    "1.3 Protocol Deviation",
+    "1.4 Verification Parameters",
+    "1.6 History"
+  ],
+  "parse_failures": [],
+  "analysis_seconds": 338.0,
+  "stop_reason": "",
+  "budget_exhausted": false
+}

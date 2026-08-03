@@ -110,7 +110,7 @@ Plans:
 - [x] 03-09-PLAN.md — `run_oracles` as the 7th tool; S10 built, P10 generalized; D-ORC2 no-pre-recorded-spans (DETECT-03)
 - [x] 03-10-PLAN.md — Boundary-crossing hunt: enumerated chain audit + a composition test per chain (D-PRE1 step 3)
 - [x] 03-11-PLAN.md — `registry.py`: 7 flat arg models, schema derivation, dispatch, pre/post-repair split, Pitfall-6 fallback
-- [ ] 03-12-P0-PLAN.md — **BLOCKING P0 repair**: fix redesigned single-shot detector regression; prove planner->workers on real TP sections emits a candidate and `{C-01,C-02}` are re-found in ≥2/3 live runs
+- [x] 03-12-P0-PLAN.md — **BLOCKING P0 repair**: fix redesigned single-shot detector regression; prove planner->workers on real TP sections emits a candidate and `{C-01,C-02}` are re-found in ≥2/3 live runs
 - [ ] 03-12-PLAN.md — D-LOOP2 baseline re-measured 3x; median + variance + drift check; reviewer confirms the governing reference (D-PRE1 step 4)
 - [x] 03-13-PLAN.md — `loop.py` + static `prompts.py` + `run_review`; D-LOOP4 prefix stability; tool-message protocol (AGENT-01)
 - [ ] 03-14-PLAN.md — Stop-condition wiring, AGENT-04 continuation floor, D-LOOP5 rejection turns, D-BUD6 forced-runaway load test
