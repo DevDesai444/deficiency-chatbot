@@ -104,10 +104,10 @@ Plans:
 - [x] 03-03-PLAN.md — `chat_completion_tools` + `ChatTurn`; Databricks-legal tool-schema derivation; dependency/STATE hygiene (AGENT-01, D-LOOP3)
 - [x] 03-04-PLAN.md — P1: real-ingestion 3.2.S.5 classification proof + verification-queue item 5 closure check (D-PRE1 step 2)
 - [x] 03-05-PLAN.md — Review package scaffold + Wave-0 offline test doubles (ScriptedChatClient / ForcedRunaway / ReplayClient, multi-doc corpus) + D-RB6 CI
-- [ ] 03-06-PLAN.md — `spanref.py` single parse/mint path + GROUND-01 round-trip composition test across all 5 rendering tools
-- [ ] 03-07-PLAN.md — `BudgetLedger`: every AGENT-03/AGENT-04 stop condition as code, with the frozen N values
-- [ ] 03-08-PLAN.md — `telemetry.py`: per-turn JSONL, provenanced `RunSummary`, all five D-TEL signal groups, atomic writes
-- [ ] 03-09-PLAN.md — `run_oracles` as the 7th tool; S10 built, P10 generalized; D-ORC2 no-pre-recorded-spans (DETECT-03)
+- [x] 03-06-PLAN.md — `spanref.py` single parse/mint path + GROUND-01 round-trip composition test across all 5 rendering tools
+- [x] 03-07-PLAN.md — `BudgetLedger`: every AGENT-03/AGENT-04 stop condition as code, with the frozen N values
+- [x] 03-08-PLAN.md — `telemetry.py`: per-turn JSONL, provenanced `RunSummary`, all five D-TEL signal groups, atomic writes
+- [x] 03-09-PLAN.md — `run_oracles` as the 7th tool; S10 built, P10 generalized; D-ORC2 no-pre-recorded-spans (DETECT-03)
 - [ ] 03-10-PLAN.md — Boundary-crossing hunt: enumerated chain audit + a composition test per chain (D-PRE1 step 3)
 - [ ] 03-11-PLAN.md — `registry.py`: 7 flat arg models, schema derivation, dispatch, pre/post-repair split, Pitfall-6 fallback
 - [ ] 03-12-PLAN.md — D-LOOP2 baseline re-measured 3x; median + variance + drift check; reviewer confirms the governing reference (D-PRE1 step 4)
