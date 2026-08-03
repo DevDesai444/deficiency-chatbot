@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+from types import ModuleType
 import re
 from pathlib import Path
 
-import agents.detection.prompts as prompts
+import agents.detection.planning as detection_planning
+import agents.detection.prompts as detection_prompts
+import agents.review.prompts as review_prompts
 
 
 _NUMERIC_RE = re.compile(r"\d+(?:[.,/]\d+)*")
@@ -74,15 +77,20 @@ def _eval_leak_tokens() -> dict[str, set[str]]:
     return {kind: {token for token in values if token} for kind, values in tokens.items()}
 
 
+_PROMPT_MODULES = (detection_prompts, detection_planning, review_prompts)
+
+
 def _prompt_strings() -> dict[str, str]:
-    return {
-        name: value
-        for name, value in vars(prompts).items()
-        if name.isupper() and isinstance(value, str)
-    }
+    strings: dict[str, str] = {}
+    for module in _PROMPT_MODULES:
+        assert isinstance(module, ModuleType)
+        for name, value in vars(module).items():
+            if not name.startswith("__") and isinstance(value, str):
+                strings[f"{module.__name__}.{name}"] = value
+    return strings
 
 
-def test_detection_prompts_do_not_contain_eval_anchor_tokens():
+def test_prompt_modules_do_not_contain_eval_anchor_tokens():
     prompt_blob = "\n".join(_prompt_strings().values())
     prompt_norm = _norm(prompt_blob)
     leak_tokens = _eval_leak_tokens()
