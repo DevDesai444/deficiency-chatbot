@@ -13,6 +13,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from schemas.documents import SpanID
 from schemas.flaws import FlawCategory, Severity, SimilarDeficiency
 from schemas.llm import ParseFailed
 
@@ -35,6 +36,23 @@ class Tier(StrEnum):
     ADVISORY = "advisory"          # T3 — model judgment, incl. novel / out-of-distribution
 
 
+class ComplianceVerdict(StrEnum):
+    """DETECT-04 / D-VER2: the enumerated compliance verdict a finding carries beside its cited rule.
+
+    Free text cannot be scored deterministically by the harness, compared across the 3 spike runs,
+    or diffed against the baseline -- the same reason the reason-code registry is enumerated.
+
+    `compliant` is DELIBERATELY UNREPRESENTABLE. verify.py::_concedes_compliance exists because a
+    live run emitted 10 of 31 "faults" whose own title ended "compliant. No finding." Making a
+    compliant verdict impossible to express is the code-gate version of that lesson -- the same
+    discipline that makes reason_code="not_unique" structurally unreachable in emit_finding.
+    """
+
+    VIOLATION = "violation"    # the submission's text contradicts an explicit requirement of the cited rule
+    GAP = "gap"                # the rule requires something the submission does not contain
+    AMBIGUOUS = "ambiguous"    # the rule applies, but the submission is insufficient to determine compliance
+
+
 class Fault(BaseModel):
     """One candidate deficiency."""
 
@@ -46,6 +64,9 @@ class Fault(BaseModel):
     tier: Tier = Tier.ADVISORY
     evidence_class: EvidenceClass = EvidenceClass.MODEL_JUDGMENT
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    verdict: ComplianceVerdict | None = Field(default=None, description="DETECT-04: enumerated compliance verdict, set on the agent path by emit_finding.")
+    rule_span_id: SpanID | None = Field(default=None, description="GROUND-03: the exact rule clause span this finding cites, re-openable by Phase 5's verifier.")
+    submission_span_id: SpanID | None = Field(default=None, description="GROUND-01: the exact submission span this finding rests on, so the finding is fully re-openable.")
 
     evidence: str = Field(default="", description="Verbatim span or cell the finding rests on.")
     section: str = Field(default="", description="Section heading the fault sits in.")
@@ -71,3 +92,5 @@ class FaultReport(BaseModel):
     domains_checked: list[str] = Field(default_factory=list)
     parse_failures: list[ParseFailed] = Field(default_factory=list)
     analysis_seconds: float = 0.0
+    stop_reason: str = Field(default="", description="AGENT-03/04: how the review loop ended -- completed | ceiling | diminishing-returns | max-turns | breaker. Empty on the legacy single-shot path.")
+    budget_exhausted: bool = Field(default=False, description="AGENT-03: True when a hard ceiling ended the run, so a partial is never read as a complete review.")
