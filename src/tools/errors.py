@@ -53,4 +53,10 @@ KNOWN_REASON_CODES: dict[str, str] = {
     "family_not_in_registry": "The requested requirement family is not present in the requirement index.",
     "no_rule_citation": "emit_finding was called without a rule span-ID or rule citation.",
     "invalid_verdict": "The verdict was not one of the enumerated ComplianceVerdict members.",
+    # Loop-side (src/agents/review/spanref.py) -- DISTINCT from gate rejections by design.
+    # D-TEL3 reads not_byte_exact/half=submission as model span-invention; a loop-side failure
+    # to resolve a reference must never land in that bucket (Pitfall 1).
+    "span_ref_unparseable": "The span reference string did not match the [doc_id:start:end] form the tools render.",
+    "span_ref_unknown_doc": "The span reference names a document that is not in the expected store.",
+    "span_ref_out_of_range": "The span reference's offsets fall outside the document's canonical text.",
 }
