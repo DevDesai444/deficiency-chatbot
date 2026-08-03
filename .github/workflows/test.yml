@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --group dev
+
+      - name: Run offline test suite
+        run: |
+          # D-RB6: DATABRICKS_HOST / DATABRICKS_TOKEN are deliberately ABSENT. The whole offline
+          # contract is that the suite is green without them. If a test starts requiring credentials
+          # it fails here rather than silently becoming un-runnable for everyone else.
+          uv run pytest -q
