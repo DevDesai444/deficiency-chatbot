@@ -344,7 +344,7 @@ def cmd_agent_run(args: argparse.Namespace) -> int:
     corpus_hash = ""
     found_set: set[str] = set()
     turn_log_path.parent.mkdir(parents=True, exist_ok=True)
-    turn_log_path.touch(exist_ok=True)
+    turn_log_path.write_text("")
 
     try:
         eval_set = load_eval_set()
