@@ -28,7 +28,7 @@ Classifications:
 | # | Chain | Producer `file:line` | Consumer `file:line` | Classification | Evidence / disposition |
 |---|---|---|---|---|---|
 | 1 | Rendered span-ID string -> `parse_span_ref` -> `was_issued` -> `open_span` | `src/tools/get_section.py:36`, `src/tools/search_corpus.py:39`, `src/tools/read_guideline.py:33`, `src/tools/open_doc.py:14`, `src/tools/follow_reference.py:21` | `src/agents/review/spanref.py:42`, `src/tools/emit_finding.py:40` | `COMPOSED` | `tests/agents/review/test_spanref_roundtrip.py::test_rendered_span_reaches_emit_finding_and_produces_a_fault`; seed chain 1 CLOSED by plan 03-06. |
-| 2 | `run_oracles_tool` lead -> lead `heading_hint` -> `get_section` -> `parse_span_ref` -> `emit_finding` | `src/agents/review/oracles_tool.py:125` | `src/tools/get_section.py:51`, `src/tools/emit_finding.py:40` | `UN-COMPOSED` | Seed chain 2 OPEN entering this plan. Plan 03-09 has rejection coverage for an un-re-opened lead, but no positive lead-to-accepted-finding composition test yet. |
+| 2 | `run_oracles_tool` lead -> lead `heading_hint` -> `get_section` -> `parse_span_ref` -> `emit_finding` | `src/agents/review/oracles_tool.py:125` | `src/tools/get_section.py:51`, `src/tools/emit_finding.py:40` | `UN-COMPOSED` | Closed in this plan by `tests/integration/test_composition_chains.py::test_oracle_lead_reopened_becomes_an_accepted_finding`; the test uses the lead's own `heading_hint`. |
 | 3 | `cache_key` including parser version -> `read_doc_cache` / `CorpusIndex.cached_entry` -> downstream tools | `src/ingest/store.py:36`, `src/ingest/corpus.py:121` | `src/ingest/store.py:70`, `src/ingest/corpus.py:53` | `COMPOSED` | `tests/ingest/test_store.py::test_parser_version_bump_invalidates_cache`; seed chain 3 CLOSED by plan 03-01. |
 | 4 | `classify_document` real output -> requirement applicability via `enumerate_requirements` / `read_guideline` | `src/ingest/classify.py:138`, `src/ingest/corpus.py:143` | `src/rulebook/requirement_index.py:161`, `src/tools/read_guideline.py:33` | `COMPOSED` | `tests/rulebook/test_requirement_index_integration.py::test_real_ingest_families_enumerate_corrected_basis_requirements`; documented by `03-P1-CLASSIFICATION-PROOF.md`. |
 | 5 | `enumerate_requirements` rows -> `read_guideline(rule_doc_id)` -> `emit_finding` | `src/rulebook/requirement_index.py:161` | `src/tools/read_guideline.py:33`, `src/tools/emit_finding.py:40` | `COMPOSED` | `tests/tools/test_enumerate_fetch_emit_e2e.py::test_enumerate_fetch_emit_15_of_15_resolve_end_to_end`; Phase-2 queue item 5 material chain. |
@@ -51,5 +51,16 @@ Classifications:
 | Seed | Required chain | Status |
 |---|---|---|
 | 1 | rendered span-ID string -> `parse_span_ref` -> `was_issued` -> `open_span` | `COMPOSED`; closed by `tests/agents/review/test_spanref_roundtrip.py::test_rendered_span_reaches_emit_finding_and_produces_a_fault`. |
-| 2 | `run_oracles` lead -> `get_section` -> `emit_finding` | `UN-COMPOSED`; positive path remains open until Task 2 writes `tests/integration/test_composition_chains.py::test_oracle_lead_reopened_becomes_an_accepted_finding`. |
+| 2 | `run_oracles` lead -> `get_section` -> `emit_finding` | `UN-COMPOSED`; closed by `tests/integration/test_composition_chains.py::test_oracle_lead_reopened_becomes_an_accepted_finding`. |
 | 3 | `cache_key` -> parse output -> served cache entry | `COMPOSED`; closed by `tests/ingest/test_store.py::test_parser_version_bump_invalidates_cache`. |
+
+## Chains that cannot be composed offline
+
+None.
+
+## Disposition
+
+- Chains examined: 16
+- Un-composed found: 1
+- Tests written: 1
+- Chains left open with reasons: 0
