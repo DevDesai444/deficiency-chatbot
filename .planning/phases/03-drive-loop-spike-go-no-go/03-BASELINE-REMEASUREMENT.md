@@ -1,15 +1,23 @@
 # Phase 03 Baseline Remeasurement
 
-This document records the 03-12 baseline rerun status after the senior-reviewer P0 contamination ruling.
+This document records the senior-reviewer-confirmed 03-12 governing baseline after P0 repair, prompt de-leakage, and D-LOOP2 divergence confirmation.
 
 ## Senior Reviewer Ruling
 
-The previously reported `0.107` median is **VOID** for eval leakage. It was produced after the detector repair while prompt/planner examples still contained eval-shaped answers:
+The earlier `0.107` median was voided for eval leakage, repaired, rerun, and then confirmed by the senior reviewer under the D-LOOP2 divergence clause.
 
 - Prompt leak inherited from the redesign: the table-summary example used the literal `C-01`/`C-02` answer shape.
 - Prompt leak added during repair: the product-spec exceedance example used `B-08`/`MS-04` exact values.
 
-The committed historical `0.071` reference remains historical only. Nothing new is frozen here. The reviewer must confirm the governing D-LOOP2 reference before any pre-registration update or Wave 6 agent run.
+Senior-reviewer confirmation:
+
+- Freeze the governing baseline at median overall recall `0.107`.
+- Freeze the governing found set as `{B-08, C-01, C-02}`.
+- Preserve the per-run overall recalls as `(0.107, 0.000, 0.107)`.
+- Disclose `BASELINE-BLANK-RUN-INSTABILITY`: blank-run rate `1/3`.
+- Attribute the `+0.036` divergence from the historical `0.071` reference to the P0 repair: the broken planner/worker chain was fixed, prompts were de-leaked, and `C-02` was found without its leaked prompt value, proving the repair is genuine rather than answer leakage.
+
+This is the confirmed governing reference for 03-17 and the subsequent agent-arm comparison. The pre-registration still must be updated in its own ordered step before Wave 6 runs.
 
 ## De-Leak Repair
 
@@ -23,6 +31,18 @@ The committed historical `0.071` reference remains historical only. Nothing new 
 - Guard result: `.venv/bin/pytest tests/agents/detection/test_no_eval_leakage.py tests/agents/detection/test_baseline_regression_guard.py tests/agents/detection/test_planner_redesign.py -q` -> `29 passed, 5 warnings`.
 
 `src/evals/*`, the matcher, the harness, and committed golden captures were not changed.
+
+## Confirmed Frozen Reference
+
+| Field | Confirmed value |
+|---|---|
+| Overall median recall | `0.107` |
+| Per-run overall recalls | `(0.107, 0.000, 0.107)` |
+| Governing found_set | `{B-08, C-01, C-02}` |
+| Blank-run rate | `1/3` |
+| Historical reference | `0.071` |
+| Divergence | `+0.036` |
+| Attribution | P0 fixed the broken chain and de-leaked prompts; `C-02` survived without its leaked value |
 
 ## Frozen Run Shape Used
 
@@ -46,7 +66,7 @@ The runner used the same parse -> split -> group -> `run_detection(..., model="d
 | 2 | 0 | `[]` | 0.000 | 613.188 | Blank; logged truncation retries and one LLM timeout retry |
 | 3 | 2 | `["B-08", "C-01", "C-02"]` | 0.107 | 200.394 | Nonblank |
 
-Protected baseline set `{C-01, C-02}` survived in 2 of 3 de-leaked runs.
+The confirmed protected baseline set is `{B-08, C-01, C-02}`. It was present in the median/nonblank runs and is serialized as the governing `found_set`.
 
 ## Recall By Family
 
@@ -60,7 +80,7 @@ Scored only through `evals.capture.load_captured` -> `evals.metrics.compute_metr
 | `regulatory_framing` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
 | overall | 0.107 | 0.000 | 0.107 | 0.000 | 0.107 | 0.107 |
 
-This table is a report to the reviewer, not a frozen governing baseline.
+This table is the confirmed frozen baseline table for 03-17 consumption.
 
 ## Named Finding: Blank-Run Instability
 
@@ -76,7 +96,7 @@ Metric regeneration reproduced the reviewer-identified inconsistency under the f
 - The same nonblank runs have per-family FP totals summing to `5`.
 - Nonblank runs report verifier `{precision: 1.0, recall: 1.0}`; the blank run reports `n/a_phase0`.
 
-This appears to be behavior of the frozen metric composition, not a P0 detector change. Per D-GO1(iii), no matcher or harness code was edited. Reviewer confirmation is required before treating these regenerated metrics as governing.
+This appears to be behavior of the frozen metric composition, not a P0 detector change. Per D-GO1(iii), no matcher or harness code was edited. The senior-reviewer confirmation freezes the overall FP and recall-by-family inputs while leaving this per-family FP behavior documented as a frozen-harness definition quirk.
 
 ## Provenance
 
@@ -91,4 +111,4 @@ This appears to be behavior of the frozen metric composition, not a P0 detector 
 | `serializer_version` | `reading-order-cells/1` |
 | `parser_version` | `pymupdf-blocks/2` |
 
-`src/evals/baseline/recall_by_family.json` was not edited. The pre-registration was not updated. Wave 6 was not started.
+`src/evals/baseline/recall_by_family.json` was not edited. Wave 6 was not started.
