@@ -12,6 +12,7 @@
   "documents_serialized_in_report": [
     "mvr1381"
   ],
+  "found_set": [],
   "harness_version": "1",
   "matcher_content_sha256": "e7857edf3f5c1579e27d95f8cf5c086a9e20a443268ef35de01429c488f2c0ca",
   "matcher_version": "1",

@@ -38,10 +38,12 @@ def test_capture_provenance_has_required_keys():
         model_id="databricks-meta-llama-3-3-70b-instruct",
         corpus_content_hash="corpus-sha",
         run_completed=True,
+        found_set={"C-02", "B-08", "C-01"},
     )
 
     assert provenance["run_index"] == 1
     assert provenance["model_id"] == "databricks-meta-llama-3-3-70b-instruct"
+    assert provenance["found_set"] == ["B-08", "C-01", "C-02"]
     assert "prereg_commit_sha" in provenance
     assert provenance["matcher_content_sha256"]
     assert provenance["baseline_sha256"]
@@ -61,6 +63,7 @@ def test_summary_carries_every_provenance_field(tmp_path):
         "serializer_version",
         "parser_version",
         "corpus_content_hash",
+        "found_set",
         "run_completed",
         "abort_reason",
     ]

@@ -41,6 +41,7 @@ _PROVENANCE_FIELDS = {
     "serializer_version",
     "parser_version",
     "corpus_content_hash",
+    "found_set",
     "run_completed",
     "abort_reason",
 }
@@ -87,6 +88,7 @@ def capture_provenance(
     corpus_content_hash: str,
     run_completed: bool,
     abort_reason: str = "",
+    found_set: list[str] | set[str] | tuple[str, ...] | None = None,
     prereg_path: str = _DEFAULT_PREREG_PATH,
     matcher_path: str = _DEFAULT_MATCHER_PATH,
     baseline_path: str = _DEFAULT_BASELINE_PATH,
@@ -106,6 +108,7 @@ def capture_provenance(
         "serializer_version": SERIALIZER_VERSION,
         "parser_version": PARSER_VERSION,
         "corpus_content_hash": corpus_content_hash,
+        "found_set": sorted(str(item) for item in (found_set or [])),
         "run_completed": run_completed,
         "abort_reason": abort_reason,
     }
