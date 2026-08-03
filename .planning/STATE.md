@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed Phase 03 Wave 1 (plans 03-01 through 03-03)
-last_updated: "2026-08-03T08:17:03.240Z"
-last_activity: 2026-08-03 -- Phase 03 execution started
+last_updated: "2026-08-03T09:34:42.135Z"
+last_activity: 2026-08-03
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 41
-  completed_plans: 25
-  percent: 61
+  completed_plans: 26
+  percent: 63
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 03 (drive-loop-spike-go-no-go) — EXECUTING
-Plan: 1 of 19
-Status: Executing Phase 03
-Last activity: 2026-08-03 -- Phase 03 execution started
+Plan: 2 of 19
+Status: Ready to execute
+Last activity: 2026-08-03
 
-Progress: [██████░░░░] 61%
+Progress: [██████░░░░] 63%
 
 ## Performance Metrics
 
@@ -51,6 +51,12 @@ Progress: [██████░░░░] 61%
 - Last 5 plans: —
 - Trend: — (no data yet)
 
+**Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 03 P05 | 10min | 3 tasks | 5 files |
+
 *Updated after each plan completion*
 
 ## Accumulated Context
@@ -64,6 +70,8 @@ Roadmap-shaping decisions for current work:
 - [Roadmap]: FDA/ICH rulebook (RULES-01..04) folded into Phase 2 (before the spike) so the go/no-go loop risk is isolated from external rulebook-sourcing risk.
 - [Roadmap]: Budgets/stop-conditions land as CODE gates in Phase 3 (AGENT-03); the full cost governor (triage + caching + compaction) hardens in Phase 6 (COST-01/02).
 - [Roadmap]: Cross-document retrieval (reference graph + `follow_reference`) lands in Phase 4 — the prerequisite the deferred v2 threshold checks depend on.
+- [Phase 03]: 03-05 preserved later-plan ownership by making budget_ledger lazily import BudgetLedger when plan 03-07 lands — Avoids a fake budget class or out-of-scope source module in the Wave-0 fixture plan.
+- [Phase 03]: 03-05 added a conftest smoke test proving the multi-document fixture persists cache entries for all input documents — The plan required a same-commit proof for build_multi_corpus_index.
 
 ### Pending Todos
 
@@ -86,6 +94,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-08-03T08:17:03.234Z
+Last session: 2026-08-03T09:33:59.917Z
 Stopped at: Completed Phase 03 Wave 1 (plans 03-01 through 03-03)
 Resume file: None
