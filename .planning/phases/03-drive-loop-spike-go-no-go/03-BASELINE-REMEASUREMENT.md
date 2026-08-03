@@ -4,21 +4,18 @@ This document records the D-LOOP2 baseline arm remeasurement performed before an
 
 ## Senior Reviewer Ruling
 
-RULING (senior reviewer, after independent diagnosis): **NEITHER number governs yet.** The `0.000` median is not a baseline; it is a measurement of a broken detector. The redesigned planner/worker chain emitted zero findings (`/tmp/census.json`: `planner_workers=10`, `planner_suspicions=0`, `workers_emitted=0`, `worker_failures=0`, `pre_verify=0`, `post_verify=0`, `pre_challenge=0`, `post_challenge=0`). A direct specialist probe on the TP-bearing sections also returned a validly parsed `findings=[]` with no failure recorded.
+RULING (senior reviewer, after independent diagnosis): **NEITHER number governs yet.** The `0.000` median from the first 03-12 attempt was not a baseline; it measured a broken detector. The redesigned planner/worker chain emitted zero findings (`/tmp/census.json`: `planner_workers=10`, `planner_suspicions=0`, `workers_emitted=0`, `worker_failures=0`, `pre_verify=0`, `post_verify=0`, `pre_challenge=0`, `post_challenge=0`). A direct specialist probe on the TP-bearing sections also returned a validly parsed `findings=[]` with no failure recorded.
 
 Consequences:
 
-- `0.071` remains the committed historical reference. Nothing new is frozen.
-- `03-12` stays OPEN.
-- A blocking P0 repair task precedes `03-12` completion: `03-11-P0-PLAN.md`.
-- The repair must fix the single-shot regression in the redesigned chain without touching the matcher, harness, committed golden captures, or baseline file (D-GO1(iii)).
-- Acceptance for P0 is pre-registered: a live single-shot run must re-find both `C-01` and `C-02` in at least 2 of 3 runs, and the missing planner->workers composition test on the real TP-bearing sections must emit at least one candidate finding.
-- After P0, `03-12` reruns all three baseline measurements from scratch and freezes whatever median the repaired detector produces, with any persistent `>0.03` divergence from `0.071` disclosed and attributed.
-- Do not proceed to Wave 6 (`03-14`) until the repaired baseline is frozen.
+- `0.071` remains the committed historical reference until the repaired 03-12 rerun is confirmed.
+- A blocking P0 repair task preceded `03-12` completion: `03-11-P0-PLAN.md`.
+- The repair fixed the redesigned chain without touching the matcher, harness, committed golden captures, or baseline file (D-GO1(iii)).
+- P0 acceptance passed: live single-shot runs re-found both `C-01` and `C-02` in 3 of 3 runs, and the planner->workers composition guard on the real TP-bearing sections emits a candidate finding.
+- This 03-12 rerun now freezes the repaired detector's measured median for senior-reviewer confirmation.
+- Do not proceed to Wave 6 (`03-14`) until this repaired baseline is confirmed.
 
 Amended D-PRE1 order: P2 -> P1 -> boundary hunt -> P0 repair -> `03-12` rerun -> pre-registration -> agent runs.
-
-Own-error note for the record: the regression predates commit `8760665` in working-tree behavior, but `8760665` committed the redesign without eval validation. The pre-registration checkpoint caught it before agent runs, which is the discipline working as designed.
 
 ## Frozen Configuration
 
@@ -26,21 +23,26 @@ Own-error note for the record: the regression predates commit `8760665` in worki
 - Temperature: `0` through the existing legacy detector structured-output path.
 - Corpus attempted: non-held-out eval documents `mvr1381` and `minispec`; `spec32s41` remained held out.
 - Governing serialized report: `mvr1381`, matching the committed `src/evals/baseline/recall_by_family.json` reference generated from `golden:mvr1381_run3`.
-- Run-time git SHA before the run set was committed: `c72a31d745d83cae0ec212bfdcd858156d2f0d9b`
-- Task 1 artifact commit: `890330f`
+- Run-time git SHA before this repaired run set: `3dc5a8e05f2233becf74383b0a066876fa3755f3`
 - Command shape used for each run:
 
 ```bash
-PYTHONPATH=src RUN_INDEX=N .venv/bin/python -c '<one-off runner equivalent to evals.run cmd_run: load_eval_set; parse each non-held-out document; split/group sections; run_detection(..., model="databricks-meta-llama-3-3-70b-instruct"); write the mvr1381 FaultReport to baseline-runN.json; write capture_provenance(...) to baseline-runN-summary.json>'
+PYTHONPATH=src .venv/bin/python -u - <<'PY'
+# one-off runner equivalent to evals.run cmd_run:
+# load_eval_set; parse each non-held-out document; split/group sections;
+# run_detection(..., model="databricks-meta-llama-3-3-70b-instruct");
+# write the mvr1381 FaultReport to baseline-runN.json;
+# write capture_provenance(...) to baseline-runN-summary.json
+PY
 ```
 
-The plan's nominal command, `.venv/bin/python -m evals.run run --model databricks-meta-llama-3-3-70b-instruct --out <path>`, currently writes metrics JSON rather than a serialized `FaultReport`. To keep `src/evals/run.py` and the legacy detector arm unchanged, the captures were produced from the one-off runner described above, using the same parse -> split -> group -> `run_detection` sequence as `cmd_run`.
+The plan's nominal command, `.venv/bin/python -m evals.run run --model databricks-meta-llama-3-3-70b-instruct --out <path>`, writes metrics JSON rather than a serialized `FaultReport`. To keep `src/evals/run.py` and the legacy detector arm unchanged, the captures were produced from the one-off runner described above, using the same parse -> split -> group -> `run_detection` sequence as `cmd_run`.
 
-All three runs completed without parse failures or rerolls.
+Run 1 logged an OCR endpoint timeout on page 47 and continued through the parser fallback; no parse failure was recorded and no reroll was taken. All three runs completed with `parse_failures={}`.
 
 ## Re-Scoring Commands
 
-Each committed capture was re-scored without an LLM call:
+Each committed capture is re-scorable without an LLM call:
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m evals.run score --captured .planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run1.json
@@ -48,62 +50,60 @@ PYTHONPATH=src .venv/bin/python -m evals.run score --captured .planning/phases/0
 PYTHONPATH=src .venv/bin/python -m evals.run score --captured .planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run3.json
 ```
 
-All three reproduced the same values: overall recall `0.000`, precision `0.000`, `tp=0`, `fp=0`, `fn=28`, and all four family recalls at `0.000`.
-
 ## Per-Family Recall
 
 | Family | run1 | run2 | run3 | min | median | max | committed baseline |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `absence_of_evidence` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| `absence_of_evidence` | 0.091 | 0.091 | 0.000 | 0.000 | 0.091 | 0.091 | 0.000 |
 | `derivation_plausibility` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
-| `cross_reference_integrity` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.286 |
+| `cross_reference_integrity` | 0.286 | 0.286 | 0.000 | 0.000 | 0.286 | 0.286 | 0.286 |
 | `regulatory_framing` | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
-| overall | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.071 |
+| overall | 0.107 | 0.107 | 0.000 | 0.000 | 0.107 | 0.107 | 0.071 |
 
 ## Per-Run Metrics
 
 | Run | `tp` | `fp` | `fn` | `precision` | `anchor_rate` | `found_set` | faults emitted | wall seconds |
 |---:|---:|---:|---:|---:|---:|---|---:|---:|
-| 1 | 0 | 0 | 28 | 0.000 | 0.000 | `[]` | 0 | 283.789 |
-| 2 | 0 | 0 | 28 | 0.000 | 0.000 | `[]` | 0 | 226.139 |
-| 3 | 0 | 0 | 28 | 0.000 | 0.000 | `[]` | 0 | 240.783 |
+| 1 | 3 | 0 | 25 | 1.000 | 1.000 | `["B-08", "C-01", "C-02"]` | 2 | 314.060 |
+| 2 | 3 | 0 | 25 | 1.000 | 1.000 | `["B-08", "C-01", "C-02"]` | 2 | 238.356 |
+| 3 | 0 | 0 | 28 | 0.000 | 0.000 | `[]` | 0 | 455.986 |
 
 ## Drift Check
 
 `EXCEEDS`
 
 - Committed overall reference: `0.071`
-- Remeasured overall median: `0.000`
-- Absolute difference: `0.071`
+- Repaired remeasured overall median: `0.107`
+- Absolute difference: `0.036`
 - Pre-registered materiality line: `0.030`
 
-The remeasured median is materially below the committed reference and requires senior-reviewer confirmation before any agent arm runs.
+The repaired remeasured median is materially above the committed historical reference and requires senior-reviewer confirmation before any agent arm runs.
 
 ## Protected Set
 
-The protected baseline set is `{C-01, C-02}`. The remeasured baseline arm did not preserve either protected item:
+The protected baseline set is `{C-01, C-02}`.
 
 | Run | `C-01` found? | `C-02` found? |
 |---:|---|---|
-| 1 | no | no |
-| 2 | no | no |
+| 1 | yes | yes |
+| 2 | yes | yes |
 | 3 | no | no |
 
-This is a material finding about the reference itself, not about the future agent arm.
+The repaired baseline arm preserves the protected set in 2 of 3 runs. Run 3 is a material variance finding about the reference itself: the worker path produced candidates, but the live run's final challenged report contained zero mvr1381 findings.
 
 ## Baseline Variance Reading
 
-The overall recall spread was `min=0.000`, `median=0.000`, `max=0.000`, so run-to-run spread in this three-draw set was `0.000`.
+The overall recall spread was `min=0.000`, `median=0.107`, `max=0.107`, so the three-draw spread was `0.107`.
 
 "If the single-shot detector swings widely across its own 3 runs, 'above baseline' is a weaker claim than it looks, and the gate reading must say so."
 
-In this set, the concern is not wide numeric swing. The concern is measurement stability versus the committed reference: all three fresh runs landed at zero recall and lost the protected set.
+This set does swing widely: two runs find `["B-08", "C-01", "C-02"]`, while one run emits no final mvr1381 findings. Later "above baseline" claims should be read against the median, but the gate report must disclose that the single-shot reference has a zero-finding draw inside its own N=3 set.
 
 ## Attribution
 
-`03-P2-BASELINE-SHIFT.md` states that any change in the recall baselines between the committed values and the D-LOOP2 remeasurement is attributable to the P2 parser/cache state rather than to the agent loop. The observed overall shift is `-0.071` from the committed `0.071` to the remeasured median `0.000`.
+`03-P2-BASELINE-SHIFT.md` states that parse/cache changes can move the baseline reference and must be attributed rather than folded silently into variance. The first 03-12 attempt then showed an additional detector-regression failure: the redesigned planner/worker chain could emit no findings. P0 repaired that detector path by restoring table-contradiction sensitivity, routing bounded Table 19/Table 20 suspicions, preserving untitled worker findings, and preventing challenge from refuting summary-cell contradictions merely because source rows have different labels.
 
-The measured run-to-run variance across this set contributes `0.000` spread. The remaining `0.071` absolute movement is therefore not explained by variance inside the three fresh draws; it is the reportable post-P2 baseline-reference shift that the senior reviewer must confirm before pre-registration.
+The observed overall shift is `+0.036` from the committed `0.071` to the repaired median `0.107`. The within-set spread is `0.107`, so this is not a stable point estimate. The median increase is attributable to the repaired detector once again finding the historical protected set in two runs, plus one additional absence-of-evidence TP (`B-08`) in those same runs; the zero third run remains a material variance/stability finding to surface at the gate.
 
 ## What The Committed Baseline Could Not Record
 
@@ -115,13 +115,13 @@ Proposed governing median values for plan 03-17:
 
 | Metric | Governing median |
 |---|---:|
-| `absence_of_evidence` | 0.000 |
+| `absence_of_evidence` | 0.091 |
 | `derivation_plausibility` | 0.000 |
-| `cross_reference_integrity` | 0.000 |
+| `cross_reference_integrity` | 0.286 |
 | `regulatory_framing` | 0.000 |
-| overall | 0.000 |
+| overall | 0.107 |
 
-Run-set git SHA before Task 1 commit: `c72a31d745d83cae0ec212bfdcd858156d2f0d9b`
+Run-set git SHA before this 03-12 rerun: `3dc5a8e05f2233becf74383b0a066876fa3755f3`
 
 Cross-arm provenance values the agent-run summaries must match:
 
@@ -137,7 +137,7 @@ Additional provenance carried by all three baseline sidecars:
 | Field | Value |
 |---|---|
 | `baseline_path` | `src/evals/baseline/recall_by_family.json` |
-| `corpus_content_hash` | `e1e6a956399cbf313ff33b8738b870615a5a83ed90389aa0f252687d60f269f2` |
+| `corpus_content_hash` | `e4df7729cdfb3c473b487e66b67404a7c58a7f05a02983fc140f2bd25501ade4` |
 | `normalizer_version` | `nfc-wscollapse-gdehyph-lig/1-lex1` |
 | `serializer_version` | `reading-order-cells/1` |
 | `parser_version` | `pymupdf-blocks/2` |

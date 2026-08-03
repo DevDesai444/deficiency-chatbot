@@ -1,10 +1,10 @@
 {
   "abort_reason": "",
-  "analysis_wall_seconds": 283.789,
+  "analysis_wall_seconds": 314.06,
   "baseline_path": "src/evals/baseline/recall_by_family.json",
   "baseline_sha256": "e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3",
   "captured_report_path": ".planning/phases/03-drive-loop-spike-go-no-go/runs/baseline-run1.json",
-  "corpus_content_hash": "e1e6a956399cbf313ff33b8738b870615a5a83ed90389aa0f252687d60f269f2",
+  "corpus_content_hash": "e4df7729cdfb3c473b487e66b67404a7c58a7f05a02983fc140f2bd25501ade4",
   "documents_attempted": [
     "mvr1381",
     "minispec"
