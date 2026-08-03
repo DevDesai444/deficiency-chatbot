@@ -95,16 +95,14 @@ def _install_offline_agent_run(monkeypatch, tmp_path: Path, *, fail: bool = Fals
 
     def fake_ingest(root):
         state["ingested_files"] = sorted(p.name for p in Path(root).iterdir())
+        entries = [
+            DocEntry(doc_id=f"raw{i}", filename=name, content_hash=f"hash{i}")
+            for i, name in enumerate(state["ingested_files"], start=1)
+        ]
         return CorpusIndex(
             root=str(root),
             cache_dir=str(tmp_path / "cache"),
-            manifest=CoverageManifest(
-                documents=[
-                    DocEntry(doc_id="raw1", filename="scored.pdf", content_hash="hash1"),
-                    DocEntry(doc_id="raw2", filename="scored.docx", content_hash="hash2"),
-                ],
-                counts={"parsed": 2},
-            ),
+            manifest=CoverageManifest(documents=entries, counts={"parsed": len(entries)}),
         )
 
     def fake_run_review(corpus, manifest, ledger, budget, telemetry, complete, registry, job_id=""):
@@ -167,7 +165,7 @@ def test_unknown_model_routes_through_resolver_and_artifacts_round_trip(monkeypa
     assert len(set(state["budget_ids"])) == 1
     assert len(set(state["ledger_ids"])) == 1
     assert len(set(state["telemetry_ids"])) == 1
-    assert [doc.doc_id for doc in state["run_review_calls"][0]["manifest"].documents] == ["d1", "d2"]
+    assert {doc.doc_id for doc in state["run_review_calls"][0]["manifest"].documents} == {"d1", "d2"}
 
     assert sorted(p.name for p in out_dir.iterdir()) == [
         "agent-run1-summary.json",
@@ -207,6 +205,38 @@ def test_non_default_prefix_never_writes_agent_run_files(monkeypatch, tmp_path):
         "probe-1.jsonl",
     ]
     assert not list(out_dir.glob("agent-run*"))
+
+
+def test_held_out_split_assembles_only_held_out_documents(monkeypatch, tmp_path):
+    state = _install_offline_agent_run(monkeypatch, tmp_path)
+    out_dir = tmp_path / "out"
+
+    code = main(
+        [
+            "agent-run",
+            "--run-index",
+            "1",
+            "--run-prefix",
+            "calibration-run",
+            "--document-split",
+            "held-out",
+            "--max-tokens",
+            "1000",
+            "--max-wall-clock",
+            "60",
+            "--out-dir",
+            str(out_dir),
+        ]
+    )
+
+    assert code == 0
+    assert state["ingested_files"] == ["heldout.pdf"]
+    assert [doc.doc_id for doc in state["run_review_calls"][0]["manifest"].documents] == ["held"]
+    assert sorted(p.name for p in out_dir.iterdir()) == [
+        "calibration-run1-summary.json",
+        "calibration-run1.json",
+        "calibration-run1.jsonl",
+    ]
 
 
 def test_agent_run_failure_still_writes_aborted_artifacts(monkeypatch, tmp_path):

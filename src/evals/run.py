@@ -351,7 +351,9 @@ def cmd_agent_run(args: argparse.Namespace) -> int:
         with tempfile.TemporaryDirectory(prefix="eval-agent-corpus-") as tmp:
             corpus_root = Path(tmp)
             for doc in eval_set.documents:
-                if doc.held_out:
+                if args.document_split == "scored" and doc.held_out:
+                    continue
+                if args.document_split == "held-out" and not doc.held_out:
                     continue
                 source = Path(doc.path)
                 target = corpus_root / source.name
@@ -365,7 +367,11 @@ def cmd_agent_run(args: argparse.Namespace) -> int:
                     (
                         doc
                         for doc in eval_set.documents
-                        if not doc.held_out and Path(doc.path).name == entry.filename
+                        if (
+                            (args.document_split == "scored" and not doc.held_out)
+                            or (args.document_split == "held-out" and doc.held_out)
+                        )
+                        and Path(doc.path).name == entry.filename
                     ),
                     None,
                 )
@@ -384,7 +390,9 @@ def cmd_agent_run(args: argparse.Namespace) -> int:
             result = run_review(corpus, manifest, ledger, budget, telemetry, complete, registry, job_id="")
             report = result.report
             for doc in eval_set.documents:
-                if doc.held_out:
+                if args.document_split == "scored" and doc.held_out:
+                    continue
+                if args.document_split == "held-out" and not doc.held_out:
                     continue
                 found_set.update(score([f.model_dump() for f in report.faults], eval_set.deficiencies, doc.doc_id).matched_gt_ids)
     except Exception as exc:  # noqa: BLE001 -- an aborted run must still leave artifacts.
@@ -453,6 +461,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_run_p.add_argument("--max-tokens", type=int, required=True, help="Per-run token ceiling.")
     agent_run_p.add_argument("--max-wall-clock", type=float, required=True, help="Per-run wall-clock ceiling in seconds.")
     agent_run_p.add_argument("--max-turns", type=int, default=50, help="Per-run turn ceiling.")
+    agent_run_p.add_argument(
+        "--document-split",
+        choices=("scored", "held-out"),
+        default="scored",
+        help="Eval document split to assemble (default: scored). Use held-out only for calibration.",
+    )
     agent_run_p.add_argument("--out-dir", required=True, help="Directory for FaultReport, JSONL, and RunSummary artifacts.")
     agent_run_p.add_argument(
         "--prereg",
