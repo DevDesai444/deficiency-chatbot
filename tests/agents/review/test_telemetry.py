@@ -173,3 +173,34 @@ def test_no_secret_or_document_text_reaches_the_artifacts(tmp_path, monkeypatch)
     assert "secret-token-value" not in combined
     assert "Authorization" not in combined
     assert "full document body should never be serialized" not in combined
+
+
+def test_summary_carries_consumption_time_splits():
+    class Budget:
+        billed_tokens = 100
+        cached_tokens = 25
+        turns = 3
+        usage_missing_turns = 0
+        model_time_s = 4.5
+        tool_execution_time_s = 2.25
+
+        def wall_clock_s(self):
+            return 9.0
+
+    class Ledger:
+        embedding_time_s = 1.5
+
+        def dedup_hit_rate(self):
+            return 0.0
+
+    summary = RunSummary.from_turns(
+        provenance=_provenance(),
+        records=[],
+        budget_ledger=Budget(),
+        retrieval_ledger=Ledger(),
+    )
+
+    assert summary.wall_clock_s == 9.0
+    assert summary.model_time_s == 4.5
+    assert summary.tool_execution_time_s == 2.25
+    assert summary.embedding_time_s == 1.5

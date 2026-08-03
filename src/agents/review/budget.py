@@ -44,6 +44,8 @@ class BudgetLedger:
     cached_tokens: int = 0  # COST-01 visibility: Sum prompt_tokens_details.cached_tokens.
     turns: int = 0
     continuations: int = 0
+    model_time_s: float = 0.0
+    tool_execution_time_s: float = 0.0
     usage_missing_turns: int = 0
     started_at: float = 0.0
     which_bound: str = ""
@@ -87,6 +89,12 @@ class BudgetLedger:
     def record_tool_success(self) -> None:
         """A non-rejected tool result resets D-BUD3's same-class rejection counter."""
         self._consecutive_rejections.clear()
+
+    def record_model_time(self, seconds: float) -> None:
+        self.model_time_s += max(0.0, seconds)
+
+    def record_tool_time(self, seconds: float) -> None:
+        self.tool_execution_time_s += max(0.0, seconds)
 
     def over_ceiling(self) -> bool:
         return self.billed_tokens >= self.max_tokens

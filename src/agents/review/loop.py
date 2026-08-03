@@ -233,7 +233,9 @@ def run_review(
             return finish(pre_call_stop, aborted=pre_call_stop == "ceiling")
 
         _emit_review_event(job_id, "agent_turn", "Review turn started", {"turn": budget.turns + 1})
+        model_started = time.monotonic()
         turn = complete(messages, tools)
+        budget.record_model_time(time.monotonic() - model_started)
         budget.record_turn(turn)
         pct_of_ceiling = budget.billed_tokens / budget.max_tokens if budget.max_tokens else 0.0
         _emit_review_event(
@@ -295,14 +297,17 @@ def run_review(
             call_id = _call_id(call)
             tool_name, raw_args = _call_function(call)
             _emit_review_event(job_id, "tool_call", "Tool call dispatched", {"tool": tool_name})
+            tool_started = time.monotonic()
             try:
                 result = registry.dispatch(tool_name, raw_args)
             except Exception as exc:  # noqa: BLE001 - an aborted run must return its partial.
+                budget.record_tool_time(time.monotonic() - tool_started)
                 content = f"REJECTED[dispatch_exception] {type(exc).__name__}: {exc}"
                 messages.append({"role": "tool", "tool_call_id": call_id, "content": content})
                 telemetry.turn(index=budget.turns, dispatch_exception=type(exc).__name__, tool=tool_name)
                 budget.record_productivity(0, 0, 0)
                 return finish("aborted", aborted=True, error=content)
+            budget.record_tool_time(time.monotonic() - tool_started)
 
             _record_dispatch_telemetry(telemetry, result)
             if isinstance(result.raw_result, Fault):

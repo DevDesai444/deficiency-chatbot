@@ -18,6 +18,7 @@ class RetrievalLedger:
         self._served: set[tuple[str, int, int]] = set()
         self._dedup_checks = 0
         self._dedup_hits = 0
+        self.embedding_time_s = 0.0
 
     def record_span(self, span: SpanID) -> None:
         self._issued.add((span.doc_id, span.start, span.end))
@@ -38,3 +39,6 @@ class RetrievalLedger:
 
     def dedup_hit_rate(self) -> float:
         return self._dedup_hits / self._dedup_checks if self._dedup_checks else 0.0
+
+    def record_embedding_time(self, seconds: float) -> None:
+        self.embedding_time_s += max(0.0, seconds)

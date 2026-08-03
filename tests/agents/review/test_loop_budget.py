@@ -176,3 +176,14 @@ def test_pre_repair_does_not_consume_a_turn(tmp_path):
     assert result.stop_reason == "completed"
     records = [json.loads(line) for line in (tmp_path / "turns.jsonl").read_text().splitlines()]
     assert not [r for r in records if r.get("record_type") == "repair" and r.get("layer") == "pre"]
+
+
+def test_model_and_tool_time_are_recorded(tmp_path):
+    corpus, ledger, budget, telemetry, registry = _parts(tmp_path)
+    client = ScriptedChatClient([_turn(make_tool_call("open_doc", {"doc_id": "d1"})), _stop_turn()])
+
+    result = run_review(corpus, corpus.manifest, ledger, budget, telemetry, client, registry)
+
+    assert result.stop_reason == "completed"
+    assert budget.model_time_s >= 0.0
+    assert budget.tool_execution_time_s >= 0.0

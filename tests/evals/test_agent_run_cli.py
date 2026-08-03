@@ -176,6 +176,9 @@ def test_unknown_model_routes_through_resolver_and_artifacts_round_trip(monkeypa
     summary = json.loads((out_dir / "agent-run1-summary.json").read_text())
     assert summary["provenance"]["run_completed"] is True
     assert summary["provenance"]["found_set"] == ["T-01"]
+    assert "model_time_s" in summary
+    assert "tool_execution_time_s" in summary
+    assert "embedding_time_s" in summary
 
 
 def test_non_default_prefix_never_writes_agent_run_files(monkeypatch, tmp_path):

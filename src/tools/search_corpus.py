@@ -3,6 +3,8 @@ branch exists in this file by design (routing submission content to Databricks w
 network cost/latency to every run and make SC4's recall measurement non-deterministic)."""
 from __future__ import annotations
 
+import time
+
 import numpy as np
 
 from ingest.anchors import mint_span
@@ -46,8 +48,12 @@ def search_corpus(corpus: CorpusIndex, query: str, ledger: RetrievalLedger, top_
     bm25 = BM25Index([c[3] for c in chunks], chunk_ids)
     lexical_ranked = bm25.query(query, top_k=top_k * 2)
 
-    embeddings = embed_texts([c[3] for c in chunks])
-    q_emb = embed_query(query).reshape(1, -1).astype(np.float32)
+    embedding_started = time.monotonic()
+    try:
+        embeddings = embed_texts([c[3] for c in chunks])
+        q_emb = embed_query(query).reshape(1, -1).astype(np.float32)
+    finally:
+        ledger.record_embedding_time(time.monotonic() - embedding_started)
     q_norm = q_emb / (np.linalg.norm(q_emb) + 1e-9)
     e_norm = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-9)
     scores = (e_norm @ q_norm.T).flatten()

@@ -287,6 +287,9 @@ class RunSummary(BaseModel):
     cached_tokens: int = 0
     turns: int = 0
     wall_clock_s: float = 0.0
+    model_time_s: float = 0.0
+    tool_execution_time_s: float = 0.0
+    embedding_time_s: float = 0.0
     usage_missing_turns: int = 0
     dedup_hit_rate: float = 0.0
     malformed_trailing_turn_lines: int = 0
@@ -394,6 +397,9 @@ class RunSummary(BaseModel):
             cached_tokens=int(_read_number(budget_ledger, "cached_tokens", 0)),
             turns=int(_read_number(budget_ledger, "turns", 0)),
             wall_clock_s=float(_read_number(budget_ledger, "wall_clock_s", wall_clock_s)),
+            model_time_s=float(_read_number(budget_ledger, "model_time_s", 0.0)),
+            tool_execution_time_s=float(_read_number(budget_ledger, "tool_execution_time_s", 0.0)),
+            embedding_time_s=float(_read_number(retrieval_ledger, "embedding_time_s", 0.0)),
             usage_missing_turns=int(_read_number(budget_ledger, "usage_missing_turns", 0)),
             dedup_hit_rate=ledger_dedup_hit_rate(retrieval_ledger),
             malformed_trailing_turn_lines=malformed_trailing_turn_lines,
