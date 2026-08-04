@@ -32,6 +32,8 @@ _PROVENANCE_FIELDS = {
     "run_index",
     "model_id",
     "prereg_commit_sha",
+    "code_head_sha",
+    "working_tree_dirty",
     "harness_version",
     "matcher_version",
     "matcher_content_sha256",
@@ -81,6 +83,28 @@ def _git_sha_of(path: str) -> str:
     return result.stdout.strip().splitlines()[0] if result.stdout.strip() else ""
 
 
+# A1 (03-19 prereg v2): record the exact code HEAD each scored run executed at, plus whether
+# the working tree was dirty, so all 3 runs are provably at one identical, clean HEAD.
+def _git_head_sha() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=2, check=False,
+        )
+    except Exception:
+        return ""
+    return result.stdout.strip()
+
+
+def _git_working_tree_dirty() -> bool:
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"], capture_output=True, text=True, timeout=5, check=False,
+        )
+    except Exception:
+        return False
+    return bool(result.stdout.strip())
+
+
 def capture_provenance(
     *,
     run_index: int,
@@ -99,6 +123,8 @@ def capture_provenance(
         "run_index": run_index,
         "model_id": resolved_model,
         "prereg_commit_sha": _git_sha_of(prereg_path),
+        "code_head_sha": _git_head_sha(),
+        "working_tree_dirty": _git_working_tree_dirty(),
         "harness_version": HARNESS_VERSION,
         "matcher_version": MATCHER_VERSION,
         "matcher_content_sha256": _sha256_file(matcher_path),

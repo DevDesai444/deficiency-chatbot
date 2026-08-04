@@ -109,6 +109,11 @@ def test_tool_call_and_rejection_rows_reconcile_with_ledger_total(tmp_path):
     # (c) the (reason_code, half) key is present.
     assert "span_ref_out_of_range|" in summary.rejections_by_code_half
     assert sum(summary.rejections_by_code_half.values()) == 1
+    # A1 (03-19 prereg v2): provenance records the code HEAD and working-tree cleanliness so
+    # all 3 scored runs are provably at one identical, clean HEAD.
+    assert "code_head_sha" in summary.provenance
+    assert "working_tree_dirty" in summary.provenance
+    assert isinstance(summary.provenance["working_tree_dirty"], bool)
 
 
 def test_identical_calls_trip_breaker_repeat_three(tmp_path):
