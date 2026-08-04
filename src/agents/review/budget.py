@@ -33,7 +33,7 @@ class BudgetLedger:
     max_tokens: int
     max_wall_clock_s: float
     max_turns: int = 50
-    dr_window: int = 3
+    dr_window: int = 5  # S2(ii) (v3): 3 -> 5 -- a wider productivity window before DR fires.
     dr_grace_turns: int = 5  # R2 (03-19): DR is armed only AFTER turn 5 -- a rejection-heavy
     #                          start must not guillotine exploration before it begins. The
     #                          circuit breaker is unchanged and still fires during the grace window.
@@ -55,6 +55,7 @@ class BudgetLedger:
 
     _productivity: list[bool] = field(default_factory=list, init=False, repr=False)
     _tool_calls: list[tuple[str, str]] = field(default_factory=list, init=False, repr=False)
+    _rejected_calls: list[tuple[str, str]] = field(default_factory=list, init=False, repr=False)
     _rejections: list[tuple[str, str]] = field(default_factory=list, init=False, repr=False)
     _consecutive_rejections: list[tuple[str, str]] = field(default_factory=list, init=False, repr=False)
 
@@ -94,10 +95,21 @@ class BudgetLedger:
         real dispatch whether the tool then accepts or rejects it."""
         return len(self._tool_calls)
 
-    def record_rejection(self, reason_code: str, half: str) -> None:
+    def record_rejection(self, reason_code: str, half: str, tool: str = "", args: dict[str, Any] | None = None) -> None:
         key = (reason_code, half)
         self._rejections.append(key)
         self._consecutive_rejections.append(key)
+        # S1 (v3): the identical-args breaker counts ONLY identical calls whose result was
+        # REJECTED. Successful repeats are neutralized by COST-04's dedup stub and must never
+        # kill a healthy run, so a rejected call records its (tool, args) here, separately
+        # from _tool_calls (which still counts every dispatch for total_tool_calls).
+        if tool:
+            self._rejected_calls.append((tool, _canonical_json(args or {})))
+
+    def reset_productivity(self) -> None:
+        """S2(i) (v3): a nudge resets the DR productivity window, so the model gets a full
+        fresh window to comply with 'keep working' before diminishing-returns can fire again."""
+        self._productivity.clear()
 
     def record_tool_success(self) -> None:
         """A non-rejected tool result resets D-BUD3's same-class rejection counter."""
@@ -132,8 +144,10 @@ class BudgetLedger:
         return not any(self._productivity[-self.dr_window :])
 
     def breaker_tripped(self) -> str:
-        for key in set(self._tool_calls):
-            if self._tool_calls.count(key) >= self.breaker_repeat:
+        # S1 (v3): count over REJECTED identical calls only -- a successful repeat (dedup-
+        # neutralized) never trips the identical-args breaker.
+        for key in set(self._rejected_calls):
+            if self._rejected_calls.count(key) >= self.breaker_repeat:
                 return "identical_args"
 
         if len(self._consecutive_rejections) >= self.breaker_same_class:

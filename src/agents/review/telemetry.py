@@ -248,6 +248,11 @@ class TurnLog:
     def oracle_leads(self, surfaced: int) -> None:
         self._append("oracle_leads", {"surfaced": surfaced})
 
+    def coverage_reminder(self, unopened: int, uncovered: int) -> None:
+        """S4 (v3): a coverage-reminder injection turn. `turn_index` lets the reader
+        correlate it with emit_finding tool_call rows within the next few turns."""
+        self._append("coverage_reminder", {"unopened": unopened, "uncovered": uncovered})
+
     def _append(self, record_type: str, fields: dict[str, Any]) -> None:
         self._turn_index += 1
         record = {
@@ -314,6 +319,9 @@ class RunSummary(BaseModel):
     oracle_leads_reopened: int = 0
     oracle_leads_emitted: int = 0
 
+    coverage_reminder_count: int = 0
+    coverage_reminder_turns: list[int] = Field(default_factory=list)
+
     billed_tokens: int = 0
     cached_tokens: int = 0
     turns: int = 0
@@ -359,6 +367,7 @@ class RunSummary(BaseModel):
         oracle_leads_surfaced = 0
         oracle_leads_reopened = 0
         oracle_leads_emitted = 0
+        coverage_reminder_turns: list[int] = []
         dispatched_tool_calls = 0
 
         for record in records:
@@ -388,6 +397,8 @@ class RunSummary(BaseModel):
                 oracle_leads_surfaced += int(record.get("surfaced") or 0)
                 oracle_leads_reopened += int(record.get("reopened") or 0)
                 oracle_leads_emitted += int(record.get("emitted") or 0)
+            elif record_type == "coverage_reminder":
+                coverage_reminder_turns.append(int(record.get("turn_index") or 0))
 
         budget_ledger = budget_ledger or object()
         total_tool_calls = int(_read_number(budget_ledger, "total_tool_calls", dispatched_tool_calls))
@@ -424,6 +435,8 @@ class RunSummary(BaseModel):
             oracle_leads_surfaced=oracle_leads_surfaced,
             oracle_leads_reopened=oracle_leads_reopened,
             oracle_leads_emitted=oracle_leads_emitted,
+            coverage_reminder_count=len(coverage_reminder_turns),
+            coverage_reminder_turns=coverage_reminder_turns,
             billed_tokens=int(_read_number(budget_ledger, "billed_tokens", 0)),
             cached_tokens=int(_read_number(budget_ledger, "cached_tokens", 0)),
             turns=int(_read_number(budget_ledger, "turns", 0)),

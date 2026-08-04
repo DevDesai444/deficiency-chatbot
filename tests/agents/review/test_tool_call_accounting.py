@@ -116,13 +116,17 @@ def test_tool_call_and_rejection_rows_reconcile_with_ledger_total(tmp_path):
     assert isinstance(summary.provenance["working_tree_dirty"], bool)
 
 
-def test_identical_calls_trip_breaker_repeat_three(tmp_path):
+def test_identical_REJECTED_calls_trip_breaker_repeat_three(tmp_path):
     corpus, ledger, budget, telemetry, registry = _parts(tmp_path)
 
-    # Three identical open_doc calls (distinct call-ids, identical (name, args)) then the loop
-    # keeps returning the same turn; the pre-call breaker check trips on the 4th turn.
-    same = lambda: make_tool_call("open_doc", {"doc_id": "d1"})
-    client = ScriptedChatClient([_turn(same()), _turn(same()), _turn(same()), _turn(same())])
+    # S1 (v3): the identical-args breaker fires only on REJECTED identical calls. Three
+    # identical emit_finding calls with an out-of-range span are each gate-rejected; the
+    # pre-call breaker check trips on the 4th turn. (Identical SUCCESSFUL repeats do not trip
+    # -- covered by tests/agents/review/test_breaker_rejected_only.py.)
+    reject = lambda: make_tool_call("emit_finding", {
+        "submission_span_id": "[d1:0:99999]", "rule_span_id": "[d1:0:4]",
+        "verdict": "gap", "title": "t", "detail": "d"})
+    client = ScriptedChatClient([_turn(reject()), _turn(reject()), _turn(reject()), _turn(reject())])
 
     result = run_review(corpus, corpus.manifest, ledger, budget, telemetry, client, registry)
 

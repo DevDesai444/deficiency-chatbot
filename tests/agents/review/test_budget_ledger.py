@@ -112,14 +112,16 @@ def test_reread_of_a_known_span_is_unproductive() -> None:
     assert ledger.in_diminishing_returns()
 
 
-def test_breaker_trips_on_three_identical_tool_args() -> None:
+def test_breaker_trips_on_three_identical_rejected_tool_args() -> None:
+    # S1 (v3): the identical-args breaker counts REJECTED identical calls only (arg order
+    # is canonicalized, so {query,top_k} == {top_k,query}). Successful repeats never trip.
     ledger = BudgetLedger(max_tokens=10_000, max_wall_clock_s=60.0, breaker_repeat=3)
 
-    ledger.record_tool_call("search_corpus", {"query": "lod", "top_k": 5})
-    ledger.record_tool_call("search_corpus", {"top_k": 5, "query": "lod"})
+    ledger.record_rejection("post_repair_malformed", "", tool="search_corpus", args={"query": "lod", "top_k": 5})
+    ledger.record_rejection("post_repair_malformed", "", tool="search_corpus", args={"top_k": 5, "query": "lod"})
     assert ledger.breaker_tripped() == ""
 
-    ledger.record_tool_call("search_corpus", {"query": "lod", "top_k": 5})
+    ledger.record_rejection("post_repair_malformed", "", tool="search_corpus", args={"query": "lod", "top_k": 5})
     assert ledger.breaker_tripped() == "identical_args"
 
 
@@ -177,9 +179,8 @@ def test_stop_reason_precedence() -> None:
 
     breaker = BudgetLedger(max_tokens=10_000, max_wall_clock_s=60.0, max_turns=1, dr_window=1)
     breaker.record_turn(_turn())
-    breaker.record_tool_call("search_corpus", {"query": "a"})
-    breaker.record_tool_call("search_corpus", {"query": "a"})
-    breaker.record_tool_call("search_corpus", {"query": "a"})
+    for _ in range(3):  # S1: identical REJECTED calls trip identical_args, which precedes max-turns
+        breaker.record_rejection("post_repair_malformed", "", tool="search_corpus", args={"query": "a"})
     breaker.record_productivity(0, 0, 0)
     assert breaker.stop_reason() == "breaker"
 

@@ -35,10 +35,24 @@ def test_dr_suppressed_during_grace_then_arms_after_turn_5():
 def test_breaker_still_fires_within_the_grace_window():
     b = _ledger(breaker_repeat=3)
     b.turns = 2  # within the DR grace window
-    for _ in range(3):
-        b.record_tool_call("search_corpus", {"query": "impurity"})
+    for _ in range(3):  # S1: identical REJECTED calls trip the identical-args breaker
+        b.record_rejection("post_repair_malformed", "", tool="search_corpus", args={"query": "impurity"})
     assert b.breaker_tripped() == "identical_args"
     assert b.stop_reason() == "breaker"  # breaker is not grace-gated
+
+
+def test_dr_window_default_is_five():  # S2(ii)
+    assert _ledger().dr_window == 5
+
+
+def test_nudge_reset_clears_the_productivity_window():  # S2(i)
+    b = _ledger(dr_window=3)
+    b.turns = 10  # past the grace window
+    for _ in range(3):
+        b.record_productivity(0, 0, 0)
+    assert b.in_diminishing_returns() is True
+    b.reset_productivity()  # a nudge resets the window -> full fresh window to comply
+    assert b.in_diminishing_returns() is False
 
 
 def test_grace_does_not_change_the_pure_window_predicate_at_turns_zero():

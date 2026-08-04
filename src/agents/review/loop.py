@@ -172,6 +172,51 @@ def _is_cross_document_boundary(result: DispatchResult) -> bool:
     return result.tool == "follow_reference" and "cross_document_resolution_pending_phase_4" in str(result.result)
 
 
+def _coverage_reminder(
+    manifest: CoverageManifest, ledger: RetrievalLedger, findings: list[Fault],
+    oracle_called: bool, oracle_leads_surfaced: int,
+) -> tuple[str, int, int] | None:
+    """S4/S5 (v3): a code-computed coverage reminder (the Claude Code todo_reminder analog).
+
+    Dynamic content in a MESSAGE, never the static prefix (COST-01 preserved). Reports
+    submission documents not yet opened / opened-but-still-empty AND oracle engagement
+    (S5: run_oracles surfaced 0/0/0 across all v2 runs, yet C-01/C-02 are exactly the profile
+    oracles target) -- so an un-called oracle or an unaddressed lead visibly counts as
+    unaddressed coverage. Returns (message, unopened, uncovered) or None when nothing is
+    outstanding.
+    """
+    all_docs = [d.doc_id for d in manifest.documents]
+    if not all_docs:
+        return None
+    opened = {key[0] for key in _span_keys(ledger)}
+    emitted = {
+        f.submission_span_id.doc_id
+        for f in findings
+        if getattr(f, "submission_span_id", None) is not None
+    }
+    unopened = sorted(d for d in all_docs if d not in opened)
+    opened_no_finding = sorted(d for d in all_docs if d in opened and d not in emitted)
+    unused_leads = oracle_called and oracle_leads_surfaced > len(findings)
+
+    lines: list[str] = []
+    if not oracle_called:
+        lines.append("run_oracles has not been called -- call it on each document first to surface concrete numeric leads.")
+    if unopened:
+        lines.append("Documents not yet opened: " + ", ".join(unopened) + ".")
+    if opened_no_finding:
+        lines.append("Documents opened but with no finding yet: " + ", ".join(opened_no_finding) + ".")
+    if unused_leads:
+        lines.append(
+            f"Oracle leads surfaced={oracle_leads_surfaced}, findings emitted={len(findings)} "
+            "-- re-open and address the unused leads."
+        )
+    if not lines:
+        return None
+    header = "Coverage check -- keep working; do not conclude while evidence is unexamined."
+    uncovered = len(opened_no_finding) + (0 if oracle_called else 1) + (1 if unused_leads else 0)
+    return "\n".join([header] + lines), len(unopened), uncovered
+
+
 def _emit_review_event(
     job_id: str,
     event_type: str,
@@ -206,6 +251,9 @@ def run_review(
     findings: list[Fault] = []
     seen_requirement_ids: set[str] = set()
     pending_continuation: dict[str, int] | None = None
+    last_reminder_turn = 0  # S4 (v3): coverage reminder cadence
+    oracle_called = False  # S5 (v3): oracle engagement tracking
+    oracle_leads_surfaced = 0
     messages = build_messages(_corpus_brief(corpus, manifest))
     tools = registry.schemas()
 
@@ -277,6 +325,7 @@ def run_review(
                 }
                 messages.append({"role": "user", "content": NUDGE})
                 budget.continuations += 1
+                budget.reset_productivity()  # S2(i) (v3): full fresh window to comply
                 _emit_review_event(
                     job_id,
                     "continuation",
@@ -316,9 +365,15 @@ def run_review(
             _record_dispatch_telemetry(telemetry, result)
             if isinstance(result.raw_result, Fault):
                 findings.append(result.raw_result)
+            if result.tool == "run_oracles" and isinstance(result.raw_result, list):
+                oracle_called = True  # S5 (v3)
+                oracle_leads_surfaced += len(result.raw_result)
             if result.turn_consumed and not _is_cross_document_boundary(result):
                 if isinstance(result.raw_result, ToolRejected):
-                    budget.record_rejection(result.raw_result.reason_code, result.raw_result.half)
+                    budget.record_rejection(
+                        result.raw_result.reason_code, result.raw_result.half,
+                        tool=result.tool, args=result.args,
+                    )
                 else:
                     budget.record_tool_success()
 
@@ -329,6 +384,17 @@ def run_review(
         new_faults = len(findings) - findings_before
         new_requirements = len(seen_requirement_ids) - requirements_before
         budget.record_productivity(new_spans, new_faults, new_requirements)
+
+        # S4 (v3): every 8 turns, inject a code-computed coverage reminder as a user message
+        # (safe here -- the assistant tool_calls turn and all its tool results are already
+        # appended). Dynamic content stays out of the cached prefix.
+        if budget.turns >= last_reminder_turn + 8:
+            last_reminder_turn = budget.turns
+            reminder = _coverage_reminder(manifest, ledger, findings, oracle_called, oracle_leads_surfaced)
+            if reminder is not None:
+                message, unopened_n, uncovered_n = reminder
+                messages.append({"role": "user", "content": message})
+                telemetry.coverage_reminder(unopened_n, uncovered_n)
 
 
 __all__ = ["CompleteFn", "ReviewResult", "build_messages", "render_prefix", "run_review"]
