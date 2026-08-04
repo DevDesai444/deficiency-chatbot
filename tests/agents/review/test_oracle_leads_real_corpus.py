@@ -45,7 +45,7 @@ def _lead_text(lead: dict) -> str:
     )
 
 
-def test_oracles_surface_a_protected_tp_lead_on_the_real_corpus(scored_corpus):
+def test_oracles_surface_all_three_protected_tp_leads_on_the_real_corpus(scored_corpus):
     leads: list[dict] = []
     for entry in scored_corpus.manifest.documents:
         result = run_oracles_tool(scored_corpus, entry.doc_id, RetrievalLedger())
@@ -53,8 +53,11 @@ def test_oracles_surface_a_protected_tp_lead_on_the_real_corpus(scored_corpus):
         leads.extend(result["positive_leads"])
         leads.extend(result["absence_leads"])
 
-    fired = {t for t in _TARGETS for lead in leads if t.lower() in _lead_text(lead).lower()}
-    assert fired, (
-        f"no oracle lead named any of {_TARGETS} on the real scored corpus; "
+    fired = {t.lower() for t in _TARGETS for lead in leads if t.lower() in _lead_text(lead).lower()}
+    missing = {t.lower() for t in _TARGETS} - fired
+    # v3.2: ALL THREE must appear across the two docs' leads (C-01 11477, C-02 0.15,
+    # B-08 "Any Unspecified Impurity"), not just one.
+    assert not missing, (
+        f"oracle leads missing targets {sorted(missing)}; "
         f"{len(leads)} leads surfaced: {[_lead_text(l)[:90] for l in leads]}"
     )

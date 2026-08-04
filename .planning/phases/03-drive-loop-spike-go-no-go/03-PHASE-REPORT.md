@@ -46,7 +46,8 @@ DR/breaker/DR; fp 0/2/0; matched `found_set` empty all three. Root cause: enumer
 | v2 §10 amendment commit (preconditions) | `082a7273e9411e7609df7080f42107ad316f5b8b` |
 | **v2 §10.3 prefix amendment (governing for the v2 set)** | `3b63b750caa8b6e4cac53e27a5e13789af7782c0` (v2 set ran and closed NO-GO — see `03-19-V2-READING.md`). |
 | v3 remediation + pre-registration (S1–S5) | `4b080e425d4f89c14027148c1ebe26cbf195fc92` (GO revoked — oracles produced 0 leads; `_doc_from_cache` dropped table data). |
-| **v3.1 amendment (T1+T2, GOVERNING `prereg_commit_sha`)** | this commit — the latest commit touching `03-GO-NOGO-PREREGISTRATION-V3.md`; resolvable via `_git_sha_of(V3 file)`, concrete value in the executor's report. **Supersedes `4b080e4`.** T1 rebuilds grid tables from `cache["table_index"]`; T2 adds `numeric_cross_reference` (C-01/C-02) + `expected_row_absent` (B-08); live verification surfaces leads naming `11477` and `0.15`. |
+| v3.1 amendment (T1+T2) | `fdbd535f94f61377ae4728dd4f4ae87bef43a11f` (leads named `11477` + `0.15`; B-08 not yet reached). |
+| **v3.2 amendment (T2b-prose, GOVERNING `prereg_commit_sha`)** | this commit — the latest commit touching `03-GO-NOGO-PREREGISTRATION-V3.md`; resolvable via `_git_sha_of(V3 file)`, concrete value in the executor's report. **Supersedes `fdbd535`.** `expected_row_absent` detects the impurity/result grid table from header-or-cells so B-08's prose-only `Any Unspecified Impurity` is reachable; live verification now surfaces **all three** of `11477` / `0.15` / `Any Unspecified Impurity`; §10 precondition 4 tightened to all-three. |
 | v2 pre-registration file | `03-GO-NOGO-PREREGISTRATION-V2.md` |
 | Governing baseline (unchanged) | `03-BASELINE-REMEASUREMENT.md` (`5afb4d7`), median 0.107, found_set `{B-08, C-01, C-02}` |
 | Config delta from v1 | `dr_grace_turns=5` (R2); all other frozen numbers unchanged |

@@ -295,11 +295,18 @@ def expected_row_absent(doc: dict) -> list[Fault]:
     faults: list[Fault] = []
     for page in doc.get("pages", []):
         tables = [t for t in page.get("tables", []) if t.get("kind") == "grid"]
-        has_impurity_table = any(
-            "impurity" in " ".join(str(h or "") for h in (t.get("headers") or [])).lower()
-            or "result" in " ".join(str(h or "") for h in (t.get("headers") or [])).lower()
-            for t in tables
-        )
+        # T2b-prose (v3.2): a page "carries an impurity/result grid table" when either its
+        # HEADER or any CELL references impurity/result data (mvr1381's real grid carries
+        # 'result' in cells, not the header). The required-attribute name may then be matched
+        # from PROSE (_page_text below), so a prose-only attribute like B-08's 'Any Unspecified
+        # Impurity' is reachable while an unrelated prose word is not (exact-name whitelist).
+        def _covers_impurity_result(t: dict) -> bool:
+            blob = " ".join(str(h or "") for h in (t.get("headers") or []))
+            blob += " " + " ".join(str(c or "") for row in (t.get("rows") or []) for c in row)
+            low = blob.lower()
+            return "impurity" in low or "result" in low
+
+        has_impurity_table = any(_covers_impurity_result(t) for t in tables)
         if not has_impurity_table:
             continue
         row_labels = {

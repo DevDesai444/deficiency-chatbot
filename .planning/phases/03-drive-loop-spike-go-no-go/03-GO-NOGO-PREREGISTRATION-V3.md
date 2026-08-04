@@ -2,10 +2,10 @@
 
 > **Reviewer-approved (S1–S5, §8 r1–r6, §10 preconditions incl. §10.3 v3-prefix command).
 > The GOVERNING `prereg_commit_sha` is the SHA of the latest commit touching THIS file — the
-> v3.1 amendment commit (recorded in `03-PHASE-REPORT.md`, never inside this file — D-GO5),
-> superseding the v3 commit `4b080e4`. No scored run may execute until the reviewer gives the
-> run signal after on-disk verification of the v3.1 commit.** v2 (`3b63b75`) is closed NO-GO
-> (see `03-19-V2-READING.md`).
+> **v3.2** amendment commit (recorded in `03-PHASE-REPORT.md`, never inside this file — D-GO5),
+> superseding v3.1 `fdbd535` and v3 `4b080e4`. No scored run may execute until the reviewer
+> gives the run signal after on-disk verification of the v3.2 commit.** v2 (`3b63b75`) is
+> closed NO-GO (see `03-19-V2-READING.md`).
 
 ## v3.1 amendment (T1 + T2 — oracle engagement made real)
 
@@ -25,7 +25,26 @@ unchanged.**
 `run_oracles_tool` end-to-end on the real scored corpus surfaces leads naming **C-01
 `11477`** (mvr1381) and **C-02 `0.15`** (minispec) — 8 leads on mvr1381, 13 on minispec,
 0 check-errors (was 0/0/0). `tests/agents/review/test_oracle_leads_real_corpus.py` asserts
-≥1 of {11477, 0.15, Any Unspecified Impurity} fires or the build is red. Full suite:
+the target set fires or the build is red (bar tightened to all three in v3.2 below).
+
+## v3.2 amendment (T2b-prose — B-08 reachable, variance-reduced)
+
+v3.1 fired on C-01 and C-02 but **not B-08** (`Any Unspecified Impurity` is prose-only on
+mvr1381, whose real grid table carries `result` in cells, not the header — so T2b's
+header-only guard missed it). Losing B-08 alone still fails clause (b), and v2 hit B-08 only
+1/3 times, so this small extension directly reduces run-set variance.
+
+- **T2b-prose** — `expected_row_absent` now detects the "impurity/result grid table" from its
+  header **OR its cells**, so a page carrying impurity/result data qualifies even when the
+  attribute name lives only in prose. It still fires only on a case-insensitive **exact**
+  whitelist match (`Any Unspecified Impurity`, `Total Impurities`) with **no** grid row label
+  for it — no door opened to unrelated prose words. (`src/agents/detection/oracles.py`)
+- **Tightened verification** — `test_oracle_leads_real_corpus.py` now asserts **ALL THREE** of
+  {`11477`, `0.15`, `any unspecified impurity`} appear across the two docs' leads, not ≥1.
+
+**Live-corpus verification (all three):** mvr1381 → `11477` (`numeric_cross_reference`) **and
+`Any Unspecified Impurity` (`expected_row_absent`)**; minispec → `0.15`
+(`numeric_cross_reference`). 10 leads on mvr1381, 13 on minispec, 0 check-errors. Full suite:
 **504 passed, 11 skipped.**
 
 **Same gate structure and frozen baseline as v1/v2, new SHA, three fresh scored runs.** Only
@@ -157,11 +176,12 @@ Item 5 CLOSED (15/15 dual-resolve). v3 pre-run preconditions:
    `--run-prefix agent-run-v3-` (v1 `agent-run*` and v2 `agent-run-v2*` artifacts are
    immutable evidence; a colliding prefix would overwrite them). After run 1, confirm its
    summary's `prereg_commit_sha` equals the **v3.1** commit SHA before runs 2-3.
-4. **Oracle-lead pre-flight (v3.1).** Immediately before run 1, `run_oracles_tool` on the
-   scored corpus MUST return at least one lead whose text names {C-01 `11477`, C-02 `0.15`,
-   or B-08 `Any Unspecified Impurity`}'s anchor. **Empty / no-target leads = STOP, no runs**
-   (the oracle substrate regressed). Same assertion as `test_oracle_leads_real_corpus.py`,
-   run live against the installed corpus, alongside the §10.1 15/15 + 30/30 probes.
+4. **Oracle-lead pre-flight (v3.1, tightened v3.2).** Immediately before run 1,
+   `run_oracles_tool` on the scored corpus MUST return leads whose text names **ALL THREE** of
+   {C-01 `11477`, C-02 `0.15`, B-08 `Any Unspecified Impurity`}. **Any target missing = STOP,
+   no runs** (the oracle substrate regressed). Same assertion as
+   `test_oracle_leads_real_corpus.py`, run live against the installed corpus, alongside the
+   §10.1 15/15 + 30/30 probes.
 
    ```
    .venv/bin/python -m evals.run agent-run \
@@ -176,9 +196,9 @@ Item 5 CLOSED (15/15 dual-resolve). v3 pre-run preconditions:
 
 ## 11. Amendment clause (D-GO5) — UNCHANGED
 
-Amending after any spike run begins voids the run set. The **v3.1** commit SHA — the latest
+Amending after any spike run begins voids the run set. The **v3.2** commit SHA — the latest
 commit touching this file, recorded in `03-PHASE-REPORT.md`, never inside this file — is the
-governing `prereg_commit_sha`, superseding the v3 commit `4b080e4`.
+governing `prereg_commit_sha`, superseding v3.1 `fdbd535` and v3 `4b080e4`.
 
 ---
 
