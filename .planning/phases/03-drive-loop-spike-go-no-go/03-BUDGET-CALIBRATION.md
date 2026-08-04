@@ -93,3 +93,21 @@ Median embedding seconds: `(9.060 + 8.260) / 2 = 8.660`.
 - Proposed `max_wall_clock_s = ceil(66.220 x 4) = 265`
 
 D-BUD1(c) note: the original `250000` provisional token ceiling was too low for even the held-out single-document calibration and clipped the first attempt. The completed samples used a larger provisional ceiling only to avoid clipping the measurement. The proposed final token ceiling is high enough that reviewer confirmation is required before 03-17 consumes it.
+
+## Reviewer-Confirmed Ceilings (03-16 ruling)
+
+The senior reviewer confirmed the following final ceilings for 03-17 consumption. These SUPERSEDE the proposals above; the proposals are retained only as the pre-declared derivation record.
+
+| Ceiling | Confirmed value | Derivation |
+|---|---:|---|
+| `max_tokens` | `1,600,000` | Pre-declared `3 x median billed tokens` = `ceil(411779.5 x 3) = 1235339`, then a `~1.3x` two-document adjustment (`1235339 x 1.3 = 1605941`, rounded to `1,600,000`). The calibration corpus was single-document (`spec32s41` only); scored 03-17 runs review **two** non-held-out documents, so the single-doc token measurement is a lower bound and is scaled up rather than consumed raw. |
+| `max_wall_clock_s` | `600` | Set as a runaway backstop, not tuned to the `265` proposal. Two-document reviewing plus Databricks rate-limit backoff of up to `60s` per retry (`client.py:19`) makes wall-clock heavy-tailed for infrastructure reasons; `600` gives headroom so wall-clock is a backstop rather than the operative agent-reasoning stop. |
+| `max_turns` | `80` | `29` turns were observed on the single calibration document; a `50` cap could bind once two documents are reviewed in one run. Raised to `80` so turns remain a backstop rather than an artificial stop at two-document scope. |
+| `dr_window` | `3` | Confirmed unchanged. |
+| `breaker_repeat` | `3` | Confirmed unchanged. |
+| `breaker_same_class` | `4` | Confirmed unchanged. |
+| `max_continuations` | `5` | Confirmed unchanged. |
+
+**Ceilings are BACKSTOPS.** The operative stops are diminishing-returns and the breaker, not the ceilings. Both calibration runs ended via a DR/breaker stop (run 1 `diminishing-returns`, run 2 `breaker`), well inside every ceiling above — no run approached a token, wall-clock, or turn ceiling. The ceilings exist to bound a runaway loop, not to shape normal termination.
+
+**Flag for the phase report — breaker tripped in calibration run 2.** Calibration run 2 stopped via `breaker`. This is recorded as a watch item: if the breaker trips in any *scored* 03-17 run, its `(reason_code, half)` matrix must be examined at the gate before the run's result is accepted, because a breaker stop can mask a loop pathology rather than a clean "nothing left to find" termination.
