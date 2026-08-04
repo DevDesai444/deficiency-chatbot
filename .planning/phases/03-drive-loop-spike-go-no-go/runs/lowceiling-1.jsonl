@@ -1,0 +1,5 @@
+{"cached_tokens":0,"completion_tokens":9,"finish_reason":"tool_calls","index":1,"prompt_tokens":2957,"record_type":"turn","timestamp_monotonic":678763.958284083,"turn_index":1,"usage_present":true}
+{"record_type":"tool_call","timestamp_monotonic":678763.98763125,"tool":"read_guideline","turn_index":2}
+{"cached_tokens":0,"completion_tokens":21,"finish_reason":"tool_calls","index":2,"prompt_tokens":3323,"record_type":"turn","timestamp_monotonic":678764.69828775,"turn_index":3,"usage_present":true}
+{"record_type":"tool_call","timestamp_monotonic":678769.610919791,"tool":"search_corpus","turn_index":4}
+{"cached_tokens":0,"completion_tokens":18,"finish_reason":"tool_calls","index":3,"prompt_tokens":4957,"record_type":"turn","timestamp_monotonic":678770.296862541,"turn_index":5,"usage_present":true}

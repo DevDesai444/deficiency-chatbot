@@ -1,0 +1,11 @@
+{"cached_tokens":0,"completion_tokens":105,"finish_reason":"tool_calls","index":1,"prompt_tokens":2288,"record_type":"turn","timestamp_monotonic":678719.797044208,"turn_index":1,"usage_present":true}
+{"record_type":"tool_call","timestamp_monotonic":678719.831911541,"tool":"read_guideline","turn_index":2}
+{"cached_tokens":0,"completion_tokens":272,"finish_reason":"tool_calls","index":2,"prompt_tokens":2766,"record_type":"turn","timestamp_monotonic":678722.036842625,"turn_index":3,"usage_present":true}
+{"layer":"post","record_type":"repair","timestamp_monotonic":678722.044169041,"tool":"read_guideline","turn_index":4}
+{"half":"","reason_code":"post_repair_malformed","reason_code_known":false,"record_type":"rejection","timestamp_monotonic":678722.044623833,"tool":"read_guideline","turn_index":5}
+{"layer":"post","record_type":"repair","timestamp_monotonic":678722.044988416,"tool":"read_guideline","turn_index":6}
+{"half":"","reason_code":"post_repair_malformed","reason_code_known":false,"record_type":"rejection","timestamp_monotonic":678722.04521225,"tool":"read_guideline","turn_index":7}
+{"layer":"post","record_type":"repair","timestamp_monotonic":678722.045586125,"tool":"read_guideline","turn_index":8}
+{"half":"","reason_code":"post_repair_malformed","reason_code_known":false,"record_type":"rejection","timestamp_monotonic":678722.045844333,"tool":"read_guideline","turn_index":9}
+{"layer":"post","record_type":"repair","timestamp_monotonic":678722.046122125,"tool":"read_guideline","turn_index":10}
+{"half":"","reason_code":"post_repair_malformed","reason_code_known":false,"record_type":"rejection","timestamp_monotonic":678722.046359125,"tool":"read_guideline","turn_index":11}

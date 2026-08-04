@@ -1,0 +1,10 @@
+{
+  "job_id": "",
+  "faults": [],
+  "faults_found": false,
+  "domains_checked": [],
+  "parse_failures": [],
+  "analysis_seconds": 7.3,
+  "stop_reason": "ceiling",
+  "budget_exhausted": true
+}

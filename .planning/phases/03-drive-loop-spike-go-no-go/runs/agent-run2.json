@@ -1,0 +1,83 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Stability of analytical solutions",
+      "detail": "The stability of analytical solutions is not addressed in the provided document. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.160",
+        "start": 692,
+        "end": 1048,
+        "hash": "8a6be33e2c655bc8"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 2236,
+        "end": 2345,
+        "hash": "6d4efcbb9a0bb254"
+      },
+      "evidence": "1.4.7\nStability of Analytical Solutions ..................................................................22\n",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.160(b)",
+        "CFR-211160B-SOUND-BASIS"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Equivalency with the USP Method",
+      "detail": "The equivalency with the USP Method is not addressed in the provided document. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 23892,
+        "end": 23953,
+        "hash": "8409cfa8cf3b3b51"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 2345,
+        "end": 2448,
+        "hash": "2ff92e400db0f4f1"
+      },
+      "evidence": "1.4.8\nEquivalency with the USP Method ..............................................................23\n",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A",
+        "Q6A-WATER-CONTENT-TEST"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [],
+  "parse_failures": [],
+  "analysis_seconds": 39.2,
+  "stop_reason": "breaker",
+  "budget_exhausted": false
+}

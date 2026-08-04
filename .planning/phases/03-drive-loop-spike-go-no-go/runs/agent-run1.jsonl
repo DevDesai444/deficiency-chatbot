@@ -1,0 +1,14 @@
+{"cached_tokens":0,"completion_tokens":9,"finish_reason":"tool_calls","index":1,"prompt_tokens":2957,"record_type":"turn","timestamp_monotonic":678488.687217833,"turn_index":1,"usage_present":true}
+{"record_type":"tool_call","timestamp_monotonic":678488.731001083,"tool":"read_guideline","turn_index":2}
+{"cached_tokens":0,"completion_tokens":21,"finish_reason":"tool_calls","index":2,"prompt_tokens":3323,"record_type":"turn","timestamp_monotonic":678489.49771525,"turn_index":3,"usage_present":true}
+{"record_type":"tool_call","timestamp_monotonic":678494.66033,"tool":"search_corpus","turn_index":4}
+{"cached_tokens":0,"completion_tokens":18,"finish_reason":"tool_calls","index":3,"prompt_tokens":6576,"record_type":"turn","timestamp_monotonic":678495.519038291,"turn_index":5,"usage_present":true}
+{"record_type":"tool_call","timestamp_monotonic":678495.521665833,"tool":"open_doc","turn_index":6}
+{"cached_tokens":0,"completion_tokens":36,"finish_reason":"tool_calls","index":4,"prompt_tokens":8311,"record_type":"turn","timestamp_monotonic":678496.754973,"turn_index":7,"usage_present":true}
+{"record_type":"tool_call","timestamp_monotonic":678496.775374458,"tool":"get_section","turn_index":8}
+{"cached_tokens":0,"completion_tokens":23,"finish_reason":"tool_calls","index":5,"prompt_tokens":8400,"record_type":"turn","timestamp_monotonic":678497.970785875,"turn_index":9,"usage_present":true}
+{"half":"","reason_code":"not_found","reason_code_known":true,"record_type":"rejection","timestamp_monotonic":678497.986748,"tool":"read_guideline","turn_index":10}
+{"cached_tokens":0,"completion_tokens":24,"finish_reason":"tool_calls","index":6,"prompt_tokens":8520,"record_type":"turn","timestamp_monotonic":678499.2137455,"turn_index":11,"usage_present":true}
+{"half":"","reason_code":"not_found","reason_code_known":true,"record_type":"rejection","timestamp_monotonic":678499.229100416,"tool":"read_guideline","turn_index":12}
+{"cached_tokens":0,"completion_tokens":9,"finish_reason":"tool_calls","index":7,"prompt_tokens":8642,"record_type":"turn","timestamp_monotonic":678499.8930625,"turn_index":13,"usage_present":true}
+{"record_type":"tool_call","timestamp_monotonic":678499.901640583,"tool":"read_guideline","turn_index":14}
