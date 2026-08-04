@@ -215,7 +215,124 @@ def cross_reference_consistency(doc: dict) -> list[Fault]:
     return faults
 
 
-ORACLES = [result_vs_limit, value_vs_inline_limit, cross_reference_consistency]
+_SUMMARY_LABEL_RE = re.compile(r"\b(max|maximum|min|minimum|mean|average|median|rsd|std|sd|total)\b", re.I)
+
+
+def numeric_cross_reference(doc: dict) -> list[Fault]:
+    """T2a (v3.1): a stated column extremum that the tabulated rows contradict.
+
+    Conservative — fires only on an explicit 'Maximum'/'Minimum' summary row whose stated
+    number is beaten (beyond ~1% rounding tolerance) by the real values ABOVE it in the same
+    column (other summary rows excluded). Produces a lead the model re-opens, not an
+    auto-finding. Targets C-01 (Table 20 'Maximum' theoretical plates 11477 vs tabulated
+    12601) and C-02 / MS-02 (stated 'Maximum' 0.15 vs a higher tabulated impurity result).
+    """
+    faults: list[Fault] = []
+    for page in doc.get("pages", []):
+        for table in page.get("tables", []):
+            if table.get("kind") != "grid":
+                continue
+            rows = table.get("rows") or []
+            for ri, row in enumerate(rows):
+                if not row:
+                    continue
+                label = str(row[0] or "").strip()
+                low = label.lower()
+                if not (low.startswith("maximum") or low.startswith("minimum") or low in ("max", "min")):
+                    continue
+                is_max = low.startswith("max")
+                for ci in range(1, len(row)):
+                    stated = parse_number(row[ci])
+                    if stated is None:
+                        continue
+                    col_vals: list[float] = []
+                    for prev in rows[:ri]:  # only the tabulated data ABOVE the summary row
+                        if ci >= len(prev):
+                            continue
+                        if _SUMMARY_LABEL_RE.search(str(prev[0] or "")):
+                            continue  # exclude other summary rows (Mean/Min/Max/RSD/Total)
+                        v = parse_number(prev[ci])
+                        if v is not None:
+                            col_vals.append(v)
+                    if len(col_vals) < 2:
+                        continue
+                    computed = max(col_vals) if is_max else min(col_vals)
+                    tol = max(1e-9, 0.01 * abs(stated))
+                    mismatch = (computed > stated + tol) if is_max else (computed < stated - tol)
+                    if not mismatch:
+                        continue
+                    kind = "maximum" if is_max else "minimum"
+                    faults.append(
+                        Fault(
+                            title=f"Stated {kind} does not match the tabulated column",
+                            detail=f"Row {label!r} states {str(row[ci]).strip()!r}, but the tabulated values in that column reach {computed}.",
+                            category=FlawCategory.SPEC_MISMATCH,
+                            severity=Severity.HIGH,
+                            tier=Tier.VERIFIED,
+                            evidence_class=EvidenceClass.CODE_VERIFIED,
+                            confidence=0.9,
+                            evidence=f"{label}: stated {str(row[ci]).strip()} vs tabulated {computed}",
+                            page=table.get("page", 0),
+                            table_ref=(table.get("title") or "")[:80],
+                            source="oracle:numeric_cross_reference",
+                        )
+                    )
+    return faults
+
+
+_REQUIRED_CATEGORIES = ("Any Unspecified Impurity", "Total Impurities")
+
+
+def expected_row_absent(doc: dict) -> list[Fault]:
+    """T2b (v3.1): a rule-required specification attribute referenced on a page that carries an
+    impurity/result table, but with no tabulated row of its own.
+
+    Conservative — only fires when the page HAS an impurity/result grid table (so the schema
+    is one where the category would be expected as a row) and the required category appears in
+    the page text but is absent from every grid row label. Produces an absence lead the model
+    re-opens against the requiring rule. Targets B-08 ('Any Unspecified Impurity').
+    """
+    faults: list[Fault] = []
+    for page in doc.get("pages", []):
+        tables = [t for t in page.get("tables", []) if t.get("kind") == "grid"]
+        has_impurity_table = any(
+            "impurity" in " ".join(str(h or "") for h in (t.get("headers") or [])).lower()
+            or "result" in " ".join(str(h or "") for h in (t.get("headers") or [])).lower()
+            for t in tables
+        )
+        if not has_impurity_table:
+            continue
+        row_labels = {
+            str(row[0] or "").strip().lower()
+            for t in tables for row in (t.get("rows") or []) if row
+        }
+        text = _page_text(page).lower()
+        for cat in _REQUIRED_CATEGORIES:
+            if cat.lower() in text and cat.lower() not in row_labels:
+                faults.append(
+                    Fault(
+                        title=f"Specification attribute not tabulated as a result row: {cat}",
+                        detail=f"{cat!r} is referenced on a page with an impurity/result table, but no result row is tabulated for it -- verify its precision/coverage against the requiring rule.",
+                        category=FlawCategory.SPEC_INCOMPLETE,
+                        severity=Severity.MEDIUM,
+                        tier=Tier.VERIFIED,
+                        evidence_class=EvidenceClass.CODE_VERIFIED,
+                        confidence=0.7,
+                        evidence=cat,
+                        page=page.get("page_number", 0),
+                        source="oracle:expected_row_absent",
+                    )
+                )
+    return faults
+
+
+ORACLES = [
+    result_vs_limit,
+    value_vs_inline_limit,
+    cross_reference_consistency,
+    numeric_cross_reference,
+    expected_row_absent,
+]
 
 
 def run_oracles(doc: dict) -> list[Fault]:

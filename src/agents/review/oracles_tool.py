@@ -22,15 +22,60 @@ from tools.errors import ToolRejected
 from tools.ledger import RetrievalLedger
 
 
+def _tables_from_index(cache: dict) -> list[dict]:
+    """T1 (v3.1): rebuild grid tables from `cache["table_index"]` (the real structured data the
+    old `_doc_from_cache` dropped). `table_index` maps `"{table_id},{row},{col}" -> SpanID`;
+    each cell's text is `canonical[start:end]`. Row 0 is the header row (serializer convention,
+    serialize.py:31), rows 1.. are data rows. Produces the `kind="grid"` shape the oracle
+    battery consumes (headers + rows), so `result_vs_limit` and the T2 oracles can fire.
+    """
+    table_index = cache.get("table_index") or {}
+    canonical = cache.get("canonical") or ""
+    grouped: dict[str, dict[tuple[int, int], str]] = {}
+    for key, span in table_index.items():
+        parts = key.rsplit(",", 2)  # table_id may itself contain commas; row/col are the last two
+        if len(parts) != 3:
+            continue
+        table_id, r_s, c_s = parts
+        try:
+            r, c = int(r_s), int(c_s)
+        except ValueError:
+            continue
+        start, end = span.get("start"), span.get("end")
+        if start is None or end is None:
+            continue
+        grouped.setdefault(table_id, {})[(r, c)] = canonical[start:end]
+
+    tables: list[dict] = []
+    for table_id, cells in grouped.items():
+        if not cells:
+            continue
+        max_r = max(r for (r, _c) in cells)
+        max_c = max(c for (_r, c) in cells)
+        grid = [[cells.get((r, c), "") for c in range(max_c + 1)] for r in range(max_r + 1)]
+        tables.append({
+            "kind": "grid",
+            "headers": grid[0] if grid else [],
+            "rows": grid[1:] if len(grid) > 1 else [],
+            "page": 1,
+            "title": table_id,
+        })
+    return tables
+
+
 def _doc_from_cache(cache: dict) -> dict:
-    """Rebuild the extract-style document shape deterministic checks consume."""
+    """Rebuild the extract-style document shape deterministic checks consume.
+
+    The flat-text page is preserved as-is (text-based checks still fire) AND the real grid
+    tables are reconstructed from `cache["table_index"]` (T1).
+    """
     text = cache.get("raw_serialized") or cache.get("canonical") or ""
     return {
         "pages": [
             {
                 "page_number": 1,
                 "blocks": [{"text": text, "role": "body", "reading_order": 0}],
-                "tables": [],
+                "tables": _tables_from_index(cache),
             }
         ]
     }

@@ -1,10 +1,32 @@
-# Phase 03 GO/NO-GO Pre-Registration — v3 (post-v2-NO-GO remediation)
+# Phase 03 GO/NO-GO Pre-Registration — v3 / v3.1 (post-v2-NO-GO remediation)
 
-> **Reviewer-approved (S1–S5, §8 r1–r5, §10.3 v3-prefix command) and committed with its own
-> SHA (recorded in `03-PHASE-REPORT.md`, never inside this file — D-GO5); that commit SHA is
-> the governing `prereg_commit_sha`. No scored run may execute against v3 until the reviewer
-> gives the run signal after on-disk verification of this commit.** v2 (`3b63b75`) is closed
-> NO-GO (see `03-19-V2-READING.md`).
+> **Reviewer-approved (S1–S5, §8 r1–r6, §10 preconditions incl. §10.3 v3-prefix command).
+> The GOVERNING `prereg_commit_sha` is the SHA of the latest commit touching THIS file — the
+> v3.1 amendment commit (recorded in `03-PHASE-REPORT.md`, never inside this file — D-GO5),
+> superseding the v3 commit `4b080e4`. No scored run may execute until the reviewer gives the
+> run signal after on-disk verification of the v3.1 commit.** v2 (`3b63b75`) is closed NO-GO
+> (see `03-19-V2-READING.md`).
+
+## v3.1 amendment (T1 + T2 — oracle engagement made real)
+
+The v3 GO on `4b080e4` was **revoked**: `run_oracles` produced 0 leads on both scored
+documents because `_doc_from_cache` (`oracles_tool.py`) set `tables=[]` while
+`cache["table_index"]` carried the real structured data — so S5 was theater on this corpus.
+v3.1 fixes the substrate and adds the missing oracle shapes; **everything else in v3 stands
+unchanged.**
+
+| ID | Change | Files |
+|---|---|---|
+| **T1** | `_doc_from_cache` rebuilds grid tables from `cache["table_index"]` (headers + rows + `kind="grid"`); the flat-text page is preserved so text-based checks still fire. | `src/agents/review/oracles_tool.py` |
+| **T2a** | `numeric_cross_reference` — a stated column extremum contradicted by the tabulated rows above it (conservative: explicit Maximum/Minimum row, >1% tolerance). Targets **C-01** (Table 20 Maximum 11477 vs tabulated 12601) and **C-02/MS-02** (stated Maximum 0.15 vs 0.19). | `src/agents/detection/oracles.py` |
+| **T2b** | `expected_row_absent` — a rule-required attribute (`Any Unspecified Impurity`, `Total Impurities`) referenced on a page carrying an impurity/result table but with no tabulated row. Targets **B-08**. Zero-FP-preferred. | `src/agents/detection/oracles.py` |
+
+**Live-corpus verification (the boundary-crossing composition test S5 never had):**
+`run_oracles_tool` end-to-end on the real scored corpus surfaces leads naming **C-01
+`11477`** (mvr1381) and **C-02 `0.15`** (minispec) — 8 leads on mvr1381, 13 on minispec,
+0 check-errors (was 0/0/0). `tests/agents/review/test_oracle_leads_real_corpus.py` asserts
+≥1 of {11477, 0.15, Any Unspecified Impurity} fires or the build is red. Full suite:
+**504 passed, 11 skipped.**
 
 **Same gate structure and frozen baseline as v1/v2, new SHA, three fresh scored runs.** Only
 the S1–S4 deltas below change; every v1/v2 criterion, rider, and pre-registered reading
@@ -102,6 +124,11 @@ D-ORC2; Pitfall-6 fallback; Pitfall-3 turn-indexed). New for v3:
   D-ORC2 conversion (`leads surfaced / re-opened / emitted`). v2 was 0/0/0 in all runs; v3
   must show `run_oracles` is now called early. If it is called but leads are surfaced and
   not emitted, that is the D-ORC2 low-emit reading (oracles surfacing noise or leads ignored).
+- **(r6) Oracle-lead coverage of missed protected TPs (v3.1).** For each of {C-01, C-02, B-08}
+  **not found** in the run, record whether a `run_oracles` lead **named it** AND whether the
+  model **re-opened** that lead. A v3.1 NO-GO with a recall-driven root cause on a lead we
+  surfaced but the model ignored is a **prompt problem**; one we never surfaced is an
+  **oracle problem**. This localizes any residual miss to the right layer.
 - **(r3) A2 TOC/heading absence-FP count** carried forward (dotted-leader/section-heading
   cited findings per run; v2 was 1/5, 6/12, 3/4). The diagnosis states whether the count fell.
 - **(r4) C-01 watch.** `C-01` (`'11477'`, Table 20) was lost in **all** v2 runs. Per run, if
@@ -129,7 +156,12 @@ Item 5 CLOSED (15/15 dual-resolve). v3 pre-run preconditions:
    `--prereg …03-GO-NOGO-PREREGISTRATION-V3.md` explicitly (run.py default = closed v1) and
    `--run-prefix agent-run-v3-` (v1 `agent-run*` and v2 `agent-run-v2*` artifacts are
    immutable evidence; a colliding prefix would overwrite them). After run 1, confirm its
-   summary's `prereg_commit_sha` equals the v3 amendment SHA before runs 2-3.
+   summary's `prereg_commit_sha` equals the **v3.1** commit SHA before runs 2-3.
+4. **Oracle-lead pre-flight (v3.1).** Immediately before run 1, `run_oracles_tool` on the
+   scored corpus MUST return at least one lead whose text names {C-01 `11477`, C-02 `0.15`,
+   or B-08 `Any Unspecified Impurity`}'s anchor. **Empty / no-target leads = STOP, no runs**
+   (the oracle substrate regressed). Same assertion as `test_oracle_leads_real_corpus.py`,
+   run live against the installed corpus, alongside the §10.1 15/15 + 30/30 probes.
 
    ```
    .venv/bin/python -m evals.run agent-run \
@@ -144,8 +176,9 @@ Item 5 CLOSED (15/15 dual-resolve). v3 pre-run preconditions:
 
 ## 11. Amendment clause (D-GO5) — UNCHANGED
 
-Amending after any spike run begins voids the run set. The v3 commit SHA (recorded in
-`03-PHASE-REPORT.md`, never inside this file) is the governing `prereg_commit_sha`.
+Amending after any spike run begins voids the run set. The **v3.1** commit SHA — the latest
+commit touching this file, recorded in `03-PHASE-REPORT.md`, never inside this file — is the
+governing `prereg_commit_sha`, superseding the v3 commit `4b080e4`.
 
 ---
 
