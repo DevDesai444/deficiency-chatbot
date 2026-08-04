@@ -137,7 +137,7 @@ preconditions:**
    .venv/bin/python -m evals.run agent-run \
      --model databricks-meta-llama-3-3-70b-instruct \
      --run-index <1|2|3> \
-     --run-prefix agent-run \
+     --run-prefix agent-run-v2- \
      --max-tokens 1600000 \
      --max-wall-clock 600 \
      --max-turns 80 \
@@ -145,6 +145,11 @@ preconditions:**
      --out-dir .planning/phases/03-drive-loop-spike-go-no-go/runs \
      --prereg .planning/phases/03-drive-loop-spike-go-no-go/03-GO-NOGO-PREREGISTRATION-V2.md
    ```
+
+   The prefix is **`agent-run-v2-`** (artifacts `agent-run-v2-{N}.json` / `.jsonl` /
+   `-summary.json`), NOT `agent-run`: the v1 `agent-run{1,2,3}.*` artifacts in `runs/` are
+   immutable evidence cited by `03-19-EVIDENCE.md`, and reusing the v1 prefix would overwrite
+   them (`run.py`'s `artifact_stem` is `{prefix}{run_index}`).
 
    After run 1, confirm its summary's `prereg_commit_sha` equals this amendment's SHA
    (recorded in `03-PHASE-REPORT.md`) before runs 2-3 proceed.
