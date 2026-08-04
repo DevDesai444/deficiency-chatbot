@@ -172,10 +172,11 @@ def test_zero_translation_citation_round_trip(monkeypatch, fresh_ledger):
     assert not fetch_result.startswith("[STILL_CURRENT]")
 
 
-def test_rule_doc_id_fallback_resolves_when_citation_has_no_store_match(monkeypatch, fresh_ledger):
-    """The verification-queue item 5 fix's OTHER half: an enumerate row whose `citation` is
-    subsection-granular (does NOT match any `lookup_citation` key -- exactly the real
-    requirement_index.yaml's shape) still resolves in fetch mode via its `rule_doc_id`."""
+def test_both_advertised_identifiers_resolve_in_fetch_mode(monkeypatch, fresh_ledger):
+    """R1 (03-19) contract: EVERY identifier an enumerate row advertises resolves in fetch
+    mode -- both the subsection-granular display `citation` (via the requirement-index
+    citation-display -> provenance doc_id map leg) AND the `rule_doc_id`. (The unresolvable
+    `not_found` path is covered by tests/tools/test_read_guideline_dual_resolve.py.)"""
     from rulebook.build import build_ecfr
 
     errors = [r for r in build_ecfr(update_manifest=False) if "error" in r]
@@ -195,14 +196,16 @@ def test_rule_doc_id_fallback_resolves_when_citation_has_no_store_match(monkeypa
         "rule_doc_id": "ecfr-211.166", "trigger": "test trigger",
     }]
 
-    # round-tripping the display `citation` still 404s (subsection granularity, unchanged data) --
-    # this is the honest, still-true half of the pre-fix behavior.
-    citation_result = read_guideline(CoverageManifest(), fresh_ledger, citation=rows[0]["citation"])
-    assert isinstance(citation_result, ToolRejected)
-    assert citation_result.reason_code == "not_found"
+    # R1: round-tripping the display `citation` now RESOLVES via the requirement-index
+    # citation-display -> provenance doc_id map leg (the 03-19 remediation). A fresh ledger
+    # per resolve, because both identifiers point at the SAME doc (ecfr-211.166) and a shared
+    # ledger would return the COST-04 [STILL_CURRENT] served-stub on the second call.
+    citation_result = read_guideline(CoverageManifest(), RetrievalLedger(), citation=rows[0]["citation"])
+    assert isinstance(citation_result, str)
+    assert citation_result.startswith("[ecfr-211.166:")
 
-    # but the NEW `rule_doc_id` field resolves -- this is the fix.
-    doc_id_result = read_guideline(CoverageManifest(), fresh_ledger, citation=rows[0]["rule_doc_id"])
+    # and the `rule_doc_id` field resolves too (the v3 leg, unchanged).
+    doc_id_result = read_guideline(CoverageManifest(), RetrievalLedger(), citation=rows[0]["rule_doc_id"])
     assert isinstance(doc_id_result, str)
     assert doc_id_result.startswith("[ecfr-211.166:")
 

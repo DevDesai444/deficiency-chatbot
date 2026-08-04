@@ -18,7 +18,9 @@ Rejections are instructions. If a tool result begins with REJECTED, read the HIN
 
 cross_document_resolution_pending_phase_4 is a declared Phase-4 capability boundary. Do not retry that reference. Continue with other evidence.
 
-run_oracles returns leads, not findings. Re-open each lead with get_section before citing it."""
+run_oracles returns leads, not findings. Re-open each lead with get_section before citing it.
+
+Before you claim a topic, requirement, or parameter is not addressed, open the relevant section with get_section and read it. A contents entry or a heading line naming the topic is evidence the topic is PRESENT, not absent -- locate and read the actual content before concluding it is missing."""
 
 NUDGE = "Keep working -- do not summarize."
 

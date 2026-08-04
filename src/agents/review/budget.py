@@ -34,6 +34,9 @@ class BudgetLedger:
     max_wall_clock_s: float
     max_turns: int = 50
     dr_window: int = 3
+    dr_grace_turns: int = 5  # R2 (03-19): DR is armed only AFTER turn 5 -- a rejection-heavy
+    #                          start must not guillotine exploration before it begins. The
+    #                          circuit breaker is unchanged and still fires during the grace window.
     breaker_repeat: int = 3
     breaker_same_class: int = 4
     max_continuations: int = 5
@@ -116,6 +119,14 @@ class BudgetLedger:
         return self.turns >= self.max_turns
 
     def in_diminishing_returns(self) -> bool:
+        # R2 (03-19): DR grace -- during run-turns 1..dr_grace_turns the stop is NOT armed, so an
+        # early rejection-heavy stretch cannot guillotine exploration before it begins. Gated on
+        # `0 < turns <= grace`: in a real run `turns` is >=1 whenever the window is full (the loop
+        # increments it via record_turn before productivity is recorded), so grace applies as
+        # intended; the `turns > 0` clause preserves the pure window-predicate contract for a
+        # synthetic turns==0 ledger. The circuit breaker is intentionally NOT grace-gated.
+        if 0 < self.turns <= self.dr_grace_turns:
+            return False
         if len(self._productivity) < self.dr_window:
             return False
         return not any(self._productivity[-self.dr_window :])

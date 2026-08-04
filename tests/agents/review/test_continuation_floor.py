@@ -94,7 +94,9 @@ def test_nudge_on_premature_stop(tmp_path):
 
 
 def test_nudge_bounded_by_dr(tmp_path):
-    budget = BudgetLedger(max_tokens=1_000_000, max_wall_clock_s=999, dr_window=1, max_continuations=5)
+    # dr_grace_turns=0 isolates the DR<->nudge interaction from the R2 (03-19) grace window,
+    # which has its own coverage in tests/agents/review/test_dr_grace.py.
+    budget = BudgetLedger(max_tokens=1_000_000, max_wall_clock_s=999, dr_window=1, max_continuations=5, dr_grace_turns=0)
     corpus, ledger, budget, telemetry, registry = _parts(tmp_path, budget=budget)
     client = ScriptedChatClient([_stop_turn(), _turn(make_tool_call("open_doc", {"doc_id": "missing"})), _stop_turn()])
 

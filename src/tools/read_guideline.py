@@ -71,28 +71,64 @@ def _render_annotated_rulebook(
     return "\n".join(out)
 
 
-def _fetch_citation(citation: str, ledger: RetrievalLedger, max_chars: int) -> str | ToolRejected:
-    # Dual-resolve (D-RI2/D-EF1(5), requirement-index v3): try the real whole-document store
-    # citation FIRST (e.g. "21 CFR 211.166" -- Plan 02-03's vendored citation keys), so that
-    # path is preserved byte-for-byte. Only if that misses, fall back to treating `citation` as
-    # a rulebook doc_id directly (e.g. "ecfr-211.166") -- the shape `read_guideline`'s enumerate
-    # mode now hands back as `rule_doc_id`, which `load_requirement_index`'s loader gate already
-    # guarantees resolves in the store for every requirement-index entry. Never invents a third
-    # translation -- both are pre-existing, independently resolvable keys.
+def _requirement_citation_doc_ids() -> dict[str, str]:
+    """Requirement-index `citation` display string -> that entry's provenance doc_id, built
+    from the index at call time (`load_requirement_index` is itself lru-cached, and building
+    this dict fresh keeps it consistent with the index across a test's cache_clear/rebuild).
+
+    This is the R1 third resolve leg: enumerate rows advertise a `citation` that is a rich,
+    subsection/glossary-granular DISPLAY string (e.g. "ICH Q2(R2) -- Glossary: Specificity")
+    which matches neither `lookup_citation`'s whole-document keys nor a rulebook doc_id, so a
+    model that round-tripped `row['citation']` into fetch mode got `not_found` for all 15
+    real entries (the 03-19 NO-GO root cause). Mapping it to the entry's own
+    `provenance_span_id.doc_id` -- loader-gate-guaranteed store-resolvable -- makes every
+    identifier the tool advertises resolvable in fetch mode.
+    """
+    from rulebook.requirement_index import load_requirement_index
+
+    return {e.citation: e.provenance_span_id.doc_id for e in load_requirement_index()}
+
+
+def _resolve_rule_doc(citation: str) -> tuple[str, NormalizedText] | tuple[None, None]:
+    """Triple-resolve any identifier the tool advertises, in order (R1):
+      leg 1  lookup_citation(arg)                      -- real whole-document store citation
+                                                          (e.g. "21 CFR 211.166"), preserved.
+      leg 2  requirement-index citation-display map    -- enumerate `citation` strings.
+      leg 3  rulebook_nt_for(arg) as a doc_id          -- enumerate `rule_doc_id` strings
+                                                          (e.g. "ecfr-211.166").
+    Returns (doc_id, nt) on the first leg that yields persisted canonical text, else (None, None).
+    """
     chunk = lookup_citation(citation)
     if chunk is not None:
-        doc_id = chunk.doc_id
-        nt = rulebook_nt_for(doc_id)
-        if nt is None:
-            return ToolRejected(tool="read_guideline", reason_code="not_found",
-                                 reason=f"chunk {doc_id!r} has no persisted canonical text", hint="")
-    else:
-        doc_id = citation
-        nt = rulebook_nt_for(doc_id)
-        if nt is None:
-            return ToolRejected(tool="read_guideline", reason_code="not_found",
-                                 reason=f"{citation!r} does not resolve to any vendored rulebook chunk -- checked both the store citation index and as a doc_id",
-                                 hint="call read_guideline() with no citation to see the applicable requirement index (its 'citation' and 'rule_doc_id' fields are both usable here)")
+        nt = rulebook_nt_for(chunk.doc_id)
+        if nt is not None:
+            return chunk.doc_id, nt
+
+    mapped = _requirement_citation_doc_ids().get(citation)
+    if mapped is not None:
+        nt = rulebook_nt_for(mapped)
+        if nt is not None:
+            return mapped, nt
+
+    nt = rulebook_nt_for(citation)
+    if nt is not None:
+        return citation, nt
+
+    return None, None
+
+
+def _fetch_citation(citation: str, ledger: RetrievalLedger, max_chars: int) -> str | ToolRejected:
+    doc_id, nt = _resolve_rule_doc(citation)
+    if nt is None:
+        # Teach the recovery path -- run 2 (03-18) retried the identical failing call 4x until
+        # the breaker stopped it, so the rejection must redirect the model, not just report.
+        return ToolRejected(
+            tool="read_guideline", reason_code="not_found",
+            reason=f"citation {citation!r} not resolvable -- checked the store citation index, "
+                   f"the requirement-index citation map, and as a rule_doc_id",
+            hint="call read_guideline with no arguments to enumerate, then pass a rule_doc_id "
+                 "from the returned rows -- do not retry this same call",
+        )
 
     start, end = 0, len(nt.canonical)
     if end - start > max_chars:
