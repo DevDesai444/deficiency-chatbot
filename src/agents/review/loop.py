@@ -160,7 +160,11 @@ def _record_dispatch_telemetry(telemetry: TurnLog, result: DispatchResult) -> No
         telemetry.repair(result.repair_layer, result.tool)
     if isinstance(result.raw_result, ToolRejected):
         telemetry.rejection(result.tool, result.raw_result.reason_code, result.raw_result.half)
-    elif result.tool == "run_oracles" and isinstance(result.raw_result, list):
+        return
+    # A non-rejected dispatch gets a typed tool_call row so the JSONL row count reconciles
+    # with BudgetLedger.total_tool_calls (tool_call rows + rejection rows == ledger total).
+    telemetry.tool_call(result.tool)
+    if result.tool == "run_oracles" and isinstance(result.raw_result, list):
         telemetry.oracle_leads(len(result.raw_result))
 
 

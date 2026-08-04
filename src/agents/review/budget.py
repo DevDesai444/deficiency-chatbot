@@ -81,6 +81,16 @@ class BudgetLedger:
     def record_tool_call(self, tool: str, args: dict[str, Any]) -> None:
         self._tool_calls.append((tool, _canonical_json(args)))
 
+    @property
+    def total_tool_calls(self) -> int:
+        """Authoritative dispatched-tool-call count for telemetry (read by
+        telemetry.RunSummary.from_turns). Returns len(self._tool_calls) -- the SAME list
+        the D-BUD3 identical-args breaker reads in breaker_tripped(), so the reported count
+        and the breaker can never drift. `_tool_calls` is recorded per dispatch that passed
+        arg validation (registry.py:242, before the tool executes), so this counts every
+        real dispatch whether the tool then accepts or rejects it."""
+        return len(self._tool_calls)
+
     def record_rejection(self, reason_code: str, half: str) -> None:
         key = (reason_code, half)
         self._rejections.append(key)

@@ -200,6 +200,11 @@ class TurnLog:
             fields["findings_after"] = findings_after
         self._append("continuation", fields)
 
+    def tool_call(self, tool: str) -> None:
+        """One row per NON-rejected dispatch. Paired with rejection() rows so that
+        (tool_call rows + rejection rows) reconciles with BudgetLedger.total_tool_calls."""
+        self._append("tool_call", {"tool": tool})
+
     def rejection(self, tool: str, reason_code: str, half: str) -> None:
         self._append(
             "rejection",
