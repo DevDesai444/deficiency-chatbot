@@ -1,0 +1,191 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Equivalency with USP Method Not Fully Documented",
+      "detail": "The submission does not fully document the equivalency of the analytical procedure with the USP method as required by 21 CFR 211.194(a)(5). [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.194",
+        "start": 1089,
+        "end": 1182,
+        "hash": "2256c03063917fef"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 2345,
+        "end": 2448,
+        "hash": "2ff92e400db0f4f1"
+      },
+      "evidence": "1.4.8\nEquivalency with the USP Method ..............................................................23\n",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.194(a)(5)",
+        "CFR-211194-CALCULATIONS"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Water Content Test Not Fully Documented",
+      "detail": "The submission does not fully document the water content test as required by ICH Q6A -- 3.3(e) Water Content. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 23954,
+        "end": 24000,
+        "hash": "8de85c1f07b6cebc"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A -- 3.3(e) Water Content",
+        "Q6A-WATER-CONTENT-TEST"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Water Content Specification Not Fully Documented",
+      "detail": "The submission does not fully document the water content specification as required by 21 CFR 211.160(b). [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.160",
+        "start": 692,
+        "end": 1048,
+        "hash": "8a6be33e2c655bc8"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.160(b)",
+        "CFR-211160B-SOUND-BASIS"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Specified Impurity Not Fully Documented",
+      "detail": "The submission does not fully document the specified impurity as required by ICH Q3A(R2) -- Glossary: Specified Impurity. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q3A-R2",
+        "start": 23077,
+        "end": 23139,
+        "hash": "839591a6e9515a96"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q3A(R2) -- Glossary: Specified Impurity",
+        "Q3A-SPECIFIED-IMPURITY-COMPLETENESS"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Impurity Acceptance Criteria Not Fully Documented",
+      "detail": "The submission does not fully document the impurity acceptance criteria as required by ICH Q3A(R2). [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q3A-R2",
+        "start": 15246,
+        "end": 15453,
+        "hash": "48dcb8f770a3e7bc"
+      },
+      "submission_span_id": {
+        "doc_id": "minispec",
+        "start": 0,
+        "end": 236,
+        "hash": "6aacaa6142f808ab"
+      },
+      "evidence": "Mini Impurities Specification - Mock Drug Substance\nThis specification lists acceptance criteria for named and unspecified impurities observed in a mock drug-substance batch, used to validate the eval harness's DOCX-format ground truth.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q3A(R2)",
+        "Q3A-SPECIFIED-IMPURITY-COMPLETENESS"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [],
+  "parse_failures": [],
+  "analysis_seconds": 113.4,
+  "stop_reason": "diminishing-returns",
+  "budget_exhausted": false
+}

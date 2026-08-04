@@ -1,0 +1,63 @@
+{
+  "billed_tokens": 930289,
+  "cached_tokens": 0,
+  "continuation_count": 1,
+  "dedup_hit_rate": 0.25,
+  "embedding_time_s": 25.998581459047273,
+  "findings_before_after_each_nudge": [
+    [
+      1,
+      5
+    ]
+  ],
+  "first_malformed_turn_index": 0,
+  "has_unrecognized_reason_codes": false,
+  "malformed_trailing_turn_lines": 0,
+  "max_continuations_permitted": 5,
+  "model_time_s": 86.8052837079158,
+  "oracle_leads_emitted": 0,
+  "oracle_leads_reopened": 0,
+  "oracle_leads_surfaced": 0,
+  "post_repair_malformed": 0,
+  "post_repair_malformed_rate": 0.0,
+  "pre_repair_malformed": 0,
+  "pre_repair_malformed_rate": 0.0,
+  "provenance": {
+    "abort_reason": "",
+    "baseline_path": "src/evals/baseline/recall_by_family.json",
+    "baseline_sha256": "e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3",
+    "code_head_sha": "3b63b750caa8b6e4cac53e27a5e13789af7782c0",
+    "corpus_content_hash": "a48174cc0080f673234d1820893706ee9f8e1bd56dd787ffe43816ef7df7e364",
+    "found_set": [
+      "A-08"
+    ],
+    "harness_version": "1",
+    "matcher_content_sha256": "e7857edf3f5c1579e27d95f8cf5c086a9e20a443268ef35de01429c488f2c0ca",
+    "matcher_version": "1",
+    "model_id": "databricks-meta-llama-3-3-70b-instruct",
+    "normalizer_version": "nfc-wscollapse-gdehyph-lig/1-lex1",
+    "parser_version": "pymupdf-blocks/2",
+    "prereg_commit_sha": "3b63b750caa8b6e4cac53e27a5e13789af7782c0",
+    "run_completed": true,
+    "run_index": 1,
+    "serializer_version": "reading-order-cells/1",
+    "working_tree_dirty": true
+  },
+  "rejections_by_code_half": {
+    "not_found|": 1,
+    "range_too_large|": 4
+  },
+  "rule_never_read_count": 0,
+  "span_invention_count": 0,
+  "stop_reason": "diminishing-returns",
+  "tokens_at_each_attempted_stop": [
+    49168
+  ],
+  "tool_execution_time_s": 26.562857086071745,
+  "total_tool_calls": 33,
+  "turns": 35,
+  "unrecognized_reason_codes": {},
+  "usage_missing_turns": 0,
+  "wall_clock_s": 113.7526735420106,
+  "which_bound_ended_nudging": "diminishing_returns"
+}

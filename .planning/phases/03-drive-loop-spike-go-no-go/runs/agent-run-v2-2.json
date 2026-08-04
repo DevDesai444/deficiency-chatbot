@@ -1,0 +1,431 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Failure to establish procedure for testing and release for distribution",
+      "detail": "The document does not provide evidence of a procedure for testing and release for distribution as required by 21 CFR 211.165 [verdict: violation]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "violation",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.165",
+        "start": 0,
+        "end": 47,
+        "hash": "045613b05b8f8fb0"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 28009,
+        "end": 28502,
+        "hash": "17e208901088bdc8"
+      },
+      "evidence": "The\nsample solutions were analyzed as per the analytical procedure. The results are tabulated in Table 13\nand the typical chromatogram of method precision is exhibited in Appendix 14.\nAcceptance Criteria\nThe mean recovery of known impurity in drug substance should be within 80.0% and 120.0% in\neach sample. The % RSD of each impurity recovered from six sample preparations should be NMT\n10.0.\nConclusion\nThe results indicate the analytical procedure is precise for its intended use.\nTable 13.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.165"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Stability testing program not fully described",
+      "detail": "The stability testing program is not fully described in the document, as required by 21 CFR 211.166 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.166",
+        "start": 0,
+        "end": 28,
+        "hash": "d897822df9f3b23b"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 31744,
+        "end": 32539,
+        "hash": "bde04f7dae30938d"
+      },
+      "evidence": "# 213030280\t\t\t\nDate: 12/09/14\t\t\t\tDate: 12/10/14\t\t\t\nReference: Notebook # 8133, Page # 40, 47,\n48, 49\t\t\t\tReference: Notebook # 8135, Page # 39, 46, 47, 48\t\t\t\n1.4.7\nStability of Analytical Solutions\nThe stability was evaluated for the Standard and Sample solutions. The standard solution and the\nsample solution spiked with the impurities at the specification level were prepared and analyzed as\nper the analytical procedure over a period of time using freshly prepared standard solution.\nTo determine stability of the Standard and Sample solution, the Standard solution were prepared and\nanalyzed as per the analytical procedure up to 72 hours and the sample solution were prepared and\nanalyzed up to 72 hours against the freshly prepared standard solutions. The results are summarized\nin Table 16 and Table 17.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.166"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Equipment calibration and maintenance not fully described",
+      "detail": "The document does not provide a detailed description of equipment calibration and maintenance, as required by 21 CFR 211.68 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.68",
+        "start": 0,
+        "end": 57,
+        "hash": "0b71c224a4c7baa0"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 35241,
+        "end": 36022,
+        "hash": "758d5ae801946991"
+      },
+      "evidence": "The tests are based on the\nconcept that the equipment, analytical operations and samples to be analyzed constitute an integral\nsystem that can be evaluated as such. The system suitability data from overall validation study is\ncompiled in the form of minimum, maximum and average. The results are reported in Table 20.\nshould be comparable between In house method and USP method and all unknown and known \nimpurity should be within the specification.\n\tParameters\t\tUSP Method\t\tAmneal’s Method\n\t\t\t\t\t\nSystem\nSuitability\t\t• The relative standard deviation for replicate\ninjections is not more than 2.0%.\n• The tailing factor is not more than 1.5.\n• The resolution between Estradiol and any\nimpurity peak should is not less than 1.0.\n• The column efficiency is not less than 800\ntheoretical plates.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.68"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Laboratory control procedures not fully described",
+      "detail": "The document does not provide a detailed description of laboratory control procedures, as required by 21 CFR 211.160 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.160",
+        "start": 0,
+        "end": 31,
+        "hash": "537f8e73ddd0929f"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 16228,
+        "end": 16869,
+        "hash": "2917a172be0eba67"
+      },
+      "evidence": "Specificity of the method was established by analyzing diluent, individual impurity, impurity\nmixture, control sample and sample solution spiked with impurities. The specificity results are\ntabulated in Table 2.\nThe following standards and samples were used for the Verification study.\nName\tLot No.\tCross reference COA\nEstradiol, USP Reference Standard\tN0J191\n(Purity: 99.9%)\tAppendix 1\nΔ9,11-Estradiol\tRY-5-031-c-01S-032713\n(Purity: 98.4%)\tAppendix 2\n17 α-Estradiol\t113M4057V\n(Purity: 99.50%)\tAppendix 3\nEstrone, USP Reference Standard\tL0F119\n(Purity: 99.9%)\tAppendix 4\nEstradiol, USP (Hemihydrate, Micronized)\tL00036941\tAppendix 5\nTable 2.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.160"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Quality control unit responsibilities not fully described",
+      "detail": "The document does not provide a detailed description of quality control unit responsibilities, as required by 21 CFR 211.22 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.22",
+        "start": 0,
+        "end": 50,
+        "hash": "b22afc618558bae8"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 0,
+        "end": 2852,
+        "hash": "154e40d38f8b6822"
+      },
+      "evidence": "PHARMACEUT I CALS\n3.2.S.4.3 VERIFICATION OF ANALYTICAL PROCEDURE FOR\nRELATED COMPOUNDS\nDOCUMENT APPROVAL PAGE\nMaterial N arne: Estradiol, USP (Hemihydrate, Micronized)\t\t\nMethod No.: 1381-RC\tVerification Report No.: MVR-1381-RC\tVersion No.: 02\nPrepared By: 5- t~ MP- Date: OS j 06[2-01 b\nSumana Giddu- Analytical R&D\t\t\n~ :\nI\ns oG (:wl6\nReviewed By: Date: 0\nSasi Padala ; lytic~ R&D\t\t\n(~\nReviewed By: Date: cJs:j oct {2o 1- t\n1\nHitesh Patel- Analytical R&D\t\t\n~ ~vvvv~\nReviewed By: , Date: 0 S I o9/'LOt _,G\nVamsi Koppuri- Analytical R&D\t\t\n~\nApproved By: Date: osl.b512(Jl'-\nBhavika Patel- Analytical R&D\t\t\n~~\nApproved By: Date: o~(o,:J-016,\nJitendra Patel- Quality Management\t\t\nTABLE OF CONTENTS\n1\nVERIFICATION OF ANALYTICAL PROCEDURE FOR RELATED COMPOUNDS 4\n1.1\nIntroduction ..............................................................................................................4\n1.2\nStandards and Samples Used in Verification Study ................................................9\n1.3\nProtocol Deviation ...................................................................................................9\n1.4\nVerification Parameters ...........................................................................................9\n1.4.1\nSpecificity ......................................................................................................9\n1.4.2\nLinearity .......................................................................................................10\n1.4.3\nLimit of Detection ........................................................................................14\n1.4.4\nLimit of Quantitation ...................................................................................15\n1.4.5\nAbsorptivity Factor ......................................................................................17\n1.4.6\nPrecision .......................................................................................................17\n1.4.6.1\nSystem Precision ................................................................................18\n1.4.6.2\nMethod Precision ...............................................................................19\n1.4.6.3\nIntermediate Precision (Ruggedness Study) ......................................20\n1.4.7\nStability of Analytical Solutions ..................................................................22\n1.4.8\nEquivalency with the USP Method ..............................................................23\n1.4.9\nSystem Suitability ........................................................................................24\n1.5\nConclusions ............................................................................................................26\n1.6\nHistory....................................................................................................................54\nLIST OF IN-TEXT TABLES\nTable 1.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.22"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Production record review not fully described",
+      "detail": "The document does not provide a detailed description of production record review, as required by 21 CFR 211.192 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.192",
+        "start": 0,
+        "end": 35,
+        "hash": "c412fa16b0810165"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 0,
+        "end": 2852,
+        "hash": "154e40d38f8b6822"
+      },
+      "evidence": "PHARMACEUT I CALS\n3.2.S.4.3 VERIFICATION OF ANALYTICAL PROCEDURE FOR\nRELATED COMPOUNDS\nDOCUMENT APPROVAL PAGE\nMaterial N arne: Estradiol, USP (Hemihydrate, Micronized)\t\t\nMethod No.: 1381-RC\tVerification Report No.: MVR-1381-RC\tVersion No.: 02\nPrepared By: 5- t~ MP- Date: OS j 06[2-01 b\nSumana Giddu- Analytical R&D\t\t\n~ :\nI\ns oG (:wl6\nReviewed By: Date: 0\nSasi Padala ; lytic~ R&D\t\t\n(~\nReviewed By: Date: cJs:j oct {2o 1- t\n1\nHitesh Patel- Analytical R&D\t\t\n~ ~vvvv~\nReviewed By: , Date: 0 S I o9/'LOt _,G\nVamsi Koppuri- Analytical R&D\t\t\n~\nApproved By: Date: osl.b512(Jl'-\nBhavika Patel- Analytical R&D\t\t\n~~\nApproved By: Date: o~(o,:J-016,\nJitendra Patel- Quality Management\t\t\nTABLE OF CONTENTS\n1\nVERIFICATION OF ANALYTICAL PROCEDURE FOR RELATED COMPOUNDS 4\n1.1\nIntroduction ..............................................................................................................4\n1.2\nStandards and Samples Used in Verification Study ................................................9\n1.3\nProtocol Deviation ...................................................................................................9\n1.4\nVerification Parameters ...........................................................................................9\n1.4.1\nSpecificity ......................................................................................................9\n1.4.2\nLinearity .......................................................................................................10\n1.4.3\nLimit of Detection ........................................................................................14\n1.4.4\nLimit of Quantitation ...................................................................................15\n1.4.5\nAbsorptivity Factor ......................................................................................17\n1.4.6\nPrecision .......................................................................................................17\n1.4.6.1\nSystem Precision ................................................................................18\n1.4.6.2\nMethod Precision ...............................................................................19\n1.4.6.3\nIntermediate Precision (Ruggedness Study) ......................................20\n1.4.7\nStability of Analytical Solutions ..................................................................22\n1.4.8\nEquivalency with the USP Method ..............................................................23\n1.4.9\nSystem Suitability ........................................................................................24\n1.5\nConclusions ............................................................................................................26\n1.6\nHistory....................................................................................................................54\nLIST OF IN-TEXT TABLES\nTable 1.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.192"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Laboratory records not fully described",
+      "detail": "The document does not provide a detailed description of laboratory records, as required by 21 CFR 211.194 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.194",
+        "start": 0,
+        "end": 29,
+        "hash": "ad63ec89c516542d"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 0,
+        "end": 2852,
+        "hash": "154e40d38f8b6822"
+      },
+      "evidence": "PHARMACEUT I CALS\n3.2.S.4.3 VERIFICATION OF ANALYTICAL PROCEDURE FOR\nRELATED COMPOUNDS\nDOCUMENT APPROVAL PAGE\nMaterial N arne: Estradiol, USP (Hemihydrate, Micronized)\t\t\nMethod No.: 1381-RC\tVerification Report No.: MVR-1381-RC\tVersion No.: 02\nPrepared By: 5- t~ MP- Date: OS j 06[2-01 b\nSumana Giddu- Analytical R&D\t\t\n~ :\nI\ns oG (:wl6\nReviewed By: Date: 0\nSasi Padala ; lytic~ R&D\t\t\n(~\nReviewed By: Date: cJs:j oct {2o 1- t\n1\nHitesh Patel- Analytical R&D\t\t\n~ ~vvvv~\nReviewed By: , Date: 0 S I o9/'LOt _,G\nVamsi Koppuri- Analytical R&D\t\t\n~\nApproved By: Date: osl.b512(Jl'-\nBhavika Patel- Analytical R&D\t\t\n~~\nApproved By: Date: o~(o,:J-016,\nJitendra Patel- Quality Management\t\t\nTABLE OF CONTENTS\n1\nVERIFICATION OF ANALYTICAL PROCEDURE FOR RELATED COMPOUNDS 4\n1.1\nIntroduction ..............................................................................................................4\n1.2\nStandards and Samples Used in Verification Study ................................................9\n1.3\nProtocol Deviation ...................................................................................................9\n1.4\nVerification Parameters ...........................................................................................9\n1.4.1\nSpecificity ......................................................................................................9\n1.4.2\nLinearity .......................................................................................................10\n1.4.3\nLimit of Detection ........................................................................................14\n1.4.4\nLimit of Quantitation ...................................................................................15\n1.4.5\nAbsorptivity Factor ......................................................................................17\n1.4.6\nPrecision .......................................................................................................17\n1.4.6.1\nSystem Precision ................................................................................18\n1.4.6.2\nMethod Precision ...............................................................................19\n1.4.6.3\nIntermediate Precision (Ruggedness Study) ......................................20\n1.4.7\nStability of Analytical Solutions ..................................................................22\n1.4.8\nEquivalency with the USP Method ..............................................................23\n1.4.9\nSystem Suitability ........................................................................................24\n1.5\nConclusions ............................................................................................................26\n1.6\nHistory....................................................................................................................54\nLIST OF IN-TEXT TABLES\nTable 1.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.194"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Complaint files not fully described",
+      "detail": "The document does not provide a detailed description of complaint files, as required by 21 CFR 211.198 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.198",
+        "start": 0,
+        "end": 26,
+        "hash": "86840bda8ed31200"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 0,
+        "end": 2852,
+        "hash": "154e40d38f8b6822"
+      },
+      "evidence": "PHARMACEUT I CALS\n3.2.S.4.3 VERIFICATION OF ANALYTICAL PROCEDURE FOR\nRELATED COMPOUNDS\nDOCUMENT APPROVAL PAGE\nMaterial N arne: Estradiol, USP (Hemihydrate, Micronized)\t\t\nMethod No.: 1381-RC\tVerification Report No.: MVR-1381-RC\tVersion No.: 02\nPrepared By: 5- t~ MP- Date: OS j 06[2-01 b\nSumana Giddu- Analytical R&D\t\t\n~ :\nI\ns oG (:wl6\nReviewed By: Date: 0\nSasi Padala ; lytic~ R&D\t\t\n(~\nReviewed By: Date: cJs:j oct {2o 1- t\n1\nHitesh Patel- Analytical R&D\t\t\n~ ~vvvv~\nReviewed By: , Date: 0 S I o9/'LOt _,G\nVamsi Koppuri- Analytical R&D\t\t\n~\nApproved By: Date: osl.b512(Jl'-\nBhavika Patel- Analytical R&D\t\t\n~~\nApproved By: Date: o~(o,:J-016,\nJitendra Patel- Quality Management\t\t\nTABLE OF CONTENTS\n1\nVERIFICATION OF ANALYTICAL PROCEDURE FOR RELATED COMPOUNDS 4\n1.1\nIntroduction ..............................................................................................................4\n1.2\nStandards and Samples Used in Verification Study ................................................9\n1.3\nProtocol Deviation ...................................................................................................9\n1.4\nVerification Parameters ...........................................................................................9\n1.4.1\nSpecificity ......................................................................................................9\n1.4.2\nLinearity .......................................................................................................10\n1.4.3\nLimit of Detection ........................................................................................14\n1.4.4\nLimit of Quantitation ...................................................................................15\n1.4.5\nAbsorptivity Factor ......................................................................................17\n1.4.6\nPrecision .......................................................................................................17\n1.4.6.1\nSystem Precision ................................................................................18\n1.4.6.2\nMethod Precision ...............................................................................19\n1.4.6.3\nIntermediate Precision (Ruggedness Study) ......................................20\n1.4.7\nStability of Analytical Solutions ..................................................................22\n1.4.8\nEquivalency with the USP Method ..............................................................23\n1.4.9\nSystem Suitability ........................................................................................24\n1.5\nConclusions ............................................................................................................26\n1.6\nHistory....................................................................................................................54\nLIST OF IN-TEXT TABLES\nTable 1.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.198"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Impurity profiles not fully described",
+      "detail": "The document does not provide a detailed description of impurity profiles, as required by ICH Q3A(R2) [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q3A-R2",
+        "start": 8000,
+        "end": 8045,
+        "hash": "fe4089beb8410418"
+      },
+      "submission_span_id": {
+        "doc_id": "minispec",
+        "start": 0,
+        "end": 439,
+        "hash": "241efa9be7bb8dda"
+      },
+      "evidence": "Mini Impurities Specification - Mock Drug Substance\nThis specification lists acceptance criteria for named and unspecified impurities observed in a mock drug-substance batch, used to validate the eval harness's DOCX-format ground truth.\nAccuracy of the method was established at three concentration levels.\nImpurity\tResult (%)\tLimit\nImpurity A\t0.08\t0.10\nImpurity B\t0.15\t0.10\nImpurity C\t0.19\t0.20\nTotal impurities\t0.14\t0.20\nMaximum\t0.15\tN/A",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q3A(R2)"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Water content not fully described",
+      "detail": "The document does not provide a detailed description of water content, as required by ICH Q6A [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 8000,
+        "end": 8086,
+        "hash": "cd0f54e7f9c46afa"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Component testing not fully described",
+      "detail": "The document does not provide a detailed description of component testing, as required by 21 CFR 211.84 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.84",
+        "start": 0,
+        "end": 96,
+        "hash": "c2d2ef7e4d2ed66e"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 0,
+        "end": 2852,
+        "hash": "154e40d38f8b6822"
+      },
+      "evidence": "PHARMACEUT I CALS\n3.2.S.4.3 VERIFICATION OF ANALYTICAL PROCEDURE FOR\nRELATED COMPOUNDS\nDOCUMENT APPROVAL PAGE\nMaterial N arne: Estradiol, USP (Hemihydrate, Micronized)\t\t\nMethod No.: 1381-RC\tVerification Report No.: MVR-1381-RC\tVersion No.: 02\nPrepared By: 5- t~ MP- Date: OS j 06[2-01 b\nSumana Giddu- Analytical R&D\t\t\n~ :\nI\ns oG (:wl6\nReviewed By: Date: 0\nSasi Padala ; lytic~ R&D\t\t\n(~\nReviewed By: Date: cJs:j oct {2o 1- t\n1\nHitesh Patel- Analytical R&D\t\t\n~ ~vvvv~\nReviewed By: , Date: 0 S I o9/'LOt _,G\nVamsi Koppuri- Analytical R&D\t\t\n~\nApproved By: Date: osl.b512(Jl'-\nBhavika Patel- Analytical R&D\t\t\n~~\nApproved By: Date: o~(o,:J-016,\nJitendra Patel- Quality Management\t\t\nTABLE OF CONTENTS\n1\nVERIFICATION OF ANALYTICAL PROCEDURE FOR RELATED COMPOUNDS 4\n1.1\nIntroduction ..............................................................................................................4\n1.2\nStandards and Samples Used in Verification Study ................................................9\n1.3\nProtocol Deviation ...................................................................................................9\n1.4\nVerification Parameters ...........................................................................................9\n1.4.1\nSpecificity ......................................................................................................9\n1.4.2\nLinearity .......................................................................................................10\n1.4.3\nLimit of Detection ........................................................................................14\n1.4.4\nLimit of Quantitation ...................................................................................15\n1.4.5\nAbsorptivity Factor ......................................................................................17\n1.4.6\nPrecision .......................................................................................................17\n1.4.6.1\nSystem Precision ................................................................................18\n1.4.6.2\nMethod Precision ...............................................................................19\n1.4.6.3\nIntermediate Precision (Ruggedness Study) ......................................20\n1.4.7\nStability of Analytical Solutions ..................................................................22\n1.4.8\nEquivalency with the USP Method ..............................................................23\n1.4.9\nSystem Suitability ........................................................................................24\n1.5\nConclusions ............................................................................................................26\n1.6\nHistory....................................................................................................................54\nLIST OF IN-TEXT TABLES\nTable 1.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.84"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Receipt and storage not fully described",
+      "detail": "The document does not provide a detailed description of receipt and storage, as required by 21 CFR 211.82 [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.82",
+        "start": 0,
+        "end": 91,
+        "hash": "369f37dbe2bbef17"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 0,
+        "end": 2852,
+        "hash": "154e40d38f8b6822"
+      },
+      "evidence": "PHARMACEUT I CALS\n3.2.S.4.3 VERIFICATION OF ANALYTICAL PROCEDURE FOR\nRELATED COMPOUNDS\nDOCUMENT APPROVAL PAGE\nMaterial N arne: Estradiol, USP (Hemihydrate, Micronized)\t\t\nMethod No.: 1381-RC\tVerification Report No.: MVR-1381-RC\tVersion No.: 02\nPrepared By: 5- t~ MP- Date: OS j 06[2-01 b\nSumana Giddu- Analytical R&D\t\t\n~ :\nI\ns oG (:wl6\nReviewed By: Date: 0\nSasi Padala ; lytic~ R&D\t\t\n(~\nReviewed By: Date: cJs:j oct {2o 1- t\n1\nHitesh Patel- Analytical R&D\t\t\n~ ~vvvv~\nReviewed By: , Date: 0 S I o9/'LOt _,G\nVamsi Koppuri- Analytical R&D\t\t\n~\nApproved By: Date: osl.b512(Jl'-\nBhavika Patel- Analytical R&D\t\t\n~~\nApproved By: Date: o~(o,:J-016,\nJitendra Patel- Quality Management\t\t\nTABLE OF CONTENTS\n1\nVERIFICATION OF ANALYTICAL PROCEDURE FOR RELATED COMPOUNDS 4\n1.1\nIntroduction ..............................................................................................................4\n1.2\nStandards and Samples Used in Verification Study ................................................9\n1.3\nProtocol Deviation ...................................................................................................9\n1.4\nVerification Parameters ...........................................................................................9\n1.4.1\nSpecificity ......................................................................................................9\n1.4.2\nLinearity .......................................................................................................10\n1.4.3\nLimit of Detection ........................................................................................14\n1.4.4\nLimit of Quantitation ...................................................................................15\n1.4.5\nAbsorptivity Factor ......................................................................................17\n1.4.6\nPrecision .......................................................................................................17\n1.4.6.1\nSystem Precision ................................................................................18\n1.4.6.2\nMethod Precision ...............................................................................19\n1.4.6.3\nIntermediate Precision (Ruggedness Study) ......................................20\n1.4.7\nStability of Analytical Solutions ..................................................................22\n1.4.8\nEquivalency with the USP Method ..............................................................23\n1.4.9\nSystem Suitability ........................................................................................24\n1.5\nConclusions ............................................................................................................26\n1.6\nHistory....................................................................................................................54\nLIST OF IN-TEXT TABLES\nTable 1.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.82"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [],
+  "parse_failures": [],
+  "analysis_seconds": 183.0,
+  "stop_reason": "ceiling",
+  "budget_exhausted": true
+}

@@ -1,0 +1,151 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Precision testing for drug products",
+      "detail": "The submission does not provide sufficient detail on the precision testing for drug products, as required by 21 CFR 211.165. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.165",
+        "start": 0,
+        "end": 47,
+        "hash": "045613b05b8f8fb0"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 1808,
+        "end": 1930,
+        "hash": "e5a35e03c325ccb4"
+      },
+      "evidence": "1.4.6\nPrecision .......................................................................................................17\n",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.165"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Laboratory records for precision testing",
+      "detail": "The submission does not provide sufficient detail on the laboratory records for precision testing, as required by 21 CFR 211.194. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.194",
+        "start": 0,
+        "end": 29,
+        "hash": "ad63ec89c516542d"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 1808,
+        "end": 1930,
+        "hash": "e5a35e03c325ccb4"
+      },
+      "evidence": "1.4.6\nPrecision .......................................................................................................17\n",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.194"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Stability testing of drug products",
+      "detail": "The submission does not provide sufficient detail on the stability testing of drug products, as required by 21 CFR 211.166. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.166",
+        "start": 0,
+        "end": 28,
+        "hash": "d897822df9f3b23b"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 2236,
+        "end": 2345,
+        "hash": "6d4efcbb9a0bb254"
+      },
+      "evidence": "1.4.7\nStability of Analytical Solutions ..................................................................22\n",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.166"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Impurity reporting and control",
+      "detail": "The submission does not provide sufficient detail on the reporting and control of impurities, as required by ICH Q3A(R2). [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q3A-R2",
+        "start": 8000,
+        "end": 8045,
+        "hash": "fe4089beb8410418"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 31744,
+        "end": 32539,
+        "hash": "bde04f7dae30938d"
+      },
+      "evidence": "# 213030280\t\t\t\nDate: 12/09/14\t\t\t\tDate: 12/10/14\t\t\t\nReference: Notebook # 8133, Page # 40, 47,\n48, 49\t\t\t\tReference: Notebook # 8135, Page # 39, 46, 47, 48\t\t\t\n1.4.7\nStability of Analytical Solutions\nThe stability was evaluated for the Standard and Sample solutions. The standard solution and the\nsample solution spiked with the impurities at the specification level were prepared and analyzed as\nper the analytical procedure over a period of time using freshly prepared standard solution.\nTo determine stability of the Standard and Sample solution, the Standard solution were prepared and\nanalyzed as per the analytical procedure up to 72 hours and the sample solution were prepared and\nanalyzed up to 72 hours against the freshly prepared standard solutions. The results are summarized\nin Table 16 and Table 17.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q3A(R2)"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [],
+  "parse_failures": [],
+  "analysis_seconds": 39.6,
+  "stop_reason": "breaker",
+  "budget_exhausted": false
+}
