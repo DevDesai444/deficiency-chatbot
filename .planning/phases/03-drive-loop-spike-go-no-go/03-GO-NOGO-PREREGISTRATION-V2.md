@@ -118,11 +118,36 @@ preconditions:**
    composition check against the installed store, recording both in run-1 provenance — so
    the remediation is proven live before the scored set, and store drift cannot silently
    reintroduce the confounder.
-2. **A1 — one identical, clean HEAD.** All 3 scored runs MUST execute at a single identical
-   git HEAD with a clean working tree. Each run summary now records `code_head_sha` and
-   `working_tree_dirty` (telemetry A1); the three `code_head_sha` values must be identical
-   and every `working_tree_dirty` must be `false`, or the set is void (D-GO2(ii)). Verify
-   before run 1 and confirm from the committed summaries after.
+2. **A1 — one identical HEAD, clean system-under-test.** All 3 scored runs MUST execute at a
+   single identical git HEAD: the three `code_head_sha` values must be identical or the set
+   is void. `working_tree_dirty` is recorded truthfully and is EXPECTED to be true in this
+   repository (standing out-of-scope files: `CLAUDE.md`, `frontend/**`,
+   `rulebook/manifest.yaml`, `docs/databricks-*`, `.agent*/`, `.planning` scratch). The
+   binding cleanliness requirement is scoped to the system under test:
+   `git status --porcelain -- src/ tests/` MUST be empty immediately before run 1 and remain
+   so through run 3 (output logged in the run notes). Dirty `rulebook/manifest.yaml` is
+   covered by precondition 1's live probes, which prove the installed store surface
+   immediately pre-run.
+3. **Explicit `--prereg` path.** The frozen run command MUST pass
+   `--prereg .planning/phases/03-drive-loop-spike-go-no-go/03-GO-NOGO-PREREGISTRATION-V2.md`
+   explicitly (run.py's default points at the closed v1 file and is deliberately NOT edited).
+   The full byte-frozen command line, recorded at amendment time:
+
+   ```
+   .venv/bin/python -m evals.run agent-run \
+     --model databricks-meta-llama-3-3-70b-instruct \
+     --run-index <1|2|3> \
+     --run-prefix agent-run \
+     --max-tokens 1600000 \
+     --max-wall-clock 600 \
+     --max-turns 80 \
+     --document-split scored \
+     --out-dir .planning/phases/03-drive-loop-spike-go-no-go/runs \
+     --prereg .planning/phases/03-drive-loop-spike-go-no-go/03-GO-NOGO-PREREGISTRATION-V2.md
+   ```
+
+   After run 1, confirm its summary's `prereg_commit_sha` equals this amendment's SHA
+   (recorded in `03-PHASE-REPORT.md`) before runs 2-3 proceed.
 
 ## 11. Amendment clause (D-GO5) — UNCHANGED
 

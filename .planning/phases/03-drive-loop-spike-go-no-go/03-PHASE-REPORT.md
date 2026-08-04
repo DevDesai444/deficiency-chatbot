@@ -42,17 +42,26 @@ DR/breaker/DR; fp 0/2/0; matched `found_set` empty all three. Root cause: enumer
 | Field | Value |
 |---|---|
 | Remediation commit (R1/R2/R3 + tests + evidence) | `f8a3d0ccad359ec91bfc02830a9a295952cbea21` |
-| v2 pre-registration commit (`prereg_commit_sha` for the fresh set) | `e4ff7016598010c17b2e87a0b76006909e069121` |
+| v2 pre-registration first commit | `e4ff7016598010c17b2e87a0b76006909e069121` |
+| **v2 §10 amendment commit (GOVERNING `prereg_commit_sha` for the set)** | this commit — the latest commit touching `03-GO-NOGO-PREREGISTRATION-V2.md`; resolvable via `_git_sha_of(V2 file)`, concrete value in the executor's report. **Supersedes `e4ff701`** (the amendment re-touched the V2 file). |
 | v2 pre-registration file | `03-GO-NOGO-PREREGISTRATION-V2.md` |
 | Governing baseline (unchanged) | `03-BASELINE-REMEASUREMENT.md` (`5afb4d7`), median 0.107, found_set `{B-08, C-01, C-02}` |
 | Config delta from v1 | `dr_grace_turns=5` (R2); all other frozen numbers unchanged |
-| A1 provenance additions | run summaries now record `code_head_sha` + `working_tree_dirty`; all 3 scored runs must run at one identical, clean HEAD (§10) |
+| A1 provenance additions | run summaries record `code_head_sha` + `working_tree_dirty` (§10.2) |
 
-Full suite at the remediation commit: **492 passed, 11 skipped**. The v2 SHA is recorded
-here and will be carried into every fresh run's `prereg_commit_sha`; it is **not** embedded
-inside the v2 file (a commit's own hash cannot live in the file it contains). **No scored
-run has executed under v2** — the run signal comes from the reviewer after on-disk
-verification of both commits.
+**§10 pre-run preconditions (amended):** (1) live 15-entry dual-resolve + R1 30/30 checks
+immediately before run 1; (2) A1 — one identical `code_head_sha` across all 3 runs, and
+`git status --porcelain -- src/ tests/` empty before run 1 through run 3 (`working_tree_dirty`
+is expected true for standing out-of-scope files and is scoped accordingly); (3) the frozen
+command MUST pass `--prereg …03-GO-NOGO-PREREGISTRATION-V2.md` explicitly (run.py default is
+the closed v1 file, deliberately not edited), and after run 1 the summary's
+`prereg_commit_sha` must equal this amendment's SHA before runs 2-3 proceed.
+
+The governing `prereg_commit_sha` is the §10-amendment commit and is **not** embedded inside
+the v2 file (a commit's own hash cannot live in the file it contains); it is resolvable via
+`_git_sha_of`. **No scored run has executed under v2** — the run signal comes from the
+reviewer after his independent full-suite run at this HEAD completes (the executor's
+492-green predates `e4ff701`'s telemetry change).
 
 ## 4–N. Fresh-set results, telemetry, diagnosis, verdict
 
