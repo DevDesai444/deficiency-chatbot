@@ -67,6 +67,16 @@ the v2 file (a commit's own hash cannot live in the file it contains); it is res
 reviewer after his independent full-suite run at this HEAD completes (the executor's
 492-green predates `e4ff701`'s telemetry change).
 
-## 4–N. Fresh-set results, telemetry, diagnosis, verdict
+## 4. v3.2 scored set (governing `prereg_commit_sha` = `e8de55aa4bbc1f75030a18ef05f79474ac61654d`)
 
-*Placeholders — authored after the reviewer-signalled v2 scored runs. No content yet.*
+Three scored runs at HEAD `e8de55a`, prefix `agent-run-v3-`, all §10 preconditions passed
+(15/15 + 30/30 probes, oracle-lead all-three pre-flight, one clean identical HEAD). Raw
+numbers in `03-19-V3-RUN-NOTES.md`: overall recall median **0.071** (baseline 0.107),
+cross_reference_integrity **0.286**; identical `found_set {C-02, C-04, MS-01, MS-02, MS-04}`
+all runs — **C-02 preserved, C-01 and B-08 lost all runs**; `run_oracles` not called in any
+run (0/0/0). Stop reasons breaker(same_class)/diminishing-returns/breaker(same_class). No
+verdict declared — the v3.2 gate reading is the reviewer's, against `e8de55a`.
+
+## 5–N. Diagnosis, verdict
+
+*Reviewer's gate reading against `e8de55a`. No content yet.*
