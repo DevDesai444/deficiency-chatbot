@@ -20,7 +20,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 9 phases (0–8), granularity `standard`.
 
 - [x] **Phase 0: Eval Harness** - Multi-doc ground-truth + per-stage metrics (recall-by-family); the continuous gate on every later phase (completed 2026-07-30)
-- [ ] **Phase 1: Ingestion Foundation** - Walk arbitrary nested PDF+DOCX, content-classify, converge on one document model, build the corpus index
+- [x] **Phase 1: Ingestion Foundation** - Walk arbitrary nested PDF+DOCX, content-classify, converge on one document model, build the corpus index (v1.0 — verified complete 2026-08-05, 71 tests green)
 - [x] **Phase 2: Retrieval, Navigation Tools & Rulebook** - Hybrid corpus retrieval + five span-ID tools + the FDA/ICH rulebook the agent reads (completed 2026-07-31)
 - [x] **Phase 3: Drive-Loop Spike (GO/NO-GO)** - One tool-using agent grounding findings within code budgets — **NO-GO** (3rd consecutive; recall 0.071 < 0.107); superseded by β, records retained as audit trail (closed 2026-08-05)
 - [ ] **Phase 4: Rulebook Enrichment + Absence Enumeration (β)** - Thicken thin ICH/FDA coverage to per-requirement granularity, then enumerate applicable required items and flag the absent ones — the fix for absence-of-evidence = 0.000
