@@ -186,7 +186,9 @@ Item 5 CLOSED (15/15 dual-resolve). v3 pre-run preconditions:
 1. **Live probes** immediately before run 1: 15-entry dual-resolve **15/15** AND R1
    composition **30/30** against the installed store; recorded in run-1 notes.
 2. **Provenance triple / one clean HEAD.** All 3 runs at a single identical `code_head_sha`
-   (or void); `prereg_commit_sha` == the v3 commit SHA on every run; `working_tree_dirty`
+   (or void); `prereg_commit_sha` == the governing v3.3 prereg commit SHA (the latest commit
+   touching THIS file, resolved via `_git_sha_of` and recorded in `03-PHASE-REPORT.md`) on
+   every run; `working_tree_dirty`
    recorded truthfully (expected true for standing out-of-scope files). Binding cleanliness
    scoped to the system under test: `git status --porcelain -- src/ tests/` empty before run
    1 through run 3 (logged).
@@ -194,7 +196,8 @@ Item 5 CLOSED (15/15 dual-resolve). v3 pre-run preconditions:
    `--prereg …03-GO-NOGO-PREREGISTRATION-V3.md` explicitly (run.py default = closed v1) and
    `--run-prefix agent-run-v3-` (v1 `agent-run*` and v2 `agent-run-v2*` artifacts are
    immutable evidence; a colliding prefix would overwrite them). After run 1, confirm its
-   summary's `prereg_commit_sha` equals the **v3.1** commit SHA before runs 2-3.
+   summary's `prereg_commit_sha` equals the governing v3.3 prereg commit SHA (the latest
+   commit touching THIS file, per `03-PHASE-REPORT.md`) before runs 2-3.
 4. **Oracle-lead pre-flight (v3.1, tightened v3.2).** Immediately before run 1,
    `run_oracles_tool` on the scored corpus MUST return leads whose text names **ALL THREE** of
    {C-01 `11477`, C-02 `0.15`, B-08 `Any Unspecified Impurity`}. **Any target missing = STOP,
@@ -217,9 +220,9 @@ Item 5 CLOSED (15/15 dual-resolve). v3 pre-run preconditions:
 
 ## 11. Amendment clause (D-GO5) — UNCHANGED
 
-Amending after any spike run begins voids the run set. The **v3.2** commit SHA — the latest
+Amending after any spike run begins voids the run set. The **v3.3** commit SHA — the latest
 commit touching this file, recorded in `03-PHASE-REPORT.md`, never inside this file — is the
-governing `prereg_commit_sha`, superseding v3.1 `fdbd535` and v3 `4b080e4`.
+governing `prereg_commit_sha`, superseding v3.2 `e8de55a`, v3.1 `fdbd535`, and v3 `4b080e4`.
 
 ---
 
