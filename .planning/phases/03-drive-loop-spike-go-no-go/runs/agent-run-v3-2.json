@@ -2,44 +2,8 @@
   "job_id": "",
   "faults": [
     {
-      "title": "Impurity specification gap",
-      "detail": "The impurity specification is missing a general acceptance criterion for total impurities. [verdict: gap]",
-      "category": "general_cmc",
-      "severity": "medium",
-      "tier": "corroborated",
-      "evidence_class": "quote_anchored",
-      "confidence": 0.7,
-      "verdict": "gap",
-      "rule_span_id": {
-        "doc_id": "ich-Q3A-R2",
-        "start": 15246,
-        "end": 15453,
-        "hash": "48dcb8f770a3e7bc"
-      },
-      "submission_span_id": {
-        "doc_id": "minispec",
-        "start": 307,
-        "end": 439,
-        "hash": "f04e0a436b97b138"
-      },
-      "evidence": "Impurity\tResult (%)\tLimit\nImpurity A\t0.08\t0.10\nImpurity B\t0.15\t0.10\nImpurity C\t0.19\t0.20\nTotal impurities\t0.14\t0.20\nMaximum\t0.15\tN/A",
-      "section": "",
-      "page": 0,
-      "table_ref": "",
-      "source": "tool:emit_finding",
-      "guidance_refs": [
-        "ICH Q3A(R2)",
-        "Q3A-SPECIFIED-IMPURITY-COMPLETENESS"
-      ],
-      "precedents": [],
-      "novel": false,
-      "out_of_distribution": false,
-      "challenge_note": "",
-      "cited_section_indices": []
-    },
-    {
-      "title": "System suitability gap",
-      "detail": "The system suitability section is missing a record of all calculations performed in connection with the test. [verdict: gap]",
+      "title": "Missing calculation records",
+      "detail": "The submission is missing calculation records for the test results. [verdict: gap]",
       "category": "general_cmc",
       "severity": "medium",
       "tier": "corroborated",
@@ -53,19 +17,271 @@
         "hash": "fe67310b9dd1604b"
       },
       "submission_span_id": {
-        "doc_id": "mvr1381",
-        "start": 2448,
-        "end": 2564,
-        "hash": "d84e5bd0ec73acc4"
+        "doc_id": "minispec",
+        "start": 307,
+        "end": 439,
+        "hash": "f04e0a436b97b138"
       },
-      "evidence": "1.4.9\nSystem Suitability ........................................................................................24\n",
+      "evidence": "Impurity\tResult (%)\tLimit\nImpurity A\t0.08\t0.10\nImpurity B\t0.15\t0.10\nImpurity C\t0.19\t0.20\nTotal impurities\t0.14\t0.20\nMaximum\t0.15\tN/A",
       "section": "",
       "page": 0,
       "table_ref": "",
       "source": "tool:emit_finding",
       "guidance_refs": [
-        "21 CFR 211.194(a)(5)",
+        "21 CFR 211.194",
         "CFR-211194-CALCULATIONS"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Missing water content test",
+      "detail": "The submission is missing a water content test with justified acceptance criteria for hygroscopic or hydrate drug substances. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 8000,
+        "end": 8086,
+        "hash": "cd0f54e7f9c46afa"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 2038,
+        "end": 2145,
+        "hash": "e84df627c458591d"
+      },
+      "evidence": "1.4.6.2\nMethod Precision ...............................................................................19\n",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A -- 3.3(e) Water Content",
+        "Q6A-WATER-CONTENT-TEST"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Missing water content test",
+      "detail": "The submission is missing a water content test with justified acceptance criteria for hygroscopic or hydrate drug substances. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 8000,
+        "end": 8086,
+        "hash": "cd0f54e7f9c46afa"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A -- 3.3(e) Water Content",
+        "Q6A-WATER-CONTENT-TEST"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Missing water content test",
+      "detail": "The submission is missing a water content test with justified acceptance criteria for hygroscopic or hydrate drug substances. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 8000,
+        "end": 8086,
+        "hash": "cd0f54e7f9c46afa"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A -- 3.3(e) Water Content",
+        "Q6A-WATER-CONTENT-TEST"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Missing water content test",
+      "detail": "The submission is missing a water content test with justified acceptance criteria for hygroscopic or hydrate drug substances. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 8000,
+        "end": 8086,
+        "hash": "cd0f54e7f9c46afa"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A -- 3.3(e) Water Content",
+        "Q6A-WATER-CONTENT-TEST"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Missing water content test",
+      "detail": "The submission is missing a water content test with justified acceptance criteria for hygroscopic or hydrate drug substances. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 8000,
+        "end": 8086,
+        "hash": "cd0f54e7f9c46afa"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A -- 3.3(e) Water Content",
+        "Q6A-WATER-CONTENT-TEST"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Missing water content test",
+      "detail": "The submission is missing a water content test with justified acceptance criteria for hygroscopic or hydrate drug substances. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 8000,
+        "end": 8086,
+        "hash": "cd0f54e7f9c46afa"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A -- 3.3(e) Water Content",
+        "Q6A-WATER-CONTENT-TEST"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Missing water content test",
+      "detail": "The submission is missing a water content test with justified acceptance criteria for hygroscopic or hydrate drug substances. [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q6A",
+        "start": 8000,
+        "end": 8086,
+        "hash": "cd0f54e7f9c46afa"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 50960,
+        "end": 51701,
+        "hash": "760f123d6772dd16"
+      },
+      "evidence": "van der Kraan\nResponsible Chemist\nThis document results from a validated procedure and therefore bears no s ignature.\nPage 2 of 3\n(145797)15042014 10:24\nT + 3 1 (0)4126 61 000\nAspen O ss B .V.\nC . Reg. Brabant , No. 5 7822883\nPO Box 98, NL- 5340 AB, Oss\nK loosterstraat 6, NL-5349 A B , Oss\nwww.aspenpharma.com\nVendor’s Certificate of Analysis for Estradiol Hemihydrate, USP (Micronized)\n(;)aspen\nCertificate of Analysis\nESTRADIOL\nhemihydrate, microniz ed\nUSP 37\nL00036941\n49565.1\nLot number\nOrder\nSPECIFICAT ION\nR E SULT\nMISCELLANEOUS\n2.9 to 3.5%\n3 .2 %\nWater (KF)\n3.2 °/o\n5 3 .5%\nWater (KF) [US P]\nReleased by N . van der Kraan\nResponsible Che mist\nT his docum e nt res ults fro m a validated procedu re and t he refore bears no signature.",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q6A -- 3.3(e) Water Content",
+        "Q6A-WATER-CONTENT-TEST"
       ],
       "precedents": [],
       "novel": false,
@@ -77,7 +293,7 @@
   "faults_found": true,
   "domains_checked": [],
   "parse_failures": [],
-  "analysis_seconds": 50.8,
-  "stop_reason": "diminishing-returns",
+  "analysis_seconds": 113.9,
+  "stop_reason": "completed",
   "budget_exhausted": false
 }

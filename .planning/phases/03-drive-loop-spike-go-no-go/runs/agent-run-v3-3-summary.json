@@ -1,30 +1,40 @@
 {
-  "billed_tokens": 630497,
+  "billed_tokens": 1063317,
   "cached_tokens": 0,
-  "continuation_count": 1,
-  "coverage_reminder_count": 4,
+  "continuation_count": 4,
+  "coverage_reminder_count": 2,
   "coverage_reminder_turns": [
     17,
-    34,
-    48,
-    65
+    36
   ],
-  "dedup_hit_rate": 0.4444444444444444,
-  "embedding_time_s": 6.6781866669189185,
+  "dedup_hit_rate": 0.45454545454545453,
+  "embedding_time_s": 22.23392016487196,
   "findings_before_after_each_nudge": [
     [
       2,
+      3
+    ],
+    [
+      3,
       4
+    ],
+    [
+      4,
+      5
+    ],
+    [
+      5,
+      6
     ]
   ],
   "first_malformed_turn_index": 0,
   "has_unrecognized_reason_codes": false,
   "malformed_trailing_turn_lines": 0,
   "max_continuations_permitted": 5,
-  "model_time_s": 284.2187066702172,
+  "model_time_s": 73.4437259567203,
   "oracle_leads_emitted": 0,
   "oracle_leads_reopened": 0,
-  "oracle_leads_surfaced": 0,
+  "oracle_leads_surfaced": 23,
   "post_repair_malformed": 0,
   "post_repair_malformed_rate": 0.0,
   "pre_repair_malformed": 0,
@@ -33,7 +43,7 @@
     "abort_reason": "",
     "baseline_path": "src/evals/baseline/recall_by_family.json",
     "baseline_sha256": "e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3",
-    "code_head_sha": "e8de55aa4bbc1f75030a18ef05f79474ac61654d",
+    "code_head_sha": "595b9ca1b117b79acab3c569cd425d8a118d8a39",
     "corpus_content_hash": "a48174cc0080f673234d1820893706ee9f8e1bd56dd787ffe43816ef7df7e364",
     "found_set": [
       "C-02",
@@ -48,27 +58,30 @@
     "model_id": "databricks-meta-llama-3-3-70b-instruct",
     "normalizer_version": "nfc-wscollapse-gdehyph-lig/1-lex1",
     "parser_version": "pymupdf-blocks/2",
-    "prereg_commit_sha": "e8de55aa4bbc1f75030a18ef05f79474ac61654d",
+    "prereg_commit_sha": "2f29413130203e106cd248e7a7638b546f400b4f",
     "run_completed": true,
     "run_index": 3,
     "serializer_version": "reading-order-cells/1",
     "working_tree_dirty": true
   },
   "rejections_by_code_half": {
-    "not_found|": 8,
-    "range_too_large|": 2
+    "not_found|": 6,
+    "range_too_large|": 3
   },
   "rule_never_read_count": 0,
   "span_invention_count": 0,
   "stop_reason": "breaker",
   "tokens_at_each_attempted_stop": [
-    247205
+    245498,
+    444552,
+    588950,
+    748486
   ],
-  "tool_execution_time_s": 7.424983207019977,
-  "total_tool_calls": 37,
-  "turns": 39,
+  "tool_execution_time_s": 22.8917934151832,
+  "total_tool_calls": 42,
+  "turns": 50,
   "unrecognized_reason_codes": {},
   "usage_missing_turns": 0,
-  "wall_clock_s": 292.223185040988,
+  "wall_clock_s": 96.55951737507712,
   "which_bound_ended_nudging": ""
 }

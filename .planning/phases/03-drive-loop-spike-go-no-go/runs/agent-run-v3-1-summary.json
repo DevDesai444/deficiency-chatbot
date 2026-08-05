@@ -1,29 +1,28 @@
 {
-  "billed_tokens": 307154,
+  "billed_tokens": 722134,
   "cached_tokens": 0,
   "continuation_count": 1,
-  "coverage_reminder_count": 3,
+  "coverage_reminder_count": 2,
   "coverage_reminder_turns": [
     17,
-    34,
-    48
+    36
   ],
-  "dedup_hit_rate": 0.2,
-  "embedding_time_s": 5.278784207999706,
+  "dedup_hit_rate": 0.16666666666666666,
+  "embedding_time_s": 4.897580374963582,
   "findings_before_after_each_nudge": [
     [
       2,
-      2
+      9
     ]
   ],
   "first_malformed_turn_index": 0,
   "has_unrecognized_reason_codes": false,
   "malformed_trailing_turn_lines": 0,
   "max_continuations_permitted": 5,
-  "model_time_s": 35.615200960077345,
+  "model_time_s": 81.05976974789519,
   "oracle_leads_emitted": 0,
   "oracle_leads_reopened": 0,
-  "oracle_leads_surfaced": 0,
+  "oracle_leads_surfaced": 23,
   "post_repair_malformed": 0,
   "post_repair_malformed_rate": 0.0,
   "pre_repair_malformed": 0,
@@ -32,7 +31,7 @@
     "abort_reason": "",
     "baseline_path": "src/evals/baseline/recall_by_family.json",
     "baseline_sha256": "e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3",
-    "code_head_sha": "e8de55aa4bbc1f75030a18ef05f79474ac61654d",
+    "code_head_sha": "595b9ca1b117b79acab3c569cd425d8a118d8a39",
     "corpus_content_hash": "a48174cc0080f673234d1820893706ee9f8e1bd56dd787ffe43816ef7df7e364",
     "found_set": [
       "C-02",
@@ -47,27 +46,28 @@
     "model_id": "databricks-meta-llama-3-3-70b-instruct",
     "normalizer_version": "nfc-wscollapse-gdehyph-lig/1-lex1",
     "parser_version": "pymupdf-blocks/2",
-    "prereg_commit_sha": "e8de55aa4bbc1f75030a18ef05f79474ac61654d",
+    "prereg_commit_sha": "2f29413130203e106cd248e7a7638b546f400b4f",
     "run_completed": true,
     "run_index": 1,
     "serializer_version": "reading-order-cells/1",
     "working_tree_dirty": true
   },
   "rejections_by_code_half": {
-    "not_found|": 6,
-    "range_too_large|": 1
+    "not_found|": 4,
+    "not_retrieved_this_session|submission": 11,
+    "range_too_large|": 2
   },
   "rule_never_read_count": 0,
   "span_invention_count": 0,
   "stop_reason": "breaker",
   "tokens_at_each_attempted_stop": [
-    250206
+    189330
   ],
-  "tool_execution_time_s": 6.640134793939069,
-  "total_tool_calls": 23,
-  "turns": 25,
+  "tool_execution_time_s": 5.346487045055255,
+  "total_tool_calls": 46,
+  "turns": 48,
   "unrecognized_reason_codes": {},
   "usage_missing_turns": 0,
-  "wall_clock_s": 42.92350224999245,
+  "wall_clock_s": 86.61940470791887,
   "which_bound_ended_nudging": ""
 }

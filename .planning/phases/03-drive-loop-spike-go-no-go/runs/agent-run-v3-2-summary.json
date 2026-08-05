@@ -1,29 +1,44 @@
 {
-  "billed_tokens": 338393,
+  "billed_tokens": 1089574,
   "cached_tokens": 0,
-  "continuation_count": 1,
-  "coverage_reminder_count": 3,
+  "continuation_count": 5,
+  "coverage_reminder_count": 2,
   "coverage_reminder_turns": [
     17,
-    34,
-    48
+    36
   ],
-  "dedup_hit_rate": 0.3333333333333333,
-  "embedding_time_s": 15.466838915017433,
+  "dedup_hit_rate": 0.7,
+  "embedding_time_s": 28.995032957871445,
   "findings_before_after_each_nudge": [
     [
       2,
-      2
+      4
+    ],
+    [
+      4,
+      5
+    ],
+    [
+      5,
+      6
+    ],
+    [
+      6,
+      7
+    ],
+    [
+      7,
+      8
     ]
   ],
   "first_malformed_turn_index": 0,
   "has_unrecognized_reason_codes": false,
   "malformed_trailing_turn_lines": 0,
   "max_continuations_permitted": 5,
-  "model_time_s": 34.53807504137512,
+  "model_time_s": 84.04915120673832,
   "oracle_leads_emitted": 0,
   "oracle_leads_reopened": 0,
-  "oracle_leads_surfaced": 0,
+  "oracle_leads_surfaced": 23,
   "post_repair_malformed": 0,
   "post_repair_malformed_rate": 0.0,
   "pre_repair_malformed": 0,
@@ -32,9 +47,10 @@
     "abort_reason": "",
     "baseline_path": "src/evals/baseline/recall_by_family.json",
     "baseline_sha256": "e680eb8638c811b5b9b1a9c7a585223250fdea66f40cf88611b426ba281a0ae3",
-    "code_head_sha": "e8de55aa4bbc1f75030a18ef05f79474ac61654d",
+    "code_head_sha": "595b9ca1b117b79acab3c569cd425d8a118d8a39",
     "corpus_content_hash": "a48174cc0080f673234d1820893706ee9f8e1bd56dd787ffe43816ef7df7e364",
     "found_set": [
+      "A-08",
       "C-02",
       "C-04",
       "MS-01",
@@ -47,27 +63,31 @@
     "model_id": "databricks-meta-llama-3-3-70b-instruct",
     "normalizer_version": "nfc-wscollapse-gdehyph-lig/1-lex1",
     "parser_version": "pymupdf-blocks/2",
-    "prereg_commit_sha": "e8de55aa4bbc1f75030a18ef05f79474ac61654d",
+    "prereg_commit_sha": "2f29413130203e106cd248e7a7638b546f400b4f",
     "run_completed": true,
     "run_index": 2,
     "serializer_version": "reading-order-cells/1",
     "working_tree_dirty": true
   },
   "rejections_by_code_half": {
-    "not_found|": 5,
-    "range_too_large|": 1
+    "not_found|": 4,
+    "range_too_large|": 2
   },
   "rule_never_read_count": 0,
   "span_invention_count": 0,
-  "stop_reason": "diminishing-returns",
+  "stop_reason": "completed",
   "tokens_at_each_attempted_stop": [
-    195875
+    282147,
+    471138,
+    601656,
+    748221,
+    910875
   ],
-  "tool_execution_time_s": 16.10131816775538,
-  "total_tool_calls": 24,
-  "turns": 26,
+  "tool_execution_time_s": 29.739790960098617,
+  "total_tool_calls": 39,
+  "turns": 50,
   "unrecognized_reason_codes": {},
   "usage_missing_turns": 0,
-  "wall_clock_s": 51.09211804100778,
-  "which_bound_ended_nudging": "diminishing_returns"
+  "wall_clock_s": 114.00909208401572,
+  "which_bound_ended_nudging": "max_continuations"
 }
