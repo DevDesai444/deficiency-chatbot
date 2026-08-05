@@ -4,7 +4,7 @@ occurrences of "copyright" in their own PDF text, yet every persisted ich-* chun
 the full ICH_LEGAL_NOTICE (Pitfall 4) -- applied uniformly as a stored constant, never scraped
 per-PDF.
 
-OFFLINE (D-RB6): builds all 4 ICH chunks from the REAL, COMMITTED rulebook/ich/*.pdf snapshot
+OFFLINE (D-RB6): builds all 5 ICH chunks from the REAL, COMMITTED rulebook/ich/*.pdf snapshot
 (Task 3's vendored files) via build_ich's local-file-first path (src/rulebook/build.py) into an
 ISOLATED tmp_path_factory-scoped store -- NO network call, NO dependence on the shared default
 data/ store. Not synthetic fixtures: Pitfall 4 is a property of these actual source documents.
@@ -68,6 +68,6 @@ def test_ich_chunk_carries_notice_even_when_source_pdf_lacks_it(ich_db_path):
 
 def test_every_ich_chunk_carries_the_notice_exactly(ich_db_path):
     ich_chunks = [c for c in all_chunks(db_path=ich_db_path) if c.source == "ich"]
-    assert len(ich_chunks) == 4  # Q2(R2), Q3A(R2), Q3B(R2), Q6A
+    assert len(ich_chunks) == 5  # Q1A(R2), Q2(R2), Q3A(R2), Q3B(R2), Q6A (Q1A added in Phase 4, RULES-06)
     for chunk in ich_chunks:
         assert chunk.license == ICH_LEGAL_NOTICE

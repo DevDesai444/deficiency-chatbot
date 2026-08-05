@@ -10,7 +10,8 @@ correct against the real index -- but nothing drove the REAL, committed
 
 This module is that missing boundary-crossing test: fully offline (D-RB6), built from the real
 committed `rulebook/**` snapshot (mirroring `tests/rulebook/test_requirement_index.py`'s
-`_self_contained_rulebook_store` fixture), asserting the FULL chain resolves 15/15.
+`_self_contained_rulebook_store` fixture), asserting the FULL chain resolves 25/25 (Phase 4
+grew the real committed index 15 -> 25 entries; RULES-06).
 """
 from __future__ import annotations
 
@@ -61,37 +62,40 @@ def _doc_entry(family_guess: str, doc_id: str) -> DocEntry:
     )
 
 
-# The real requirement_index.yaml's 15 entries span exactly 4 families (verified directly
-# against the committed file): 3.2.S.4.3 (10 entries), 3.2.S.4.1 (2), 3.2.S.5 (2), 3.2.P.7 (1).
-# A manifest classifying one document into each of the 4 families makes all 15 fire via DIRECT
-# family match (D-RB4) -- no profile-closure edge needed for this particular set.
-_ALL_15_MANIFEST = CoverageManifest(
+# The real requirement_index.yaml's 25 entries span exactly 6 families (verified directly against
+# the committed file after the Phase-4 RULES-06 enrichment): 3.2.S.4.3 (10), 3.2.S.4.1 (5),
+# 3.2.P.5 (4), 3.2.P.7 (3), 3.2.S.5 (2), 3.2.S.7 (1). A manifest classifying one document into each
+# of the 6 families makes all 25 fire via DIRECT family match (D-RB4) -- no profile-closure edge
+# needed for this particular set.
+_ALL_ENTRIES_MANIFEST = CoverageManifest(
     documents=[
         _doc_entry("3.2.S.4.3", "d1"),
         _doc_entry("3.2.S.4.1", "d2"),
         _doc_entry("3.2.S.5", "d3"),
         _doc_entry("3.2.P.7", "d4"),
+        _doc_entry("3.2.P.5", "d5"),
+        _doc_entry("3.2.S.7", "d6"),
     ]
 )
 
 
-def test_enumerate_fetch_emit_15_of_15_resolve_end_to_end(_self_contained_rulebook_store, tmp_path):
-    """The mandatory composition test: enumerate_requirements -> for EACH of the 15 real,
+def test_enumerate_fetch_emit_25_of_25_resolve_end_to_end(_self_contained_rulebook_store, tmp_path):
+    """The mandatory composition test: enumerate_requirements -> for EACH of the 25 real,
     applicable requirement-index entries -> read_guideline(rule_doc_id) resolves (not
     ToolRejected) and returns >=1 issued span-ID -> that span-ID passes emit_finding's
-    retrieval-ledger + store-membership checks. Asserts 15/15 end-to-end."""
+    retrieval-ledger + store-membership checks. Asserts 25/25 end-to-end."""
     ledger = RetrievalLedger()
 
-    entries = ri.enumerate_requirements(_ALL_15_MANIFEST)
+    entries = ri.enumerate_requirements(_ALL_ENTRIES_MANIFEST)
     assert not isinstance(entries, ToolRejected)
-    assert len(entries) == 15, (
-        f"expected all 15 real requirement-index entries to fire for this manifest, "
+    assert len(entries) == 25, (
+        f"expected all 25 real requirement-index entries to fire for this manifest, "
         f"got {len(entries)}: {sorted(e.id for e in entries)}"
     )
 
-    rows = read_guideline(_ALL_15_MANIFEST, ledger, citation=None)
+    rows = read_guideline(_ALL_ENTRIES_MANIFEST, ledger, citation=None)
     assert isinstance(rows, list)
-    assert len(rows) == 15
+    assert len(rows) == 25
     for row in rows:
         assert set(row.keys()) == {"requirement_id", "citation", "rule_doc_id", "trigger"}
 
@@ -127,7 +131,7 @@ def test_enumerate_fetch_emit_15_of_15_resolve_end_to_end(_self_contained_rulebo
         # max_chars set generously large: several real rulebook chunks (ich-Q2-R2, ich-Q6A,
         # fda-analytical-procedures) exceed the default 8000-char bound -- this test asserts
         # RESOLUTION, not pagination behavior (that's test_oversized_citation_... elsewhere).
-        fetch_result = read_guideline(_ALL_15_MANIFEST, ledger, citation=rule_doc_id, max_chars=200_000)
+        fetch_result = read_guideline(_ALL_ENTRIES_MANIFEST, ledger, citation=rule_doc_id, max_chars=200_000)
         if isinstance(fetch_result, ToolRejected):
             rejected.append((requirement_id, rule_doc_id, f"read_guideline: {fetch_result.reason_code}"))
             continue
@@ -157,8 +161,8 @@ def test_enumerate_fetch_emit_15_of_15_resolve_end_to_end(_self_contained_rulebo
         else:
             resolved.append(requirement_id)
 
-    assert not rejected, f"expected 15/15 to resolve end-to-end, but these did not: {rejected}"
-    assert len(resolved) == 15
+    assert not rejected, f"expected 25/25 to resolve end-to-end, but these did not: {rejected}"
+    assert len(resolved) == 25
     assert set(resolved) == {row["requirement_id"] for row in rows}
 
 

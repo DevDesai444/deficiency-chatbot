@@ -186,6 +186,7 @@ ICH_LEGAL_NOTICE = (
 )
 
 ICH_GUIDELINES = [
+    ("Q1A-R2", "ICH Q1A(R2)", "2003-02-06", "https://database.ich.org/sites/default/files/Q1A(R2)%20Guideline.pdf", "rulebook/ich/Q1A-R2_Guideline.pdf"),
     ("Q2-R2", "ICH Q2(R2)", "2023-11-30", "https://database.ich.org/sites/default/files/ICH_Q2(R2)_Guideline_2023_1130.pdf", "rulebook/ich/Q2-R2_Guideline_2023-11-30.pdf"),
     ("Q3A-R2", "ICH Q3A(R2)", "2006-10-25", "https://database.ich.org/sites/default/files/Q3A_R2__Guideline.pdf", "rulebook/ich/Q3A-R2_Guideline.pdf"),
     ("Q3B-R2", "ICH Q3B(R2)", "2006-06-02", "https://database.ich.org/sites/default/files/Q3B(R2)%20Guideline.pdf", "rulebook/ich/Q3B-R2_Guideline.pdf"),
