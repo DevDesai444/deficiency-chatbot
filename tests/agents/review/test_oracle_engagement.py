@@ -63,7 +63,7 @@ def test_coverage_reminder_flags_an_uncalled_oracle():
     class _Ledger:  # minimal stub: d1 has been opened (a span issued), but no finding, no oracle
         _issued = {("d1", 0, 5)}
 
-    result = _coverage_reminder(manifest, _Ledger(), [], oracle_called=False, oracle_leads_surfaced=0)
+    result = _coverage_reminder(manifest, _Ledger(), [], oracle_called=False, oracle_leads_surfaced=0, oracle_reopens=0)
     assert result is not None
     message, _unopened, _uncovered = result
     assert "run_oracles has not been called" in message
@@ -75,8 +75,8 @@ def test_coverage_reminder_flags_unused_oracle_leads():
     class _Ledger:
         _issued = {("d1", 0, 5)}
 
-    # oracle called, 4 leads surfaced, 0 findings -> unused leads flagged even though d1 opened
-    result = _coverage_reminder(manifest, _Ledger(), [], oracle_called=True, oracle_leads_surfaced=4)
+    # U2 (v3.3): oracle called, 4 leads surfaced, none re-opened -> flag re-opening (not calling)
+    result = _coverage_reminder(manifest, _Ledger(), [], oracle_called=True, oracle_leads_surfaced=4, oracle_reopens=0)
     assert result is not None
     message, _u, _c = result
-    assert "Oracle leads surfaced=4" in message
+    assert "surfaced 4 leads, none re-opened" in message

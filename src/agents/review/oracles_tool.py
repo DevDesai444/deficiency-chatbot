@@ -123,7 +123,9 @@ def _absence_check(fault) -> str:
         return "P10"
     if "limit of detection" in fault.title.lower() or "limit of quantitation" in fault.title.lower():
         return "S9"
-    return fault.source.removeprefix("checklist:") or "seed_check"
+    # U3 (v3.3): strip the oracle: prefix too, so T2b's source "oracle:expected_row_absent"
+    # maps to a real check key (not the raw source string, which _rule_hint could not resolve).
+    return fault.source.removeprefix("checklist:").removeprefix("oracle:") or "seed_check"
 
 
 def _expected_element(fault) -> str:
@@ -139,7 +141,12 @@ def _rule_hint(check: str) -> str:
         "S9": "ICH Q2(R2)",
         "S10": "21 CFR 211.194",
         "P10": "ICH Q1A(R2)",
-    }.get(check, "read_guideline enumerate")
+        # U3 (v3.3): T2b's expected_row_absent maps to a citation that RESOLVES via the triple-
+        # resolve (verified: "21 CFR 211.194" -> [ecfr-211.194:...]) -- not the old default
+        # "read_guideline enumerate", which produced read_guideline(citation='read_guideline
+        # enumerate'), a nonsense citation.
+        "expected_row_absent": "21 CFR 211.194",
+    }.get(check, "21 CFR 211.194")
 
 
 def _absence_lead(fault, corpus: CorpusIndex, doc_id: str) -> dict:
@@ -196,8 +203,13 @@ def run_oracles_tool(
     absence_faults = _run_check(
         "run_seed_checks", checklist_module.run_seed_checks, doc, check_errors
     )
-    positive_leads = [_positive_lead(f, corpus, doc_id) for f in positive_faults]
-    absence_leads = [_absence_lead(f, corpus, doc_id) for f in absence_faults]
+    # U3 (v3.3): T2b's expected_row_absent is semantically an ABSENCE (a required row is not
+    # tabulated), so it takes the absence-lead shape (expected_element + requiring-rule
+    # read_guideline next_call), not the positive get_section shape.
+    oracle_absence = [f for f in positive_faults if f.source == "oracle:expected_row_absent"]
+    oracle_positive = [f for f in positive_faults if f.source != "oracle:expected_row_absent"]
+    positive_leads = [_positive_lead(f, corpus, doc_id) for f in oracle_positive]
+    absence_leads = [_absence_lead(f, corpus, doc_id) for f in absence_faults + oracle_absence]
 
     return {
         "doc_id": doc_id,

@@ -77,6 +77,17 @@ all runs — **C-02 preserved, C-01 and B-08 lost all runs**; `run_oracles` not 
 run (0/0/0). Stop reasons breaker(same_class)/diminishing-returns/breaker(same_class). No
 verdict declared — the v3.2 gate reading is the reviewer's, against `e8de55a`.
 
-## 5–N. Diagnosis, verdict
+## 5. v3.2 ruling + v3.3 remediation (held)
 
-*Reviewer's gate reading against `e8de55a`. No content yet.*
+v3.2 (`e8de55a`) closed **NO-GO** — overall 0.071 < 0.107, regulatory regressed 0.200→0.000,
+C-01 and B-08 lost all runs (`03-19-V3-READING.md`). Reviewer-verified correction: the
+run-notes r5/r6 "`run_oracles` not called" claim is **wrong** — it was called 3/2/5 times; the
+summary `0/0/0` was a loop.py wiring bug (dict vs list). v3.3 (U1/U2/U3) fixes the wiring; it
+is **reviewer-approved and committed**. The v3.3 commit SHA (latest commit touching
+`03-GO-NOGO-PREREGISTRATION-V3.md`, resolvable via `_git_sha_of`, concrete value in the
+executor's report) is the governing `prereg_commit_sha` for the fresh set, **superseding
+`e8de55a`**.
+
+## 6–N. Diagnosis, verdict
+
+*Reviewer's decision at the v3.3 adjudication / decision-point. No content yet.*

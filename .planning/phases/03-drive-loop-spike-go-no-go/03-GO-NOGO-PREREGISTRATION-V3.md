@@ -7,6 +7,25 @@
 > gives the run signal after on-disk verification of the v3.2 commit.** v2 (`3b63b75`) is
 > closed NO-GO (see `03-19-V2-READING.md`).
 
+## v3.3 amendment (U1/U2/U3 — oracle-engagement wiring; reviewer-approved, governing)
+
+v3.2 (`e8de55a`) is closed NO-GO (`03-19-V3-READING.md`). The runs exposed a **wiring bug**,
+not a prompt problem: `run_oracles` was called 3/2/5 times, but the summary read `0/0/0`
+because the loop tracker checked `isinstance(raw_result, list)` while `run_oracles_tool`
+returns a **dict** — so the coverage reminder kept telling the model to call a tool it had
+already called. v3.3 fixes the wiring; the gate/baseline are unchanged.
+
+| ID | Change | Files |
+|---|---|---|
+| **U1** | Loop tracker + telemetry read the run_oracles **dict** return (`positive_leads` + `absence_leads`); `oracle_called=True` on any non-ToolRejected return, `oracle_leads_surfaced` counted correctly. | `loop.py` |
+| **U2** | Coverage reminder flags "un-called" only when truly un-called; once called-but-no-lead-re-opened, it flags **"surfaced N leads, none re-opened — re-open a lead with get_section"** (tracks get_section/open_doc after run_oracles). | `loop.py` |
+| **U3** | The `expected_row_absent` (B-08) lead is now an **absence** lead whose `next_call` cites a **resolvable** rule (`21 CFR 211.194` → `[ecfr-211.194:…]`), not the nonsense `read_guideline(citation='read_guideline enumerate')`. | `oracles_tool.py` |
+
+Tests: `test_oracle_wiring.py` (U1 dict-tracked, U2 none-re-opened message, U3 resolvable
+next_call). Full suite: **508 passed, 11 skipped.** **Reviewer-approved and committed;** this
+commit's SHA is the governing `prereg_commit_sha`, superseding v3.2 `e8de55a` (recorded in
+`03-PHASE-REPORT.md`, never inside this file).
+
 ## v3.1 amendment (T1 + T2 — oracle engagement made real)
 
 The v3 GO on `4b080e4` was **revoked**: `run_oracles` produced 0 leads on both scored
@@ -181,7 +200,9 @@ Item 5 CLOSED (15/15 dual-resolve). v3 pre-run preconditions:
    {C-01 `11477`, C-02 `0.15`, B-08 `Any Unspecified Impurity`}. **Any target missing = STOP,
    no runs** (the oracle substrate regressed). Same assertion as
    `test_oracle_leads_real_corpus.py`, run live against the installed corpus, alongside the
-   §10.1 15/15 + 30/30 probes.
+   §10.1 15/15 + 30/30 probes. **v3.3:** ALSO require that a scripted run injecting one
+   `run_oracles` call reports `oracle_leads_surfaced > 0` in the summary (proves the U1
+   tracker fires) — assertion `test_oracle_wiring.py::test_u1_run_oracles_dict_return_is_tracked`.
 
    ```
    .venv/bin/python -m evals.run agent-run \

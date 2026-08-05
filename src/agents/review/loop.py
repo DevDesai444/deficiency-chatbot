@@ -164,8 +164,17 @@ def _record_dispatch_telemetry(telemetry: TurnLog, result: DispatchResult) -> No
     # A non-rejected dispatch gets a typed tool_call row so the JSONL row count reconciles
     # with BudgetLedger.total_tool_calls (tool_call rows + rejection rows == ledger total).
     telemetry.tool_call(result.tool)
-    if result.tool == "run_oracles" and isinstance(result.raw_result, list):
-        telemetry.oracle_leads(len(result.raw_result))
+    if result.tool == "run_oracles":
+        telemetry.oracle_leads(_oracle_lead_count(result.raw_result))
+
+
+def _oracle_lead_count(raw_result: object) -> int:
+    """U1 (v3.3): run_oracles_tool returns a DICT ({positive_leads, absence_leads,
+    leads_surfaced}), NOT a list. The v3 tracker checked isinstance(..., list) so it never
+    fired (summary reported 0/0/0 while run_oracles was actually called 3/2/5 times)."""
+    if not isinstance(raw_result, dict):
+        return 0
+    return len(raw_result.get("positive_leads", [])) + len(raw_result.get("absence_leads", []))
 
 
 def _is_cross_document_boundary(result: DispatchResult) -> bool:
@@ -174,7 +183,7 @@ def _is_cross_document_boundary(result: DispatchResult) -> bool:
 
 def _coverage_reminder(
     manifest: CoverageManifest, ledger: RetrievalLedger, findings: list[Fault],
-    oracle_called: bool, oracle_leads_surfaced: int,
+    oracle_called: bool, oracle_leads_surfaced: int, oracle_reopens: int,
 ) -> tuple[str, int, int] | None:
     """S4/S5 (v3): a code-computed coverage reminder (the Claude Code todo_reminder analog).
 
@@ -196,24 +205,27 @@ def _coverage_reminder(
     }
     unopened = sorted(d for d in all_docs if d not in opened)
     opened_no_finding = sorted(d for d in all_docs if d in opened and d not in emitted)
-    unused_leads = oracle_called and oracle_leads_surfaced > len(findings)
+    # U2 (v3.3): only tell the model to CALL run_oracles when it truly hasn't; once it has
+    # surfaced leads but re-opened none, tell it to RE-OPEN a lead (the v3.2 reminder kept
+    # telling the model to call a tool it had already called, because the tracker was broken).
+    leads_untaken = oracle_called and oracle_leads_surfaced > 0 and oracle_reopens == 0
 
     lines: list[str] = []
     if not oracle_called:
         lines.append("run_oracles has not been called -- call it on each document first to surface concrete numeric leads.")
+    elif leads_untaken:
+        lines.append(
+            f"run_oracles surfaced {oracle_leads_surfaced} leads, none re-opened -- "
+            "re-open a lead with get_section to ground a finding."
+        )
     if unopened:
         lines.append("Documents not yet opened: " + ", ".join(unopened) + ".")
     if opened_no_finding:
         lines.append("Documents opened but with no finding yet: " + ", ".join(opened_no_finding) + ".")
-    if unused_leads:
-        lines.append(
-            f"Oracle leads surfaced={oracle_leads_surfaced}, findings emitted={len(findings)} "
-            "-- re-open and address the unused leads."
-        )
     if not lines:
         return None
     header = "Coverage check -- keep working; do not conclude while evidence is unexamined."
-    uncovered = len(opened_no_finding) + (0 if oracle_called else 1) + (1 if unused_leads else 0)
+    uncovered = len(opened_no_finding) + (0 if oracle_called else 1) + (1 if leads_untaken else 0)
     return "\n".join([header] + lines), len(unopened), uncovered
 
 
@@ -254,6 +266,7 @@ def run_review(
     last_reminder_turn = 0  # S4 (v3): coverage reminder cadence
     oracle_called = False  # S5 (v3): oracle engagement tracking
     oracle_leads_surfaced = 0
+    oracle_reopens = 0  # U2 (v3.3): get_section/open_doc calls after run_oracles ran
     messages = build_messages(_corpus_brief(corpus, manifest))
     tools = registry.schemas()
 
@@ -365,9 +378,11 @@ def run_review(
             _record_dispatch_telemetry(telemetry, result)
             if isinstance(result.raw_result, Fault):
                 findings.append(result.raw_result)
-            if result.tool == "run_oracles" and isinstance(result.raw_result, list):
-                oracle_called = True  # S5 (v3)
-                oracle_leads_surfaced += len(result.raw_result)
+            if result.tool == "run_oracles" and not isinstance(result.raw_result, ToolRejected):
+                oracle_called = True  # U1 (v3.3): run_oracles_tool returns a dict, not a list
+                oracle_leads_surfaced += _oracle_lead_count(result.raw_result)
+            elif oracle_called and result.tool in ("get_section", "open_doc") and not isinstance(result.raw_result, ToolRejected):
+                oracle_reopens += 1  # U2 (v3.3): a lead re-opened after oracles ran
             if result.turn_consumed and not _is_cross_document_boundary(result):
                 if isinstance(result.raw_result, ToolRejected):
                     budget.record_rejection(
@@ -390,7 +405,7 @@ def run_review(
         # appended). Dynamic content stays out of the cached prefix.
         if budget.turns >= last_reminder_turn + 8:
             last_reminder_turn = budget.turns
-            reminder = _coverage_reminder(manifest, ledger, findings, oracle_called, oracle_leads_surfaced)
+            reminder = _coverage_reminder(manifest, ledger, findings, oracle_called, oracle_leads_surfaced, oracle_reopens)
             if reminder is not None:
                 message, unopened_n, uncovered_n = reminder
                 messages.append({"role": "user", "content": message})
