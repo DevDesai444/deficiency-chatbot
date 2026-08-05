@@ -64,9 +64,40 @@
 - [ ] **COST-03**: Compaction clears **tool results (evidence) only — never reasoning or emitted findings** — retains the N most recent results, and **freezes every replacement decision by span-ID** so re-rendered turns are byte-identical. This is what makes the recall invariant survive compaction: the agent keeps what it concluded even after the bulk evidence is shed, and can re-open any shed span by handle
 - [x] **COST-04**: Re-retrieving an unchanged span returns a "still current, refer to your earlier retrieval" stub instead of the full text (read deduplication)
 
-## v2 Requirements
+## v2.0 Requirements (β — current milestone)
 
-Deferred — tracked, not in the current roadmap.
+The v1.0 agentic-recall loop is a confirmed NO-GO. β moves **recall** to a general deterministic pipeline and repurposes the agent as a **verifier**. Roadmapper maps these across ~4–6 phases (Phase 4 onward; Phases 0–3 preserved). Phase 0 eval harness stays the continuous gate. All recall checks stay rulebook/structure-general — no corpus hardcoding.
+
+### Deterministic Recall
+- [ ] **RECALL-01**: System enumerates applicable FDA/ICH required items from the rulebook requirement index and flags any the submission does not address (absence detection), driven by the rulebook — not by knowledge of a specific corpus
+- [ ] **RECALL-02**: System deterministically detects intra-document structural inconsistencies (summary-vs-detail value mismatch, reported result exceeding its spec limit) and emits them as grounded candidates
+- [ ] **RECALL-03**: System builds a cross-document reference graph (hyperlinks, "see §X", numeric value cross-refs) and flags unresolved references, absent referenced content or documents, and cross-document value contradictions — submission-internal integrity the rulebook cannot express (subsumes DETECT-01/02)
+- [ ] **RECALL-04**: System surfaces candidate deficiencies by similarity to the past-deficiency (precedent) corpus
+- [ ] **RECALL-05**: Every deterministic recall check is rulebook/structure/graph-general; a guard test proves no submission-specific constant is embedded (anti-overfitting — the eval corpus is a proxy, never a target)
+
+### Multi-Agent Verification
+- [ ] **VERIFY-01**: Each candidate is judged by an isolated, write-disabled verifier sub-agent that re-opens the cited source + rule and returns a machine-parsed VERDICT: KEEP | DOWNGRADE (never DROP; unsure resolves to KEEP — the downgrade-never-drop recall invariant, enforced in code) (subsumes GROUND-02)
+- [ ] **VERIFY-02**: An orchestrator fans out verifiers keyed on docId:sectionId:ruleId, consolidates and dedups, and reports coverage so a "no deficiencies found" result states what was reviewed (subsumes AGENT-02, DETECT-05)
+- [ ] **VERIFY-03**: The verifier model is cross-family / decorrelated from the candidate source, so correlated errors cannot be rubber-stamped
+- [ ] **VERIFY-04**: An agentic interpretive-tail pass surfaces grounded deficiencies that no deterministic rule expresses
+
+### On-Prem Models
+- [ ] **MODEL-01**: NVIDIA Llama-3.3-Nemotron-Super-49B-v1.5 is served self-hosted on Databricks as the verify/reasoning model alongside Llama 3.3 70B + Qwen MoE; no external LLM API is ever called
+- [ ] **MODEL-02**: Nemotron pre-wiring probes pass — vLLM tool-call + `detailed thinking on/off` validated on real verification traces; tool-parser flags and quant confirmed for the target GPU
+
+### Weak-Model Reliability
+- [ ] **RELIABILITY-01**: Tool-call arguments are constrained by server-side guided decoding (vLLM guided_json / Ollama format) wherever the endpoint supports it
+- [ ] **RELIABILITY-02**: Malformed tool-args receive field-level, actionable error feedback (which field, expected type), bounded by a retry cap
+- [ ] **RELIABILITY-03**: Targeted semantic arg coercion handles weak-model failure modes (quoted numbers/booleans, single-key-wrapper unwrap) without loosening advertised schemas
+
+### Rulebook enrichment
+- [ ] **RULES-06**: The rulebook's ICH/FDA coverage is enriched to the per-requirement granularity RECALL-01 enumeration needs (currently ich=4, fda=1 chunks vs eCFR 215)
+
+**Carried from v1.0:** EVAL-01/02/03 (harness — continuous gate) and COST-01/02/03 (cost governor) remain in scope and will be mapped by the roadmapper. INF-V2-02 (Claude-orchestrator) is now **excluded** by the on-premise/privacy constraint.
+
+## Deferred / Future Requirements
+
+Deferred — tracked, not in the current milestone.
 
 ### Detection depth
 - **DET-V2-01**: Threshold-arithmetic deficiencies (impurities S2–S5, residual solvents Q3C, elemental Q3D, P3) — require cross-document retrieval to be solid first
