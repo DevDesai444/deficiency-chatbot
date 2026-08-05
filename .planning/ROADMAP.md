@@ -148,8 +148,8 @@ The phases below replace the superseded v1.0 agentic-recall Phases 4–6. Depend
   3. Enumeration is **corpus-general**: a guard test proves the absence check embeds no submission-specific constant — running it against a held-out corpus produces absence candidates from the *same* rulebook logic, and renaming/reorganizing folders does not change which requirements are deemed applicable.
   4. Every absence candidate is **grounded and re-openable** — it names the rule clause it violates and the coverage-manifest evidence that the required item is absent — so a downstream verifier can re-open both sides; a "no absences" result states which required items *were* satisfied (coverage is meaningful).
 **Plans**: 3 plans in 2 waves
-- [ ] 04-01-PLAN.md — Rulebook + requirement-index enrichment: vendor ICH Q1A(R2), decompose Q3A/Q3B/Q6A per-requirement, expand closure edges, coverage baseline + traceability gate (RULES-06)
-- [ ] 04-02-PLAN.md — Emit-gate absence variant: CoverageAbsenceAnchor schema + emit_absence_finding (byte-exact rule half, re-derivable anchor) (RECALL-01)
+- [x] 04-01-PLAN.md — Rulebook + requirement-index enrichment: vendor ICH Q1A(R2), decompose Q3A/Q3B/Q6A per-requirement, expand closure edges, coverage baseline + traceability gate (RULES-06)
+- [x] 04-02-PLAN.md — Emit-gate absence variant: CoverageAbsenceAnchor schema + emit_absence_finding (byte-exact rule half, re-derivable anchor) (RECALL-01)
 - [ ] 04-03-PLAN.md — Deterministic absence pass: enumerate_requirements ∘ search_corpus ∘ emit_absence_finding, mvr1381-tuned threshold, absence-gate (recover absence>0.000), D-GEN3 generality CI guard (RECALL-01)
 
 ### Phase 5: Deterministic Structural & Cross-Document Recall (β)
