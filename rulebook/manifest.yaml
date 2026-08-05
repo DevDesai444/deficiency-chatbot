@@ -63,6 +63,22 @@
   sha256: 7fff122daf0a667920b359ce857373b6cf503e36c5b6d96b5537bac925ae9197
   path: rulebook/ecfr/title-21/part-11.xml
   section_count: 10
+- source: fda
+  citation: 'FDA Guidance: Analytical Procedures and Methods Validation for Drugs
+    and Biologics'
+  version: current as vendored
+  license: U.S. Government work -- public domain (17 U.S.C. 105).
+  url: https://www.fda.gov/files/drugs/published/Analytical-Procedures-and-Methods-Validation-for-Drugs-and-Biologics.pdf
+  sha256: 40df8a1252d09f43da1d1928101bdf3a281217db63158a49e4229b2bfcfae20e
+  path: rulebook/fda/analytical-procedures-and-methods-validation-for-drugs-and-biologics.pdf
+- source: ich
+  citation: ICH Q1A(R2)
+  version: '2003-02-06'
+  license: ICH_LEGAL_NOTICE (applied uniformly, see src/rulebook/build.py -- stored
+    regardless of whether the source PDF embeds its own copy, Pitfall 4)
+  url: https://database.ich.org/sites/default/files/Q1A(R2)%20Guideline.pdf
+  sha256: bc7124e1e7c6bde5a460b5f7a00f0e084181f2cde4902a602192f3e656e1246f
+  path: rulebook/ich/Q1A-R2_Guideline.pdf
 - source: ich
   citation: ICH Q2(R2)
   version: '2023-11-30'
@@ -95,11 +111,3 @@
   url: https://database.ich.org/sites/default/files/Q6A%20Guideline.pdf
   sha256: a797b2a83c161c9a533ac17b899e6fa38bbec67e023ea56c664ceb53703b6b4a
   path: rulebook/ich/Q6A_Guideline.pdf
-- source: fda
-  citation: 'FDA Guidance: Analytical Procedures and Methods Validation for Drugs
-    and Biologics'
-  version: current as vendored
-  license: U.S. Government work -- public domain (17 U.S.C. 105).
-  url: https://www.fda.gov/files/drugs/published/Analytical-Procedures-and-Methods-Validation-for-Drugs-and-Biologics.pdf
-  sha256: 40df8a1252d09f43da1d1928101bdf3a281217db63158a49e4229b2bfcfae20e
-  path: rulebook/fda/analytical-procedures-and-methods-validation-for-drugs-and-biologics.pdf
