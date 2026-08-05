@@ -1,3 +1,12 @@
+- source: precedent
+  citation: ANDA-TDDS Deficiency Roadmap (precedent spreadsheet)
+  version: vendored as-is
+  license: internal
+  url: ''
+  sha256: df8663718613130f86201567b4218fa1f87154d9f2fb4fac4f6de8bdf5f834cc
+  path: rulebook/precedents/ANDA-TDDS-Deficiency-Roadmap.xlsm
+  note: 'D-PREC: schema audit + dedupe policy vs defpredict.main.deficiency_kb is
+    a senior-reviewer manual step, NOT performed here.'
 - source: ecfr
   citation: 21 CFR Part 210
   version: '2026-07-29'
@@ -94,12 +103,3 @@
   url: https://www.fda.gov/files/drugs/published/Analytical-Procedures-and-Methods-Validation-for-Drugs-and-Biologics.pdf
   sha256: 40df8a1252d09f43da1d1928101bdf3a281217db63158a49e4229b2bfcfae20e
   path: rulebook/fda/analytical-procedures-and-methods-validation-for-drugs-and-biologics.pdf
-- source: precedent
-  citation: ANDA-TDDS Deficiency Roadmap (precedent spreadsheet)
-  version: vendored as-is
-  license: internal
-  url: ''
-  sha256: df8663718613130f86201567b4218fa1f87154d9f2fb4fac4f6de8bdf5f834cc
-  path: rulebook/precedents/ANDA-TDDS-Deficiency-Roadmap.xlsm
-  note: 'D-PREC: schema audit + dedupe policy vs defpredict.main.deficiency_kb is
-    a senior-reviewer manual step, NOT performed here.'
