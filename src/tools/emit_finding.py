@@ -32,7 +32,7 @@ from ingest.anchors import HashMismatch, open_span
 from ingest.corpus import CorpusIndex
 from rulebook.store import DEFAULT_RULEBOOK_CACHE_DIR, rulebook_nt_for
 from schemas.documents import NormalizedText, OffsetRun, SpanID
-from schemas.faults import ComplianceVerdict, EvidenceClass, Fault, Tier
+from schemas.faults import ComplianceVerdict, CoverageAbsenceAnchor, EvidenceClass, Fault, Tier
 from tools.errors import ToolRejected
 from tools.ledger import RetrievalLedger
 
@@ -130,5 +130,101 @@ def emit_finding(
         tier=Tier.CORROBORATED, evidence_class=EvidenceClass.QUOTE_ANCHORED, confidence=0.7,
         verdict=compliance_verdict, rule_span_id=rule_span_id, submission_span_id=submission_span_id,
         evidence=submission_raw, source="tool:emit_finding",
+        guidance_refs=[rule_citation or rule_span_id.doc_id] + ([requirement_id] if requirement_id else []),
+    )
+
+
+def emit_absence_finding(
+    corpus: CorpusIndex,
+    rule_span_id: SpanID | None,
+    absence_anchor: CoverageAbsenceAnchor,
+    ledger: RetrievalLedger,
+    requirement_id: str = "",
+    rule_citation: str = "",
+    title: str = "",
+    detail: str = "",
+    rulebook_cache_dir: str = DEFAULT_RULEBOOK_CACHE_DIR,
+) -> Fault | ToolRejected:
+    """The absence-typed grounding gate (D-GATE1/D-GATE2) -- the ONLY path by which an
+    absence-typed Fault can exist.
+
+    An absence finding (a never-mentioned or whole-section absence) has no single submission text
+    span, so its submission half is a typed `CoverageAbsenceAnchor` (the enumerate inputs +
+    sub-threshold retrieval hits + manifest span-IDs) rather than a `submission_span_id`. The RULE
+    half stays byte-exact and UNCHANGED from `emit_finding` (D-EF1): it is re-opened via
+    `open_span`, validated as issued THIS session (ledger), and validated to resolve in the
+    RULEBOOK store. When the anchor additionally carries a narrative-claim CORPUS span (D-ABS4 /
+    mvr / MS-03), that span is re-opened byte-exact via the SAME `corpus.cached_entry` + `open_span`
+    path `emit_finding` uses. The gate also proves the negative is RE-DERIVABLE (D-GATE2): an
+    anchor missing the enumerate inputs (family / requirement_id) needed to re-run the search is
+    rejected as `unanchored_absence`. Every failure is a typed `ToolRejected`, never a raised
+    exception. Absence findings carry the existing `ComplianceVerdict.GAP` -- no new verdict.
+    """
+    # --- 1. RULE half: byte-exact and UNCHANGED (D-EF1) --------------------------------------
+    if rule_span_id is None:
+        return ToolRejected(tool="emit_absence_finding", reason_code="no_rule_citation",
+                            half="rule",
+                            reason="an absence finding must cite a specific rule clause span, none was provided",
+                            hint="call read_guideline first, then pass its returned rule span-ID as rule_span_id")
+
+    if not ledger.was_issued(rule_span_id):
+        return ToolRejected(tool="emit_absence_finding", reason_code="not_retrieved_this_session",
+                            half="rule",
+                            reason="rule_span_id was never actually retrieved this session",
+                            hint="re-fetch via read_guideline, then cite the span-ID it returns")
+
+    rule_nt = rulebook_nt_for(rule_span_id.doc_id, cache_dir=rulebook_cache_dir)
+    if rule_nt is None:
+        return ToolRejected(tool="emit_absence_finding", reason_code="wrong_store",
+                            half="rule",
+                            reason=f"rule_span_id.doc_id={rule_span_id.doc_id!r} does not resolve in the RULEBOOK store",
+                            hint="rule_span_id must come from read_guideline, not get_section")
+
+    try:
+        open_span(rule_span_id, rule_nt, rule_span_id.doc_id)
+    except HashMismatch:
+        return ToolRejected(tool="emit_absence_finding", reason_code="not_byte_exact",
+                            half="rule",
+                            reason="rule_span_id no longer re-opens byte-exact against the rulebook store",
+                            hint="re-fetch the current rule text via read_guideline and cite its freshly-issued span-ID")
+
+    # --- 2. Optional narrative-claim CORPUS span (D-ABS4): re-open byte-exact, SAME path -----
+    claim_span_id = absence_anchor.claim_span_id
+    if claim_span_id is not None:
+        if not ledger.was_issued(claim_span_id):
+            return ToolRejected(tool="emit_absence_finding", reason_code="not_retrieved_this_session",
+                                half="submission",
+                                reason="the narrative-claim span was never actually retrieved this session",
+                                hint="re-fetch via search_corpus/get_section, then cite the span-ID it returns")
+        corpus_cache = corpus.cached_entry(claim_span_id.doc_id)
+        if corpus_cache is None:
+            return ToolRejected(tool="emit_absence_finding", reason_code="wrong_store",
+                                half="submission",
+                                reason=f"claim_span_id.doc_id={claim_span_id.doc_id!r} does not resolve in the CORPUS store",
+                                hint="the claim span must come from search_corpus/get_section over THIS corpus")
+        claim_nt = NormalizedText(canonical=corpus_cache["canonical"], raw_serialized=corpus_cache["raw_serialized"],
+                                  offset_map=[OffsetRun.model_validate(r) for r in corpus_cache["offset_map"]],
+                                  normalizer_version=corpus_cache["normalizer_version"], serializer_version=corpus_cache["serializer_version"])
+        try:
+            open_span(claim_span_id, claim_nt, claim_span_id.doc_id)
+        except HashMismatch:
+            return ToolRejected(tool="emit_absence_finding", reason_code="not_byte_exact",
+                                half="submission",
+                                reason="the narrative-claim span no longer re-opens byte-exact against the corpus store",
+                                hint="re-fetch the current text via search_corpus/get_section and cite its freshly-issued span-ID")
+
+    # --- 3. The negative must be RE-DERIVABLE (D-GATE2) --------------------------------------
+    if absence_anchor.requirement_id == "" or absence_anchor.family == "":
+        return ToolRejected(tool="emit_absence_finding", reason_code="unanchored_absence",
+                            half="submission",
+                            reason="absence anchor missing enumerate inputs required to re-run the negative",
+                            hint="populate CoverageAbsenceAnchor.family and .requirement_id so the verifier can RE-RUN the search")
+
+    # --- 4. Construct the absence-typed Fault (GAP; no submission_span_id) -------------------
+    return Fault(
+        title=title or "Absent required element", detail=detail,
+        tier=Tier.CORROBORATED, evidence_class=EvidenceClass.CHECKLIST, confidence=0.7,
+        verdict=ComplianceVerdict.GAP, rule_span_id=rule_span_id, submission_span_id=None,
+        absence_anchor=absence_anchor, source="tool:emit_absence_finding",
         guidance_refs=[rule_citation or rule_span_id.doc_id] + ([requirement_id] if requirement_id else []),
     )
