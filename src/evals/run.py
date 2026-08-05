@@ -58,6 +58,7 @@ DEFAULT_SCORE_OUT = "docs/eval/last_metrics.json"
 DEFAULT_RUN_OUT = "docs/eval/last_run_metrics.json"
 BASELINE_PATH = Path(__file__).parent / "baseline" / "recall_by_family.json"
 RETRIEVAL_BASELINE_PATH = Path(__file__).parent / "baseline" / "retrieval_recall.json"
+COVERAGE_BASELINE_PATH = Path(__file__).parent / "baseline" / "coverage_baseline.json"
 
 
 def _join_source_text(parsed_doc: dict) -> str:
@@ -237,6 +238,96 @@ def cmd_retrieval_gate(args: argparse.Namespace) -> int:
         return 1
 
     print(f"RETRIEVAL-GATE OK: overall={measured:.3f} per_document={per_doc}")
+    return 0
+
+
+def cmd_coverage_gate(args: argparse.Namespace) -> int:
+    """`coverage-gate`: RULES-06's coverage no-regress floor + the D-ENR1 traceability floor
+    (D-ENR3 measure -> record -> ratchet, mirrors cmd_retrieval_gate). LIVE but LLM-free and
+    Databricks-free (D-RB6): it re-measures the local rulebook store + requirement index and runs
+    two independent checks:
+
+    (a) NO-REGRESS FLOOR (D-ENR3): every per-source chunk count and per-family requirement-entry
+        count must be >= the committed baseline's recorded value. A source/family that regresses
+        below the baseline fails the gate. (Baseline entries whose measured source/family is absent
+        count as 0 -> a regression, correctly caught.)
+    (b) TRACEABILITY FLOOR (D-ENR1 / D-RI1(2), the MS-04 hard gate): for EVERY eval-set deficiency
+        in the ABSENCE_OF_EVIDENCE family, ingest that submission's own directory, resolve its
+        content-derived profile, and assert `enumerate_requirements(manifest)` fires >= 1 applicable
+        requirement entry. If any absence deficiency has zero firing entries, the gate fails -- the
+        index the Plan-03 absence enumerator walks would be blind to that submission.
+
+    One submission that fails to ingest is recorded and treated as a traceability failure for its
+    doc_id (never a silent skip -- a blind submission is exactly what this floor exists to catch).
+    Lazy-imports rulebook.store / rulebook.requirement_index / ingest.corpus inside the body per the
+    module's import-light discipline so `--help` stays cheap.
+    """
+    import collections
+
+    from evals.schema import FailureFamily, load_eval_set
+    from ingest.corpus import ingest_corpus
+    from rulebook.requirement_index import (
+        build_requirement_edges,
+        enumerate_requirements,
+        load_requirement_index,
+    )
+    from rulebook.store import all_chunks
+
+    baseline = json.loads(Path(args.baseline).read_text())
+
+    # (a) no-regress floor -- re-measure from the live local store + index.
+    load_requirement_index.cache_clear()
+    build_requirement_edges()  # idempotent upsert -- makes the gate self-contained on a fresh store
+    chunks = all_chunks()
+    entries = load_requirement_index()
+    measured_sources = collections.Counter(c.source for c in chunks)
+    measured_families = collections.Counter(e.family for e in entries)
+
+    regressions: list[str] = []
+    for source, want in baseline.get("chunks_per_source", {}).items():
+        got = measured_sources.get(source, 0)
+        if got < want:
+            regressions.append(f"chunks_per_source[{source}] {got} < baseline {want}")
+    for family, want in baseline.get("entries_per_family", {}).items():
+        got = measured_families.get(family, 0)
+        if got < want:
+            regressions.append(f"entries_per_family[{family}] {got} < baseline {want}")
+    total_want = baseline.get("total_entries", 0)
+    if len(entries) < total_want:
+        regressions.append(f"total_entries {len(entries)} < baseline {total_want}")
+    if regressions:
+        print(f"COVERAGE-GATE FAILED: coverage regressed below committed baseline -- {regressions}")
+        return 1
+
+    # (b) traceability floor -- every absence_of_evidence eval deficiency must fire >= 1 entry.
+    eval_set = load_eval_set()
+    absence_doc_ids = sorted(
+        {d.doc_id for d in eval_set.deficiencies if d.failure_family == FailureFamily.ABSENCE_OF_EVIDENCE}
+    )
+    firing: dict[str, int] = {}
+    for doc_id in absence_doc_ids:
+        doc = next((d for d in eval_set.documents if d.doc_id == doc_id), None)
+        if doc is None:
+            print(f"COVERAGE-GATE FAILED: absence deficiency doc_id {doc_id!r} not registered in the eval set")
+            return 1
+        try:
+            corpus = ingest_corpus(Path(doc.path).parent)
+        except Exception as exc:  # noqa: BLE001 -- a blind submission is a traceability failure, not a skip
+            print(f"COVERAGE-GATE FAILED: could not ingest {doc_id} for the traceability floor: {exc}")
+            return 1
+        result = enumerate_requirements(corpus.manifest)
+        n = len(result) if isinstance(result, list) else 0
+        firing[doc_id] = n
+        if n < 1:
+            print(f"COVERAGE-GATE FAILED: no firing index entry for {doc_id} absence (traceability floor)")
+            return 1
+
+    print(
+        "COVERAGE-GATE OK: "
+        f"chunks_per_source={dict(sorted(measured_sources.items()))} "
+        f"total_entries={len(entries)} "
+        f"traceability_firing_per_absence_doc={firing}"
+    )
     return 0
 
 
@@ -480,6 +571,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     retrieval_gate_p.add_argument("--baseline", default=str(RETRIEVAL_BASELINE_PATH))
     retrieval_gate_p.set_defaults(func=cmd_retrieval_gate)
+
+    coverage_gate_p = subparsers.add_parser(
+        "coverage-gate",
+        help="RULES-06 coverage no-regress floor + D-ENR1 traceability floor (measure -> record -> ratchet).",
+    )
+    coverage_gate_p.add_argument("--baseline", default=str(COVERAGE_BASELINE_PATH))
+    coverage_gate_p.set_defaults(func=cmd_coverage_gate)
 
     return parser
 

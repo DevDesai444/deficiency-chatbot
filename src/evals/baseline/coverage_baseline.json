@@ -1,0 +1,19 @@
+{
+  "generated_from": "live:coverage_gate(rulebook.store.all_chunks + load_requirement_index)_2026-08-05",
+  "note": "D-ENR3 measure->record->ratchet coverage bar. Per-source chunk counts + per-family requirement-entry counts recorded AFTER the Phase-4 RULES-06 enrichment. Phase-2 baseline was ich=4/fda=1 and 15 index entries; this strictly exceeds both (ich=5, total_entries=25). The coverage-gate ratchets these as a no-regress floor and additionally enforces the D-ENR1 traceability floor (>=1 firing index entry per absence_of_evidence eval deficiency).",
+  "chunks_per_source": {
+    "ecfr": 215,
+    "fda": 1,
+    "ich": 5,
+    "precedent": 385
+  },
+  "entries_per_family": {
+    "3.2.P.5": 4,
+    "3.2.P.7": 3,
+    "3.2.S.4.1": 5,
+    "3.2.S.4.3": 10,
+    "3.2.S.5": 2,
+    "3.2.S.7": 1
+  },
+  "total_entries": 25
+}

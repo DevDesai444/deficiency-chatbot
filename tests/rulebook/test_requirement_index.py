@@ -443,5 +443,7 @@ def test_requirement_index_version_bumped_for_this_revision():
     item 5 resolve: the enumerate output CONTRACT gained `rule_doc_id` per row (D-RI2/D-EF1(5)
     enumerate->fetch->emit end-to-end fix). v3 -> v4 is the P1 real-ingestion linkage proof:
     mvr1381/spec32s41 do not classify to the fixture-assumed 3.2.S.5, so the two corrected-basis
-    CFR entries gained explicit family links for the real classified families."""
-    assert ri.REQUIREMENT_INDEX_VERSION == "4"
+    CFR entries gained explicit family links for the real classified families. v4 -> v5 is the
+    Phase-4 RULES-06 enrichment: 10 new per-requirement ICH Q1A/Q3A/Q3B/Q6A entries (15 -> 25) and
+    2 new profile_requires_family spec-clause closure edges (D-ENR2/D-ENR4/D-SEC1)."""
+    assert ri.REQUIREMENT_INDEX_VERSION == "5"

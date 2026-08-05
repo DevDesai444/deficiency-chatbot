@@ -7,8 +7,9 @@ the ACTUAL vendored artifact this plan commits, not a synthetic fixture -- the m
 test IS the one `git status` shows as tracked/staged.
 
 Task 2 baseline: every-row metadata completeness (7 eCFR rows at that point). Task 3 extends
-this file with the full 13-row manifest check (sha256-verified against the actual committed
-files) and the D-PREC vendor-only boundary note.
+this file with the full manifest check (sha256-verified against the actual committed files) and
+the D-PREC vendor-only boundary note. Phase 4 (RULES-06) grew ich 4 -> 5 (ICH Q1A(R2) vendored),
+so the manifest is now 14 rows.
 """
 from __future__ import annotations
 
@@ -48,9 +49,11 @@ def test_every_chunk_has_required_metadata_and_no_placeholder_date():
     assert "_SUBSTITUTE_DATE_" not in raw_text
 
 
-def test_manifest_has_13_rows_with_verified_sha256_and_dprec_boundary():
+def test_manifest_has_14_rows_with_verified_sha256_and_dprec_boundary():
     rows = _load_manifest_rows()
-    assert len(rows) == 13  # 7 ecfr + 4 ich + 1 fda + 1 precedent (Task 3's <behavior> contract)
+    # 7 ecfr + 5 ich + 1 fda + 1 precedent. ich grew 4 -> 5 in Phase 4 (RULES-06): ICH Q1A(R2)
+    # stability was vendored + added to ICH_GUIDELINES.
+    assert len(rows) == 14
 
     counts: dict[str, int] = {}
     for row in rows:
@@ -62,7 +65,7 @@ def test_manifest_has_13_rows_with_verified_sha256_and_dprec_boundary():
         actual_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
         assert actual_sha256 == row["sha256"], f"{row['path']} sha256 does not match the manifest"
 
-    assert counts == {"ecfr": 7, "ich": 4, "fda": 1, "precedent": 1}
+    assert counts == {"ecfr": 7, "ich": 5, "fda": 1, "precedent": 1}
 
     precedent_rows = [r for r in rows if r["source"] == "precedent"]
     assert len(precedent_rows) == 1

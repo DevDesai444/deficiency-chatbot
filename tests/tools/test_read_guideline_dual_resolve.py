@@ -5,9 +5,10 @@ resolved 0/15 in fetch mode, so the model's `read_guideline(citation=row['citati
 calls returned `not_found`, cascading to breaker/DR early stops. R1 adds a third resolve
 leg (the requirement-index citation-display -> provenance doc_id map). This test rounds
 BOTH identifiers each enumerate row advertises -- `row['citation']` AND `row['rule_doc_id']`
--- through fetch mode for ALL 15 real requirement-index entries: **30/30 must resolve to
-rule text carrying span-IDs, or the build is red.** Built from the real committed
-`rulebook/**` snapshot (D-RB6), mirroring `tests/tools/test_enumerate_fetch_emit_e2e.py`.
+-- through fetch mode for ALL 25 real requirement-index entries (Phase 4 grew the index
+15 -> 25; RULES-06): **50/50 must resolve to rule text carrying span-IDs, or the build is
+red.** Built from the real committed `rulebook/**` snapshot (D-RB6), mirroring
+`tests/tools/test_enumerate_fetch_emit_e2e.py`.
 """
 from __future__ import annotations
 
@@ -44,16 +45,18 @@ def _doc(fam: str, did: str) -> DocEntry:
                     classification=DocClassification(family_guess=fam))
 
 
-# Same 4-family manifest as the e2e test -> all 15 real entries fire.
-_ALL_15_MANIFEST = CoverageManifest(documents=[
+# Same 6-family manifest as the e2e test -> all 25 real entries fire (Phase 4 grew the index
+# 15 -> 25 and added the 3.2.P.5 / 3.2.S.7 families; RULES-06).
+_ALL_ENTRIES_MANIFEST = CoverageManifest(documents=[
     _doc("3.2.S.4.3", "d1"), _doc("3.2.S.4.1", "d2"),
     _doc("3.2.S.5", "d3"), _doc("3.2.P.7", "d4"),
+    _doc("3.2.P.5", "d5"), _doc("3.2.S.7", "d6"),
 ])
 
 
-def test_all_15_rows_round_trip_both_citation_and_rule_doc_id_30_of_30(_self_contained_rulebook_store):
-    rows = read_guideline(_ALL_15_MANIFEST, RetrievalLedger(), citation=None)
-    assert isinstance(rows, list) and len(rows) == 15, f"expected 15 enumerate rows, got {rows}"
+def test_all_25_rows_round_trip_both_citation_and_rule_doc_id_50_of_50(_self_contained_rulebook_store):
+    rows = read_guideline(_ALL_ENTRIES_MANIFEST, RetrievalLedger(), citation=None)
+    assert isinstance(rows, list) and len(rows) == 25, f"expected 25 enumerate rows, got {rows}"
 
     resolved = 0
     failures: list[tuple[str, str, str]] = []
@@ -62,7 +65,7 @@ def test_all_15_rows_round_trip_both_citation_and_rule_doc_id_30_of_30(_self_con
             # Fresh ledger per resolve so the COST-04 served-dedup never returns a
             # [STILL_CURRENT] stub (two entries share ecfr-211.194); we require rendered
             # rule text with span-IDs on every leg.
-            res = read_guideline(_ALL_15_MANIFEST, RetrievalLedger(), citation=row[key], max_chars=200_000)
+            res = read_guideline(_ALL_ENTRIES_MANIFEST, RetrievalLedger(), citation=row[key], max_chars=200_000)
             if isinstance(res, ToolRejected):
                 failures.append((row["requirement_id"], key, f"{res.reason_code}"))
                 continue
@@ -71,23 +74,23 @@ def test_all_15_rows_round_trip_both_citation_and_rule_doc_id_30_of_30(_self_con
                 continue
             resolved += 1
 
-    assert not failures, f"expected 30/30 to resolve; failures: {failures}"
-    assert resolved == 30
+    assert not failures, f"expected 50/50 to resolve; failures: {failures}"
+    assert resolved == 50
 
 
 def test_display_citation_leg_is_what_was_added(_self_contained_rulebook_store):
     """Direct proof of the R1 third leg: a rich display `citation` (which is neither a
     store citation key nor a doc_id) now resolves to rule text with a span-ID."""
-    rows = read_guideline(_ALL_15_MANIFEST, RetrievalLedger(), citation=None)
+    rows = read_guideline(_ALL_ENTRIES_MANIFEST, RetrievalLedger(), citation=None)
     display = rows[0]["citation"]
-    res = read_guideline(_ALL_15_MANIFEST, RetrievalLedger(), citation=display, max_chars=200_000)
+    res = read_guideline(_ALL_ENTRIES_MANIFEST, RetrievalLedger(), citation=display, max_chars=200_000)
     assert isinstance(res, str) and _SPAN_RE.search(res), f"display citation {display!r} did not resolve: {res}"
 
 
 def test_unresolvable_citation_rejection_teaches_the_recovery_path():
     """The not_found message must redirect the model (run 2 retried the identical failing
     call 4x): enumerate first, then pass a rule_doc_id; and do not retry the same call."""
-    res = read_guideline(_ALL_15_MANIFEST, RetrievalLedger(), citation="totally-not-a-real-citation-xyz")
+    res = read_guideline(_ALL_ENTRIES_MANIFEST, RetrievalLedger(), citation="totally-not-a-real-citation-xyz")
     assert isinstance(res, ToolRejected) and res.reason_code == "not_found"
     hint = res.hint.lower()
     assert "read_guideline with no arguments" in hint
