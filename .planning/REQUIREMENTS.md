@@ -13,7 +13,7 @@
 - [ ] **INGEST-02**: System parses DOCX into the same unified structured document model used for PDFs (alongside the existing PDF/OCR path)
 - [ ] **INGEST-03**: System builds a per-submission corpus index and a coverage manifest of what the corpus contains — including a per-document **availability contract** (canonical text + span-IDs guaranteed; section outline and table addressing best-effort) and typed statuses `parsed / parsed_partial / parse_failed / unsupported`, so downstream phases read capability from the manifest instead of discovering it at runtime
 - [ ] **INGEST-04**: Ingestion emits the **span-anchor substrate** every later phase grounds on: one canonical normalized text stream per document, a retained canonical→raw offset map, a versioned normalizer, stable content-addressed span-IDs (`{doc_id, start, end}` + substring hash), and a **re-open/verify primitive** that returns both the raw and canonical substrings for a span-ID or fails on hash mismatch. (Anchors are an ingestion property; Phase 2's `TOOLS-02` span-ID contract and `TOOLS-03` emit gate are built on this, not alongside it.)
-- [ ] **INGEST-05**: Every reconstructed table cell is **addressable** — serialized into the canonical text so it carries an ordinary span-ID, and resolvable through a `(table_id, row, col)` index, with merged cells resolving identically from every coordinate they span and serialization order deterministic and version-stamped. (Phase 5's "code recomputation over two verbatim cells" and Phase 4's X1/X2 cell-level comparisons have no substrate without this.)
+- [ ] **INGEST-05**: Every reconstructed table cell is **addressable** — serialized into the canonical text so it carries an ordinary span-ID, and resolvable through a `(table_id, row, col)` index, with merged cells resolving identically from every coordinate they span and serialization order deterministic and version-stamped. (Phase 5's "code recomputation over two verbatim cells" and cross-document cell-level comparisons have no substrate without this.)
 
 ### Rulebook (FDA/ICH retrievable reference)
 
@@ -33,23 +33,23 @@
 ### Agentic Loop
 
 - [x] **AGENT-01**: Detection runs as a model-driven, model-agnostic tool loop (reviewer requests evidence → reasons → requests more → stops on done/budget), replacing the one-shot pre-rendered call
-- [ ] **AGENT-02**: An orchestrator decomposes a review into objectives and fans out isolated sub-agents that each return a distilled, cited finding set
+- [~] **AGENT-02**: An orchestrator decomposes a review into objectives and fans out isolated sub-agents that each return a distilled, cited finding set *(re-homed under β VERIFY-02)*
 - [x] **AGENT-03**: Hard per-run budgets and a circuit breaker are enforced in code (stop conditions are code gates, not prompt instructions), **plus a diminishing-returns stop** — N consecutive steps yielding negligible new grounded evidence halts the loop before the ceiling, so budget is spent on progress rather than circling
-- [ ] **AGENT-04**: The budget is **bidirectional — a FLOOR as well as a ceiling.** When the model emits no tool call (i.e. declares itself finished) but is still well under budget AND has not hit the diminishing-returns condition, the loop **does not accept the stop**: it injects a continuation nudge and runs another turn. The model's self-assessment of "done" is **not** a termination condition. Rationale (this is the recall requirement): our measured failure is 2/28 — an agent that stops after finding a few obvious faults reproduces exactly that ceiling, and no ceiling-only budget can prevent it. Verbatim precedent — Claude Code `query.ts:1338` `token_budget_continuation` + `utils/tokenBudget.ts:72`: *"Stopped at {pct}% of token target. Keep working — do not summarize."* Enforced in code, never as a prompt instruction. **Anti-abuse:** the nudge is bounded by the same diminishing-returns rule (AGENT-03) so it cannot loop forever, and every continuation is recorded in telemetry (count + tokens-at-stop + whether new grounded findings followed) so the spike measures whether nudging actually buys recall or just burns budget.
+- [~] **AGENT-04**: The budget is **bidirectional — a FLOOR as well as a ceiling.** *(Spike mechanism; the loop is no longer the recall driver under β. Preserved as audit trail; recall floor now enforced by deterministic enumeration, RECALL-01.)*
 
 ### Grounding & Verification
 
 - [x] **GROUND-01**: Every claimed deficiency is pinned to a verbatim, re-openable source quote the agent actually retrieved
-- [ ] **GROUND-02**: A grounded adversarial verifier confirms or refutes each candidate against the source; an ungrounded challenge lowers confidence but never vetoes (recall invariant preserved)
+- [~] **GROUND-02**: A grounded adversarial verifier confirms or refutes each candidate against the source; an ungrounded challenge lowers confidence but never vetoes (recall invariant preserved) *(re-homed under β VERIFY-01)*
 - [x] **GROUND-03**: Each finding is dual-cited — the submission passage AND the specific FDA/ICH rule clause it violates
 
 ### Detection (v1 compliance check-kinds)
 
-- [ ] **DETECT-01**: System detects cross-document specification mismatch (X1: Quality Overall Summary 2.3 vs Module 3.2 body) — the flagship check
-- [ ] **DETECT-02**: System detects cross-document value contradictions (X2)
-- [ ] **DETECT-03**: System runs deterministic quick-win oracles: LOD/LOQ presence (S9), reference standards (S10), stability commitment (P10)
+- [~] **DETECT-01**: System detects cross-document specification mismatch (X1: Quality Overall Summary 2.3 vs Module 3.2 body) — the flagship check *(re-homed under β RECALL-03)*
+- [~] **DETECT-02**: System detects cross-document value contradictions (X2) *(re-homed under β RECALL-03)*
+- [x] **DETECT-03**: System runs deterministic quick-win oracles: LOD/LOQ presence (S9), reference standards (S10), stability commitment (P10)
 - [x] **DETECT-04**: System emits a compliance verdict per finding tied to a cited FDA/ICH rule
-- [ ] **DETECT-05**: System emits a coverage manifest so a "no deficiencies found" result is meaningful (states what was reviewed)
+- [~] **DETECT-05**: System emits a coverage manifest so a "no deficiencies found" result is meaningful (states what was reviewed) *(re-homed under β VERIFY-02)*
 
 ### Evaluation (harness first & continuous)
 
@@ -61,12 +61,12 @@
 
 - [ ] **COST-01**: A prompt-cache stable prefix + escalating context compaction let one agent reason over a corpus larger than the context window. **Cache-stability invariant:** nothing dynamic (rule lists, corpus manifests, document counts) may live in the system prompt or tool schemas — dynamic content goes in messages, or every corpus change busts the whole cached prefix
 - [ ] **COST-02**: Cheap-model triage + per-run budget ceilings keep cost scaling with docs that need deep reasoning, not raw corpus size
-- [ ] **COST-03**: Compaction clears **tool results (evidence) only — never reasoning or emitted findings** — retains the N most recent results, and **freezes every replacement decision by span-ID** so re-rendered turns are byte-identical. This is what makes the recall invariant survive compaction: the agent keeps what it concluded even after the bulk evidence is shed, and can re-open any shed span by handle
+- [ ] **COST-03**: Compaction clears **tool results (evidence) only — never reasoning or emitted findings** — retains the N most recent results, and **freezes every replacement decision by span-ID** so re-rendered turns are byte-identical
 - [x] **COST-04**: Re-retrieving an unchanged span returns a "still current, refer to your earlier retrieval" stub instead of the full text (read deduplication)
 
 ## v2.0 Requirements (β — current milestone)
 
-The v1.0 agentic-recall loop is a confirmed NO-GO. β moves **recall** to a general deterministic pipeline and repurposes the agent as a **verifier**. Roadmapper maps these across ~4–6 phases (Phase 4 onward; Phases 0–3 preserved). Phase 0 eval harness stays the continuous gate. All recall checks stay rulebook/structure-general — no corpus hardcoding.
+The v1.0 agentic-recall loop is a confirmed NO-GO (`03-19-V3.3-READING.md`: recall 0.071 < 0.107; {C-01,B-08} lost every run; absence_of_evidence=0.000). β moves **recall** to a general deterministic pipeline and repurposes the agent as a **verifier**. Mapped across β Phases 4–8 (Phase 0 eval harness stays the continuous gate; Phases 0–3 preserved). All recall checks stay rulebook/structure/graph-general — no corpus hardcoding.
 
 ### Deterministic Recall
 - [ ] **RECALL-01**: System enumerates applicable FDA/ICH required items from the rulebook requirement index and flags any the submission does not address (absence detection), driven by the rulebook — not by knowledge of a specific corpus
@@ -93,7 +93,7 @@ The v1.0 agentic-recall loop is a confirmed NO-GO. β moves **recall** to a gene
 ### Rulebook enrichment
 - [ ] **RULES-06**: The rulebook's ICH/FDA coverage is enriched to the per-requirement granularity RECALL-01 enumeration needs (currently ich=4, fda=1 chunks vs eCFR 215)
 
-**Carried from v1.0:** EVAL-01/02/03 (harness — continuous gate) and COST-01/02/03 (cost governor) remain in scope and will be mapped by the roadmapper. INF-V2-02 (Claude-orchestrator) is now **excluded** by the on-premise/privacy constraint.
+**Carried from v1.0:** EVAL-01/02/03 (harness — continuous gate, Phase 0) and COST-01/02/03 (cost governor, β Phase 8) remain in scope and are mapped below. INF-V2-02 (Claude-orchestrator) is now **excluded** by the on-premise/privacy constraint.
 
 ## Deferred / Future Requirements
 
@@ -108,7 +108,7 @@ Deferred — tracked, not in the current milestone.
 
 ### Infrastructure
 - **INF-V2-01**: Docling upgrade for unified PDF+DOCX parsing if python-docx table fidelity proves insufficient
-- **INF-V2-02**: Optional Claude-orchestrator variant (additive; only if Claude access is added)
+- **INF-V2-02**: ~~Optional Claude-orchestrator variant~~ — **EXCLUDED** by the β on-premise/privacy constraint (no external LLM API, ever)
 
 ## Out of Scope
 
@@ -116,10 +116,12 @@ Explicitly excluded (anti-features). Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
+| External LLM API (Claude/GPT) for any role | On-premise/privacy constraint — self-hosted open-weights ONLY; recall cannot be bought with a stronger hosted model |
 | Auto-filing / submitting to FDA | Review/advisory tool; human stays in the loop |
 | Final "approvable / not approvable" determination | Legal/regulatory sign-off is not the tool's role |
 | Unbounded, ungrounded autonomy | Grounding is the license to operate; autonomy without it produces confident hallucination |
 | Answer-key oracles as primary intelligence | Brittle, don't generalize; deterministic checks kept narrow, for stable facts only |
+| Recall checks tuned to the eval corpus | The eval corpus is a proxy, never a target — any check tuned to recover a specific item on this corpus is overfitting and we stop (RECALL-05 guard) |
 | Hardcoded module/folder layout | Must generalize to any directory/naming; classification is content-driven |
 | Auto-drafting the deficiency response | Out of scope for v1; reviewer finds, humans respond |
 | Full-corpus context stuffing | Defeats the retrieval/compaction design; won't scale |
@@ -127,18 +129,20 @@ Explicitly excluded (anti-features). Documented to prevent scope creep.
 
 ## Traceability
 
-Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for phase detail and success criteria. Phases execute 0 → 6; Phase 0 (Eval Harness) also runs continuously as the gate on every later phase.
+### v1.0 heritage (Phases 0–3 — preserved)
+
+Phases 0–3 are v1.0 heritage. Phase 3 (Drive-Loop Spike) closed **NO-GO** on 2026-08-05; its records are retained as the audit trail. Requirements originally mapped to the superseded v1 Phases 4–6 (AGENT-02, DETECT-01/02/05, GROUND-02, COST-01/02/03) are **re-homed under β** below and marked here as *→ β*. See `.planning/ROADMAP.md` for phase detail and success criteria.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EVAL-01 | Phase 0 — Eval Harness | Pending |
-| EVAL-02 | Phase 0 — Eval Harness | Pending |
-| EVAL-03 | Phase 0 — Eval Harness | Pending |
-| INGEST-01 | Phase 1 — Ingestion Foundation | Pending |
-| INGEST-02 | Phase 1 — Ingestion Foundation | Pending |
-| INGEST-03 | Phase 1 — Ingestion Foundation | Pending |
-| INGEST-04 | Phase 1 — Ingestion Foundation | Pending |
-| INGEST-05 | Phase 1 — Ingestion Foundation | Pending |
+| EVAL-01 | Phase 0 — Eval Harness | Complete |
+| EVAL-02 | Phase 0 — Eval Harness | Complete |
+| EVAL-03 | Phase 0 — Eval Harness | Complete |
+| INGEST-01 | Phase 1 — Ingestion Foundation | Complete |
+| INGEST-02 | Phase 1 — Ingestion Foundation | Complete |
+| INGEST-03 | Phase 1 — Ingestion Foundation | Complete |
+| INGEST-04 | Phase 1 — Ingestion Foundation | Complete |
+| INGEST-05 | Phase 1 — Ingestion Foundation | Complete |
 | RULES-01 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
 | RULES-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
 | RULES-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
@@ -148,33 +152,61 @@ Each v1 requirement maps to exactly one phase. See `.planning/ROADMAP.md` for ph
 | TOOLS-02 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
 | TOOLS-03 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
 | TOOLS-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
-| AGENT-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
-| AGENT-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
-| AGENT-04 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
-| GROUND-01 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
-| GROUND-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
-| DETECT-03 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Pending |
-| DETECT-04 | Phase 3 — Drive-Loop Spike (GO/NO-GO) | Complete |
-| AGENT-02 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
-| DETECT-01 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
-| DETECT-02 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
-| DETECT-05 | Phase 4 — Orchestrator + Sub-Agent Fan-Out | Pending |
-| GROUND-02 | Phase 5 — Grounded Adversarial Verifier | Pending |
-| COST-01 | Phase 6 — Cost Governor | Pending |
-| COST-02 | Phase 6 — Cost Governor | Pending |
-| COST-03 | Phase 6 — Cost Governor | Pending |
 | COST-04 | Phase 2 — Retrieval, Navigation Tools & Rulebook | Complete |
+| AGENT-01 | Phase 3 — Drive-Loop Spike (NO-GO) | Complete (spike) |
+| AGENT-03 | Phase 3 — Drive-Loop Spike (NO-GO) | Complete (spike) |
+| AGENT-04 | Phase 3 — Drive-Loop Spike (NO-GO) | Spike mechanism — recall floor → β RECALL-01 |
+| GROUND-01 | Phase 3 — Drive-Loop Spike (NO-GO) | Complete (spike) |
+| GROUND-03 | Phase 3 — Drive-Loop Spike (NO-GO) | Complete (spike) |
+| DETECT-03 | Phase 3 — Drive-Loop Spike (NO-GO) | Complete (spike) |
+| DETECT-04 | Phase 3 — Drive-Loop Spike (NO-GO) | Complete (spike) |
+| AGENT-02 | *superseded v1 Phase 4* | → β VERIFY-02 |
+| DETECT-01 | *superseded v1 Phase 4* | → β RECALL-03 |
+| DETECT-02 | *superseded v1 Phase 4* | → β RECALL-03 |
+| DETECT-05 | *superseded v1 Phase 4* | → β VERIFY-02 |
+| GROUND-02 | *superseded v1 Phase 5* | → β VERIFY-01 |
+| COST-01 | *superseded v1 Phase 6* | → β Phase 8 |
+| COST-02 | *superseded v1 Phase 6* | → β Phase 8 |
+| COST-03 | *superseded v1 Phase 6* | → β Phase 8 |
 
-**Coverage:**
-- v1 requirements: 33 total *(INGEST 5 + RULES 5 + TOOLS 4 + AGENT 4 + GROUND 3 + DETECT 5 + EVAL 3 + COST 4 = 33)*
-- Mapped to phases: 33 ✓
+### v2.0 β (Phases 4–8 + carried Phase 0/8)
+
+Each v2.0 requirement maps to exactly one β phase. Phase 0 (Eval Harness) also runs continuously as the gate on every β phase (zero-true-positives-lost).
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| RULES-06 | Phase 4 — Rulebook Enrichment + Absence Enumeration | Pending |
+| RECALL-01 | Phase 4 — Rulebook Enrichment + Absence Enumeration | Pending |
+| RECALL-02 | Phase 5 — Deterministic Structural & Cross-Document Recall | Pending |
+| RECALL-03 | Phase 5 — Deterministic Structural & Cross-Document Recall | Pending |
+| RECALL-04 | Phase 5 — Deterministic Structural & Cross-Document Recall | Pending |
+| RECALL-05 | Phase 5 — Deterministic Structural & Cross-Document Recall | Pending |
+| MODEL-01 | Phase 6 — On-Prem Verifier Model + Weak-Model Reliability | Pending |
+| MODEL-02 | Phase 6 — On-Prem Verifier Model + Weak-Model Reliability | Pending |
+| RELIABILITY-01 | Phase 6 — On-Prem Verifier Model + Weak-Model Reliability | Pending |
+| RELIABILITY-02 | Phase 6 — On-Prem Verifier Model + Weak-Model Reliability | Pending |
+| RELIABILITY-03 | Phase 6 — On-Prem Verifier Model + Weak-Model Reliability | Pending |
+| VERIFY-01 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Pending |
+| VERIFY-02 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Pending |
+| VERIFY-03 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Pending |
+| VERIFY-04 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Pending |
+| EVAL-01 | Phase 0 — Eval Harness (continuous gate) | Complete |
+| EVAL-02 | Phase 0 — Eval Harness (continuous gate) | Complete |
+| EVAL-03 | Phase 0 — Eval Harness (continuous gate) | Complete |
+| COST-01 | Phase 8 — Cost Governor (β) | Pending |
+| COST-02 | Phase 8 — Cost Governor (β) | Pending |
+| COST-03 | Phase 8 — Cost Governor (β) | Pending |
+
+**v2.0 Coverage:**
+- v2.0 requirements to map: 21 *(RECALL 5 + VERIFY 4 + MODEL 2 + RELIABILITY 3 + RULES-06 1 = 15 new; + carried EVAL 3 + COST 3 = 6)*
+- Mapped to β phases: 21 ✓ *(EVAL-01/02/03 held in Phase 0 as the continuous gate; COST-01/02/03 in Phase 8)*
 - Unmapped: 0 ✓
 - Duplicates (mapped to >1 phase): 0 ✓
 
-**Per-phase distribution:** Phase 0 → 3 · Phase 1 → 5 · Phase 2 → 10 · Phase 3 → 7 · Phase 4 → 4 · Phase 5 → 1 · Phase 6 → 3 (= 33).
+**Per-β-phase distribution:** Phase 4 → 2 (RULES-06, RECALL-01) · Phase 5 → 4 (RECALL-02/03/04/05) · Phase 6 → 5 (MODEL-01/02, RELIABILITY-01/02/03) · Phase 7 → 4 (VERIFY-01/02/03/04) · Phase 8 → 3 (COST-01/02/03) · Phase 0 (continuous) → 3 (EVAL-01/02/03) = 21.
 
-**Note on category-vs-phase:** requirement prefixes are *categories*, not phases. Several categories split across phases by design — GROUND-01/03 land in Phase 3 while GROUND-02 lands in Phase 5; COST-04 lands in Phase 2 (it is tool-layer behavior) while COST-01/02/03 land in Phase 6.
+**Note on category-vs-phase:** requirement prefixes are *categories*, not phases. Under β, several v1 categories are re-homed by design — DETECT-01/02 → RECALL-03; GROUND-02 → VERIFY-01; AGENT-02/DETECT-05 → VERIFY-02; COST-01/02/03 → Phase 8. AGENT-04's recall floor is subsumed by deterministic enumeration (RECALL-01) since the loop is no longer the recall driver.
 
 ---
 *Requirements defined: 2026-07-30*
-*Last updated: 2026-07-31 — count 33. Trail: 25 → 31 (2026-07-30, first Claude Code teardown: RULES-05, TOOLS-03/04, COST-03/04, AGENT-03 amended) → 32 (INGEST-04/05 span-anchor substrate + table addressing, less one reconciliation) → 33 (2026-07-31, second teardown of the loop layer: AGENT-04 bidirectional budget / continuation floor). RULES-01..05, TOOLS-01..04, COST-04 marked Complete after Phase 2 verification.*
+*Last updated: 2026-08-05 — β pivot. v1 count 33 (all mapped; Phases 0–2 Complete, Phase 3 Complete-NO-GO). v2.0 adds 15 new requirements (RECALL 5 + VERIFY 4 + MODEL 2 + RELIABILITY 3 + RULES-06) + carries EVAL 3 (Phase 0) + COST 3 (Phase 8) = 21 mapped across β Phases 4–8. Trail: Phase 3 drive-loop NO-GO (3rd consecutive; recall 0.071 < 0.107; absence=0.000) → recall re-architected as general deterministic pipeline, agent repurposed as write-disabled verifier; INF-V2-02 Claude-orchestrator excluded by on-premise constraint.*
