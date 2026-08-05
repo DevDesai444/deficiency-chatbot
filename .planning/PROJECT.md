@@ -10,6 +10,24 @@ For a regulatory analyst reviewing a drug submission, it answers: *"Where does t
 
 Given **any** directory of submission documents (any format mix of PDF/DOCX, any folder names, any nesting depth, **any number of documents — no cap**), reliably find the real FDA/ICH compliance deficiencies — **all faults, and only faults that actually exist** — each one cited to the exact passage that proves it. Recall + precision, no hallucinated "blabber."
 
+## Current Milestone: v2.0 — β: Deterministic Recall + Agentic Verify
+
+**Goal:** Replace the v1.0 agentic-recall loop — a confirmed **3rd NO-GO** (`.planning/phases/03-drive-loop-spike-go-no-go/03-19-V3.3-READING.md`: median recall 0.071 < 0.107 baseline; C-01/B-08 lost every run; absence-of-evidence 0.000), which proved a model-driven loop on self-hosted local models cannot reliably do **recall** — with a **general deterministic recall pipeline** verified by isolated local-model sub-agents. DefPredict finds all real FDA/ICH deficiencies in any submission folder, fully on-premise, without chasing the eval metric.
+
+**Target features:**
+- **Recall / rulebook enumeration** — enumerate required FDA/ICH items, flag absent ones (the fix for absence = 0.000)
+- **Recall / intra-document structural checks** — summary-vs-detail, spec exceedance
+- **Recall / cross-document reference-graph integrity** — broken/absent cross-references, absent referenced docs, cross-doc value mismatches (submission-internal; not in the rulebook)
+- **Recall / precedent retrieval** — over the past-deficiency corpus
+- **Multi-agent verification** — isolated Nemotron verifier sub-agents (write-disabled, `VERDICT: KEEP|DOWNGRADE`), orchestrator consolidates + dedups
+- **Interpretive-tail reasoning** — agentic, for deficiencies no rule can express
+- **Rulebook enrichment** — thicken thin ICH/FDA coverage
+- **Weak-model reliability hardening** — guided decoding, field-level tool errors, semantic coercion for the local verifier
+
+**Foundation carried from v1.0:** Phase 0 (eval harness — continuous gate), Phase 1 (ingestion), Phase 2 (retrieval/tools/rulebook). Phase 3 (drive-loop spike) is superseded; its records are preserved as the audit trail.
+
+**Hard constraints:** on-premise / privacy — self-hosted open-weights ONLY (Llama 3.3 70B + Qwen MoE + NVIDIA Llama-3.3-Nemotron-Super-49B-v1.5 on Databricks); **no external LLM APIs** (Claude/GPT excluded). **Guardrail:** recall checks stay rulebook+structure-general — no corpus hardcoding, no metric-chasing.
+
 ## Requirements
 
 ### Validated
@@ -100,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-30 after initialization*
+*Last updated: 2026-08-05 — milestone v2.0 (β) started after the v1.0 agentic-recall spike NO-GO*

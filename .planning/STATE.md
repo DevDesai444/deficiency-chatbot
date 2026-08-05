@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-stopped_at: Completed Phase 03 Wave 1 (plans 03-01 through 03-03)
-last_updated: "2026-08-03T09:34:42.135Z"
-last_activity: 2026-08-03
+milestone: v2.0
+milestone_name: Deterministic Recall + Agentic Verify
+status: planning
+last_updated: "2026-08-05T14:16:29.799Z"
+last_activity: 2026-08-05
 progress:
-  total_phases: 7
-  completed_phases: 3
-  total_plans: 41
-  completed_plans: 26
-  percent: 63
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,12 +24,10 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 
 ## Current Position
 
-Phase: 03 (drive-loop-spike-go-no-go) — EXECUTING
-Plan: 2 of 19
-Status: Ready to execute
-Last activity: 2026-08-03
-
-Progress: [██████░░░░] 63%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-05 — Milestone v2.0 started
 
 ## Performance Metrics
 
