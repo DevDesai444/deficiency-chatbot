@@ -53,6 +53,37 @@ class ComplianceVerdict(StrEnum):
     AMBIGUOUS = "ambiguous"    # the rule applies, but the submission is insufficient to determine compliance
 
 
+class RetrievalHit(BaseModel):
+    """One sub-threshold retrieval hit recorded on a CoverageAbsenceAnchor (D-GATE2).
+
+    Stores the span the search surfaced together with the score that fell below the run's
+    recorded threshold, so the Phase-7 verifier can RE-RUN the negative rather than trust a
+    frozen snapshot.
+    """
+
+    span_id: SpanID = Field(description="D-GATE2: the span-ID a below-threshold search_corpus hit surfaced.")
+    score: float = Field(description="D-THR: the retrieval score that fell below the recorded threshold.")
+
+
+class CoverageAbsenceAnchor(BaseModel):
+    """The submission half of an absence-typed finding (D-GATE1).
+
+    A never-mentioned / whole-section absence has no single submission text span, so instead of a
+    submission_span_id the finding carries this typed anchor: the exact enumerate inputs + the
+    sub-threshold retrieval evidence + the manifest span-IDs proving the search space. Everything
+    needed for the Phase-7 verifier to RE-RUN "was this searched and found lacking?" (D-GATE2) --
+    the negative is independently reproducible, not a recorded assertion.
+    """
+
+    profile: list[str] = Field(default_factory=list, description="D-GATE2: content-derived submission profiles enumerated.")
+    family: str = Field(default="", description="The CTD family the absent requirement belongs to.")
+    requirement_id: str = Field(default="", description="The requirement_index entry id that was searched-for and found lacking.")
+    threshold: float = Field(default=0.0, description="D-THR: the recorded retrieval threshold this run used.")
+    sub_threshold_hits: list[RetrievalHit] = Field(default_factory=list, description="D-GATE2: the top-k search_corpus hits that fell below threshold, so a verifier RE-RUNS the negative.")
+    manifest_span_ids: list[SpanID] = Field(default_factory=list, description="Manifest span-IDs proving the search space (what was enumerated/searched).")
+    claim_span_id: SpanID | None = Field(default=None, description="D-ABS4: the unsupported narrative-claim CORPUS span when one exists (mvr/MS-03), else None.")
+
+
 class Fault(BaseModel):
     """One candidate deficiency."""
 
@@ -67,6 +98,7 @@ class Fault(BaseModel):
     verdict: ComplianceVerdict | None = Field(default=None, description="DETECT-04: enumerated compliance verdict, set on the agent path by emit_finding.")
     rule_span_id: SpanID | None = Field(default=None, description="GROUND-03: the exact rule clause span this finding cites, re-openable by Phase 5's verifier.")
     submission_span_id: SpanID | None = Field(default=None, description="GROUND-01: the exact submission span this finding rests on, so the finding is fully re-openable.")
+    absence_anchor: CoverageAbsenceAnchor | None = Field(default=None, description="D-GATE1: the submission half for an absence-typed finding; mutually exclusive with a submission_span_id in practice.")
 
     evidence: str = Field(default="", description="Verbatim span or cell the finding rests on.")
     section: str = Field(default="", description="Section heading the fault sits in.")
