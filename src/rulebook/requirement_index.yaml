@@ -159,3 +159,114 @@
     start: 33
     end: 260
     hash: c04df0a9f8e47afb
+- id: Q1A-BATCH-SELECTION
+  family: 3.2.S.7
+  citation: ICH Q1A(R2) -- 2.1.3 Selection of Batches
+  trigger: Formal stability data must be provided on at least three primary batches of the drug substance,
+    each manufactured to a minimum of pilot scale by the same synthetic route and a process simulating the
+    final production process -- a stability claim supported by fewer than three primary batches is incomplete.
+  provenance_span_id:
+    doc_id: ich-Q1A-R2
+    start: 11444
+    end: 11766
+    hash: b2ca41bf6f057f97
+- id: Q1A-TESTING-FREQUENCY
+  family: 3.2.P.7
+  citation: ICH Q1A(R2) -- 2.1.6 Testing Frequency
+  trigger: Long-term stability testing frequency must be sufficient to establish the stability profile --
+    normally every 3 months over the first year, every 6 months over the second year, and annually thereafter
+    for a proposed re-test period of at least 12 months; a stability study with insufficient time points is
+    incomplete.
+  provenance_span_id:
+    doc_id: ich-Q1A-R2
+    start: 12947
+    end: 13258
+    hash: 45cdff9a5ae38bdf
+- id: Q1A-SIGNIFICANT-CHANGE
+  family: 3.2.P.7
+  citation: ICH Q1A(R2) -- 2.1.7.1 General Case (significant change)
+  trigger: When accelerated stability results are likely to approach significant-change criteria, increased
+    testing (an added final-time-point sample or a fourth time point) must be conducted -- a study that
+    approaches significant change with no corresponding increased testing is incomplete.
+  provenance_span_id:
+    doc_id: ich-Q1A-R2
+    start: 13603
+    end: 13831
+    hash: e72f558ed3dfe549
+- id: Q3A-IDENTIFICATION-THRESHOLD
+  family: 3.2.S.4.1
+  citation: ICH Q3A(R2) -- 3.1 Organic Impurities (identification threshold)
+  trigger: Each drug-substance impurity present above the identification threshold must be identified, and
+    analytical procedures must be developed for potential impurities expected to be unusually potent or toxic
+    even at or below that threshold -- an unidentified impurity above the threshold is an incomplete specification.
+  provenance_span_id:
+    doc_id: ich-Q3A-R2
+    start: 7899
+    end: 8271
+    hash: 4429298e030fc270
+- id: Q3A-RESULTS-PRECISION
+  family: 3.2.S.4.1
+  citation: ICH Q3A(R2) -- 3.3 Analytical Procedures (reporting of results)
+  trigger: Reported drug-substance impurity results must carry the required precision -- two decimal places
+    below 1.0%, one decimal place at or above 1.0%, rounded by conventional rules -- an impurity result reported
+    at insufficient precision is incomplete.
+  provenance_span_id:
+    doc_id: ich-Q3A-R2
+    start: 11615
+    end: 11857
+    hash: 5a2fee83ad45bb62
+- id: Q3B-IDENTIFICATION-THRESHOLD
+  family: 3.2.P.5
+  citation: ICH Q3B(R2) -- 4. Reporting/Control of Degradation Products (identification threshold)
+  trigger: Each drug-product degradation product above the identification threshold must be identified;
+    analytical procedures must exist for those below the threshold suspected of being unusually potent -- an
+    unidentified degradation product above the threshold is an incomplete specification.
+  provenance_span_id:
+    doc_id: ich-Q3B-R2
+    start: 6691
+    end: 6823
+    hash: c89ddc6e8d085180
+- id: Q3B-TOTAL-DEGRADATION-REPORTING
+  family: 3.2.P.5
+  citation: ICH Q3B(R2) -- 4. Reporting of Degradation Products (total degradation)
+  trigger: Total degradation products observed in the relevant batches of the drug product must be reported
+    with the analytical procedures indicated -- a degradation-products specification with no reported total
+    degradation figure is incomplete.
+  provenance_span_id:
+    doc_id: ich-Q3B-R2
+    start: 10054
+    end: 10161
+    hash: 9c0215545293905e
+- id: Q6A-DESCRIPTION
+  family: 3.2.S.4.1
+  citation: ICH Q6A -- 3.3.1(a) Description
+  trigger: The drug-substance specification must include a Description test -- a qualitative statement of state
+    and color -- and any change in these characteristics during storage must be investigated; an absent
+    Description test is an incomplete specification.
+  provenance_span_id:
+    doc_id: ich-Q6A
+    start: 23892
+    end: 24005
+    hash: c487a4639455edc8
+- id: Q6A-MICROBIAL-LIMITS
+  family: 3.2.P.5
+  citation: ICH Q6A -- 3.3.2(g) Microbial Limits
+  trigger: Where warranted, the drug-product specification must include microbial-limits testing (total aerobic
+    count, yeasts/molds, and absence of specified objectionable organisms), suitably determined by a
+    pharmacopoeial procedure -- an absent microbial-limits test where indicated is an incomplete specification.
+  provenance_span_id:
+    doc_id: ich-Q6A
+    start: 36961
+    end: 37281
+    hash: bd9f9948666b31a7
+- id: Q6A-UNIFORMITY-DOSAGE-UNITS
+  family: 3.2.P.5
+  citation: ICH Q6A -- 3.3.2(d) Uniformity of Dosage Units
+  trigger: The drug-product specification must include a uniformity-of-dosage-units test (mass of the dosage
+    form and content of active substance), determined by a pharmacopoeial procedure -- an absent uniformity
+    test is an incomplete specification.
+  provenance_span_id:
+    doc_id: ich-Q6A
+    start: 42314
+    end: 42499
+    hash: 203b0549fbf2da80

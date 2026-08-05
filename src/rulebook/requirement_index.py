@@ -43,12 +43,28 @@ _PATH = Path(__file__).parent / "requirement_index.yaml"
 # 3.2.S.4.1, not the hardcoded-manifest 3.2.S.5 assumption. The two CFR corrected-basis entries
 # keep their reviewed primary family and citations, but gain explicit family linkage for the real
 # classified families so applicability is driven by production classification rather than fixtures.
-REQUIREMENT_INDEX_VERSION = "4"
+# v4 -> v5: Phase-4 rulebook enrichment (RULES-06, D-ENR2/D-ENR4). Decomposed the already-vendored
+# ICH Q3A(R2)/Q3B(R2) (impurities) + Q6A (specifications) and the newly-vendored ICH Q1A(R2)
+# (stability) to per-requirement entries, growing the index past its 15-entry baseline:
+#   Q1A-BATCH-SELECTION, Q1A-TESTING-FREQUENCY, Q1A-SIGNIFICANT-CHANGE (stability, 3.2.S.7/3.2.P.7);
+#   Q3A-IDENTIFICATION-THRESHOLD, Q3A-RESULTS-PRECISION (drug-substance impurities, 3.2.S.4.1);
+#   Q3B-IDENTIFICATION-THRESHOLD, Q3B-TOTAL-DEGRADATION-REPORTING (drug-product degradants, 3.2.P.5);
+#   Q6A-DESCRIPTION (3.2.S.4.1), Q6A-MICROBIAL-LIMITS, Q6A-UNIFORMITY-DOSAGE-UNITS (3.2.P.5).
+# Also expanded the profile_requires_family closure (D-SEC1) past the original 2 edges with two new
+# spec-clause edges (drug_substance -> 3.2.S.4.1, drug_product -> 3.2.P.5), each carrying a real
+# byte-exact ecfr-314.50 provenance span so a required spec family with zero classified documents can
+# fire "entire section absent." No existing entry's id/family/citation changed -- only additive.
+REQUIREMENT_INDEX_VERSION = "5"
 
-# ecfr-314.50 provenance spans (real, byte-exact re-open verified) that JUSTIFY the 2
+# ecfr-314.50 provenance spans (real, byte-exact re-open verified) that JUSTIFY the
 # profile_requires_family closure edges build_requirement_edges persists below.
 _DRUG_SUBSTANCE_STABILITY_SPAN = (6968, 7095)   # "(i) Drug substance. ... stability;"
 _DRUG_PRODUCT_STABILITY_SPAN = (8328, 8655)     # "the specifications necessary ... expiration dating."
+# D-SEC1 spec-clause closure edges (Phase 4): the NDA specification requirement for the drug
+# substance / drug product -- justifies profile -> spec-family so a required spec family absent from
+# the submission fires whole-section absence.
+_DRUG_SUBSTANCE_SPEC_SPAN = (7281, 7604)        # "the specifications necessary ... crystalline form."
+_DRUG_PRODUCT_SPEC_SPAN = (8328, 8603)          # "the specifications necessary ... container closure systems;"
 
 _SUPPLEMENTAL_FAMILY_REQUIREMENT_LINKS = {
     "CFR-211160B-SOUND-BASIS": ("3.2.S.4.1", "3.2.S.4.2"),
@@ -130,16 +146,31 @@ def build_requirement_edges(db_path: str | None = None, cache_dir: str | None = 
 
     ds_start, ds_end = _DRUG_SUBSTANCE_STABILITY_SPAN
     dp_start, dp_end = _DRUG_PRODUCT_STABILITY_SPAN
+    ds_spec_start, ds_spec_end = _DRUG_SUBSTANCE_SPEC_SPAN
+    dp_spec_start, dp_spec_end = _DRUG_PRODUCT_SPEC_SPAN
     ds_span = mint_span(nt.canonical, ds_start, ds_end, "ecfr-314.50", nt.normalizer_version)
     dp_span = mint_span(nt.canonical, dp_start, dp_end, "ecfr-314.50", nt.normalizer_version)
+    ds_spec_span = mint_span(nt.canonical, ds_spec_start, ds_spec_end, "ecfr-314.50", nt.normalizer_version)
+    dp_spec_span = mint_span(nt.canonical, dp_spec_start, dp_spec_end, "ecfr-314.50", nt.normalizer_version)
     open_span(ds_span, nt, "ecfr-314.50")  # raises HashMismatch if this drifted -- never persist a dead edge
     open_span(dp_span, nt, "ecfr-314.50")
+    open_span(ds_spec_span, nt, "ecfr-314.50")  # D-SEC1 spec-clause edges: same never-persist-a-dead-edge gate
+    open_span(dp_spec_span, nt, "ecfr-314.50")
 
     edges.add_edge(
         "drug_substance", "3.2.S.7", "profile_requires_family", ds_span.model_dump_json(), **edge_kwargs
     )
     edges.add_edge(
         "drug_product", "3.2.P.7", "profile_requires_family", dp_span.model_dump_json(), **edge_kwargs
+    )
+    # D-SEC1 (Phase 4): closure edges from each profile to its NDA-required SPECIFICATION family, so a
+    # required spec family with zero classified documents surfaces "entire section absent" via the same
+    # enumerate_requirements profile-closure union. Each carries a real byte-exact 21 CFR 314.50 span.
+    edges.add_edge(
+        "drug_substance", "3.2.S.4.1", "profile_requires_family", ds_spec_span.model_dump_json(), **edge_kwargs
+    )
+    edges.add_edge(
+        "drug_product", "3.2.P.5", "profile_requires_family", dp_spec_span.model_dump_json(), **edge_kwargs
     )
 
 
