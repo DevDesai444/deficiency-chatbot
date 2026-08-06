@@ -31,6 +31,10 @@ jobs:
           uv run pytest -m "not slow" -q
 
       - name: Enforce coverage-gate (RULES-06 no-regress + D-ENR1 traceability floor)
+        env:
+          # `python -m evals.run` needs src/ on the path (pyproject's pythonpath=src applies to
+          # pytest only, not to `python -m`); mirrors docs/eval/BASELINE.md's PYTHONPATH=src usage.
+          PYTHONPATH: src
         run: |
           # Fully offline: coverage-gate re-measures the committed rulebook snapshot + requirement
           # index (no data/ corpus, no Databricks, no LLM) and fails the build on any per-source /
@@ -38,6 +42,8 @@ jobs:
           uv run python -m evals.run coverage-gate
 
       - name: Enforce absence-gate (RECALL-01 tripwire on the gate code path)
+        env:
+          PYTHONPATH: src
         run: |
           # absence-gate is offline-SAFE (WR-03): data/ is gitignored in CI, so every non-held-out
           # absence document fails to ingest and is skipped -> the gate emits
