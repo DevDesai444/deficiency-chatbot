@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: context exhaustion at 75% (2026-08-05)
-last_updated: "2026-08-05T22:52:36.918Z"
-last_activity: 2026-08-05 -- Phase 04 execution started
+stopped_at: Phase 04 complete (verified passed) — ready to plan Phase 05
+last_updated: "2026-08-06T01:10:00Z"
+last_activity: 2026-08-06 -- Phase 04 complete (3/3 plans, verified passed; absence 0.000→1.000)
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 45
-  completed_plans: 39
+  completed_plans: 42
   percent: 44
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-05)
 
 **Core value:** Given any directory of submission documents, reliably find the real FDA/ICH compliance deficiencies — all faults and only faults that exist — each cited to the exact passage that proves it.
-**Current focus:** Phase 04 — rulebook-enrichment-absence-enumeration
+**Current focus:** Phase 5 — Deterministic Structural & Cross-Document Recall (β) — ready to plan
 
 ## Current Position
 
@@ -78,10 +78,11 @@ Roadmap-shaping decisions for current work:
 
 ### Pending Todos
 
-None yet.
+- **[Phase 5 / RECALL-05] Give the absence threshold real dynamic range.** Phase 4's absence-gate threshold `0.04` sits ABOVE the RRF score ceiling (~0.0328 = `2/(60+1)`, k=60 two-ranking fusion in `src/retrieval/hybrid.py`), so the retrieval leg is currently non-discriminative — every applicable requirement emits (a sanctioned D-ABS2 over-emit, pruned downstream). RECALL-05 must introduce a retrieval signal that actually separates addressed vs. absent requirements; until then Phase 7 inherits the full pruning load. Recorded in 04-VERIFICATION.md "Phase-5 Handoff / Known Limitation".
 
 ### Blockers/Concerns
 
+- **Anti-overfitting guard is now CI-enforced but still corpus-gated in parts.** Phase 4 hardened it: NO-CONSTANT is structural (rejects CTD-family `3.2.[SP].` + hardcoded threshold floats), and `test.yml` runs coverage-gate + absence-gate every build plus a `pytest-slow` job. But SAME-LOGIC/THRESHOLD-TRANSFER/RENAME-INVARIANCE still `pytest.skip` in stock GitHub CI (gitignored held-out corpus). When Phase 5 formalizes RECALL-05, provision the held-out corpus (or a committed fixture) so the transfer invariants actually execute in CI.
 - **Phase 3 NO-GO is the governing context.** Diagnosis: not wiring — a general reasoning weakness of the local model on lead→get_section→read_guideline→emit_finding conversion and on "a required item is ABSENT" reasoning. β must not re-attempt loop-driven recall. `absence_of_evidence` = 0.000 is the #1 gap Phase 4 exists to close.
 - **Do not chase the metric.** mvr1381 is a proxy corpus. β's recall layer must stay general; RECALL-05's guard test is the enforcement, not a suggestion.
 - **Build on committed redesign.** The planner/summariser/sandwich/workers redesign is committed and is HEAD — β builds on it (verifier + deterministic recall are sibling packages), does not clobber it.
