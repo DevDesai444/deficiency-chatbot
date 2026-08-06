@@ -25,6 +25,7 @@ from ingest.corpus import CorpusIndex
 from ingest.manifest import CoverageManifest
 from rulebook import edges
 from rulebook.requirement_index import (
+    _SUPPLEMENTAL_FAMILY_REQUIREMENT_LINKS,
     RequirementEntry,
     enumerate_requirements,
     submission_profile,
@@ -120,6 +121,19 @@ def enumerate_absences(
     # in a zero-document family is not double-counted across the two candidate sources.
     emitted_keys: set[tuple[str, str]] = set()
     entries_by_id = {e.id: e for e in applicable}
+    # Edge-driven applicability, the SAME relation enumerate_requirements uses (requirement_index):
+    # each applicable requirement maps to EVERY family it applies to -- its own native `.family` PLUS
+    # every family it is edge-linked to via `_SUPPLEMENTAL_FAMILY_REQUIREMENT_LINKS`
+    # (`family_requires_requirement`). The whole-section pass MUST select on this map, not raw
+    # `.family`, or a supplementally-linked entry (native `.family` in one section, required in
+    # another) is silently dropped from a fully-omitted required section (CR-01 recall gap). No
+    # submission-specific constant is introduced -- the map is the general edge relation, not a
+    # hardcoded family/citation (anti-overfitting / generality law).
+    families_by_requirement: dict[str, set[str]] = {}
+    for entry in applicable:
+        families_by_requirement.setdefault(entry.id, set()).add(entry.family)
+        for fam in _SUPPLEMENTAL_FAMILY_REQUIREMENT_LINKS.get(entry.id, ()):
+            families_by_requirement.setdefault(entry.id, set()).add(fam)
 
     # --- 1. REQUIREMENT-LEVEL (D-ABS1): retrieval-threshold over-emit -------------------------
     for entry in applicable:
@@ -166,7 +180,11 @@ def enumerate_absences(
                 continue  # the family HAS documents -- requirement-level pass covers it, not whole-section.
             # Zero classified documents in a profile-required family: every requirement in it is
             # unaddressed. Emit one whole-section candidate per requirement in that family.
-            for entry in (e for e in entries_by_id.values() if e.family == dst_family):
+            for entry in (
+                e
+                for e in entries_by_id.values()
+                if dst_family in families_by_requirement.get(e.id, set())
+            ):
                 if (entry.family, entry.id) in emitted_keys:
                     continue
                 anchor = CoverageAbsenceAnchor(

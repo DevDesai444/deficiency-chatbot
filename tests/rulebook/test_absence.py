@@ -155,6 +155,52 @@ def test_whole_section_required_family_omitted_fires(tmp_path, _self_contained_r
         assert f.absence_anchor.requirement_id and f.absence_anchor.family
 
 
+def test_whole_section_fires_supplementally_linked_requirements(
+    tmp_path, _self_contained_rulebook_store
+):
+    """CR-01 regression: when a drug_substance submission OMITS the required spec family 3.2.S.4.1
+    entirely, the whole-section pass must fire EVERY requirement edge-linked to that family -- not
+    only entries whose native `.family` is 3.2.S.4.1. `CFR-211160B-SOUND-BASIS` and
+    `CFR-211194-CALCULATIONS` are edge-linked to 3.2.S.4.1 via `_SUPPLEMENTAL_FAMILY_REQUIREMENT_LINKS`
+    while their native `.family` is 3.2.S.5, so the old `.family`-only selection silently dropped them
+    (a recall miss on the exact omitted-section path D-SEC1 exists to catch). The fixed pass mirrors
+    enumerate_requirements' edge-driven applicability, so they surface as whole-section candidates.
+
+    Threshold 0.0 ISOLATES the whole-section branch: the empty-cache corpus makes search_corpus
+    return [] (top_score 0.0), so `0.0 >= 0.0` short-circuits the requirement-level over-emit for
+    every requirement -- the ONLY candidates that can fire are whole-section zero-document families.
+    An assertion that these CFR entries fire UNDER family 3.2.S.4.1 therefore witnesses the
+    whole-section selection specifically: it fails on the old `.family`-only generator (their native
+    `.family` 3.2.S.5 excludes them from the 3.2.S.4.1 candidate set) and passes on the edge-driven
+    fix."""
+    # drug_substance profile present (a 3.2.S.* document) but 3.2.S.4.1 has ZERO documents.
+    corpus = _corpus_with_families(tmp_path, ["3.2.S.2"])
+    ledger = RetrievalLedger()
+    faults = enumerate_absences(
+        corpus, corpus.manifest, ledger, threshold=0.0,
+        rulebook_cache_dir=str(Path("data/rulebook_cache")),
+    )
+    # requirement ids that fired for the omitted 3.2.S.4.1 whole-section family
+    fired_for_s41 = {
+        f.absence_anchor.requirement_id
+        for f in faults
+        if f.absence_anchor.family == "3.2.S.4.1"
+    }
+    # sanity: enumerate_requirements DOES link these two entries to 3.2.S.4.1 (edge-driven truth)
+    applicable_for_s41 = ri.enumerate_requirements(corpus.manifest, family="3.2.S.4.1")
+    linked_ids = {e.id for e in applicable_for_s41}
+    assert {"CFR-211160B-SOUND-BASIS", "CFR-211194-CALCULATIONS"} <= linked_ids, (
+        "fixture precondition: both CFR entries must be edge-linked to 3.2.S.4.1"
+    )
+    assert {"CFR-211160B-SOUND-BASIS", "CFR-211194-CALCULATIONS"} <= fired_for_s41, (
+        "supplementally-linked CFR entries must fire whole-section absence for the omitted 3.2.S.4.1 "
+        f"family (old .family-only selection dropped them); got fired_for_s41={fired_for_s41}"
+    )
+    for f in faults:
+        assert f.verdict == ComplianceVerdict.GAP
+        assert f.rule_span_id is not None
+
+
 def test_whole_section_non_required_family_omitted_is_silent(
     tmp_path, _self_contained_rulebook_store
 ):
