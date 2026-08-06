@@ -1,11 +1,11 @@
 """D-GEN3 CI generality guard for the deterministic absence pass (RECALL-01, Plan 04-03).
 
-This test FILE FAILS THE BUILD (D-GEN3, enforced every run -- never a one-time audit) if the
-absence module embeds a corpus constant or if a folder rename changes applicability. It encodes the
-four D-GEN2 invariants, witnessed on the HELD-OUT spec32s41 corpus (D-GEN1: the generality witness,
-never the corpus the threshold was tuned on):
+This test FILE encodes the four D-GEN2 anti-overfitting invariants, witnessed on the HELD-OUT
+spec32s41 corpus (D-GEN1: the generality witness, never the corpus the threshold was tuned on):
 
-  1. NO-CONSTANT      -- absence.py references no dataset/doc/submission-ID literal.
+  1. NO-CONSTANT       -- absence.py embeds no dataset/doc/submission-ID literal, no CTD-family
+                          string literal (3.2.S.* / 3.2.P.*), and no hardcoded numeric threshold
+                          literal (the threshold is imported from the JSON baseline / passed in).
   2. RENAME-INVARIANCE -- reorganizing/renaming the held-out corpus dir yields the IDENTICAL
                           applicable-requirement set (content-derived, not folder-derived).
   3. SAME-LOGIC TRANSFER -- the held-out corpus's absences come from the SAME index entries firing
@@ -14,12 +14,22 @@ never the corpus the threshold was tuned on):
                           absence_threshold.json, the held-out corpus's absence candidates are
                           recovered unchanged (the threshold is a general recall bar, D-GEN2(4)).
 
+WHAT STOCK CI ACTUALLY ENFORCES EVERY BUILD (be honest -- the committed config does not deliver
+more than this): only invariant (1), the STRUCTURAL NO-CONSTANT scan of absence.py, runs
+unconditionally in `.github/workflows/test.yml`'s fast lane; coverage-gate and the absence-gate
+tripwire run alongside it as CI-enforced eval-gate checks. Invariant (2) RENAME-INVARIANCE and
+invariants (3)+(4) SAME-LOGIC / THRESHOLD-TRANSFER need the gitignored held-out corpus
+`data/32s41-Specification.pdf`; without it they `pytest.skip` (RENAME) or are slow-deselected
+(SAME-LOGIC/THRESHOLD). They run FOR REAL only where the held-out corpus is present (a self-hosted
+or scheduled runner that checks out data/, via the pytest-slow job / `-m slow`).
+
 Offline (D-RB6): the real rulebook store is built from the committed snapshot; corpora ingest into
 tmp_path; nothing touches Databricks or the shared data/ store beyond reading the local corpus PDF.
 """
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -33,7 +43,24 @@ from tools.ledger import RetrievalLedger
 
 _ABSENCE_BASELINE = Path("src/evals/baseline/absence_threshold.json")
 _HELDOUT_PDF = Path("data/32s41-Specification.pdf")  # spec32s41 -- the D-GEN1 held-out witness
+_ABSENCE_SOURCE = Path("src/rulebook/absence.py")
+
+# BACKSTOP denylist (documented): the known dataset/doc/submission ids. Kept for defense-in-depth
+# and matched CASE-INSENSITIVELY, but it is a backstop only -- the primary NO-CONSTANT guard below
+# is STRUCTURAL (rejects the CTD-family and threshold-literal shapes an unseen dataset id would not
+# be caught by), so this list need not be exhaustive to keep absence.py corpus-general.
 _DATASET_LITERALS = ("mvr1381", "spec32s41", "heldout32s41", "minispec")
+
+# CTD-family string literals (3.2.S.* quality/drug-substance, 3.2.P.* drug-product): a hardcoded
+# family/section path is a corpus/CTD-shape constant, never allowed in absence.py -- families must
+# flow off the edge relation (families_by_requirement), not literals (CR-01 / anti-overfitting law).
+_CTD_FAMILY_LITERAL = re.compile(r"3\.2\.[SP]\.")
+
+# Float literals that look like a hardcoded numeric threshold. The threshold MUST be imported from
+# the JSON baseline / passed in (D-THR) -- never a literal in absence.py. Boundary sentinels 0.0 and
+# 1.0 (the no-hits fallback score / a full-recall bound) are NOT thresholds and are whitelisted.
+_FLOAT_LITERAL = re.compile(r"(?<![\w.])\d+\.\d+")
+_ALLOWED_FLOAT_SENTINELS = frozenset({"0.0", "1.0"})
 
 
 @pytest.fixture(scope="module")
@@ -66,13 +93,45 @@ def _ingest_heldout(tmp_path, subdir: str) -> "object":
 # --- Invariant 1: NO-CONSTANT (always runs, no ingest -- the cheap D-GEN3 tripwire) ----------
 
 def test_absence_module_embeds_no_corpus_constant():
-    """D-GEN2(1): absence.py must reference no corpus/doc/submission-ID literal. Reads the module
-    source directly and asserts none of the dataset ids appears -- the build FAILS if one does."""
-    source = Path("src/rulebook/absence.py").read_text().lower()
-    offenders = [lit for lit in _DATASET_LITERALS if lit in source]
+    """D-GEN2(1) STRUCTURAL NO-CONSTANT: scan src/rulebook/absence.py source and FAIL THE BUILD if it
+    embeds any corpus/CTD/threshold constant. Three structural rejections + one documented backstop:
+
+      (a) CTD-family string literal (`3.2.S.*` / `3.2.P.*`): families must flow off the edge relation,
+          never a hardcoded section path.
+      (b) hardcoded numeric threshold float literal: the threshold is imported from the JSON baseline
+          / passed in (D-THR), never a literal here. 0.0 / 1.0 boundary sentinels are whitelisted.
+      (c) BACKSTOP: the known dataset/doc/submission-id denylist, matched CASE-INSENSITIVELY.
+
+    This is a REAL structural guarantee, not a substring convenience: if it fails against the current
+    absence.py, the offending literal is surfaced and the reviewer decides -- the test is NOT to be
+    weakened to pass. (Expectation from CR-01: absence.py drives families off the edge relation and
+    imports the threshold, so it should contain NONE of these literals.)"""
+    source = _ABSENCE_SOURCE.read_text()
+    offenders: list[str] = []
+
+    # (a) CTD-family literals (3.2.S.* / 3.2.P.*).
+    ctd = _CTD_FAMILY_LITERAL.findall(source)
+    if ctd:
+        offenders.append(f"CTD-family literal(s) {sorted(set(ctd))} (families must come from the edge relation)")
+
+    # (b) hardcoded numeric threshold float literals (whitelist 0.0 / 1.0 boundary sentinels).
+    floats = {m for m in _FLOAT_LITERAL.findall(source) if m not in _ALLOWED_FLOAT_SENTINELS}
+    if floats:
+        offenders.append(
+            f"hardcoded numeric threshold literal(s) {sorted(floats)} "
+            "(the threshold must be imported from the JSON baseline / passed in, D-THR)"
+        )
+
+    # (c) BACKSTOP denylist, case-insensitive.
+    source_lower = source.lower()
+    dataset = [lit for lit in _DATASET_LITERALS if lit.lower() in source_lower]
+    if dataset:
+        offenders.append(f"dataset id literal(s) {dataset} (backstop denylist)")
+
     assert not offenders, (
-        f"src/rulebook/absence.py embeds dataset literal(s) {offenders} -- "
-        "the absence module must be corpus-general (D-GEN2 no-constant)"
+        f"src/rulebook/absence.py embeds a corpus/threshold constant -- {offenders}. "
+        "The absence module must be corpus-general (D-GEN2 STRUCTURAL no-constant); do NOT weaken "
+        "this test to pass -- fix absence.py or route the literal to the reviewer."
     )
 
 
@@ -108,10 +167,12 @@ def test_threshold_transfer_and_same_logic_on_heldout(tmp_path, _self_contained_
 
     Marked `slow` (opt-in via `-m slow`): `search_corpus` re-embeds every held-out corpus chunk on
     each per-requirement query on this CPU-only sentence-transformers backend, so a full held-out
-    absence pass runs in minutes. The always-on tripwires (NO-CONSTANT + RENAME-INVARIANCE above)
-    catch the two dominant overfitting modes cheaply every run; this deeper invariant runs in the
-    slow lane. The `absence-gate` CLI proves the same recovery mechanism on the non-held-out
-    aggregate every run (SC2)."""
+    absence pass runs in minutes. Only the STRUCTURAL NO-CONSTANT scan above runs unconditionally in
+    stock CI; RENAME-INVARIANCE skips without the gitignored held-out PDF, and this SAME-LOGIC /
+    THRESHOLD-TRANSFER invariant is slow-deselected -- both run for real only where the held-out
+    corpus is provisioned (pytest-slow job / `-m slow`). The `absence-gate` CLI proves the same
+    recovery mechanism on the non-held-out aggregate wherever a corpus is present (SC2), and runs as
+    an always-on offline tripwire in CI (SKIPPED cleanly when data/ is absent)."""
     threshold = json.loads(_ABSENCE_BASELINE.read_text())["threshold"]
 
     corpus = _ingest_heldout(tmp_path, "heldout-witness")
