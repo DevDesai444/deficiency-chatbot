@@ -1,9 +1,15 @@
 ---
 phase: 04-rulebook-enrichment-absence-enumeration
 verified: 2026-08-06T00:35:00Z
-status: human_needed
+re_verified: 2026-08-06T01:05:00Z
+status: passed
 score: 4/4 must-haves verified
 overrides_applied: 0
+human_verification_resolution:
+  - item: "Held-out generality witness (spec32s41) — SAME-LOGIC + THRESHOLD-TRANSFER"
+    resolution: "RESOLVED. Orchestrator independently ran `pytest -m slow tests/evals/test_generality_guard.py` with data/32s41-Specification.pdf present → test_threshold_transfer_and_same_logic_on_heldout PASSED (58.5s). The frozen mvr1381-tuned threshold (0.04) transfers to the held-out corpus and candidates arise from the same index entries — anti-overfitting transfer independently witnessed, not just summary-claimed."
+  - item: "Anti-overfitting guard enforcement strength (WR-01/WR-02)"
+    resolution: "RESOLVED per senior-reviewer decision (harden then complete). Hardening landed in commits 37b27e4 (CI: coverage-gate + absence-gate enforced, pytest-slow lane added), e9c0ff8 (NO-CONSTANT made structural + case-insensitive: rejects CTD-family `3.2.[SP].` and hardcoded threshold-float literals, denylist kept as backstop; docstrings corrected to what CI actually enforces), 700277e (Phase-5 handoff recorded), ca0e30c (PYTHONPATH=src fix for gate steps). Strengthened NO-CONSTANT passes against current absence.py. Residual: SAME-LOGIC/THRESHOLD-TRANSFER/RENAME still corpus-gated in stock GitHub CI (documented, not hidden); the every-build guard is now a structural check + coverage-gate + absence-gate tripwire rather than a 4-string denylist."
 human_verification:
   - test: "Held-out generality witness (spec32s41) — SAME-LOGIC + THRESHOLD-TRANSFER invariants"
     expected: "With the frozen mvr1381-tuned threshold (0.04), the held-out spec32s41 corpus recovers >=1 absence candidate, and every candidate's requirement_id is a subset of that corpus's applicable index-entry set (absences arise from the SAME index entries, not corpus-specific rules). Proves the threshold is a general recall bar, not an mvr1381 fit."
@@ -16,9 +22,9 @@ human_verification:
 # Phase 4: Rulebook Enrichment + Absence Enumeration (β) Verification Report
 
 **Phase Goal:** Close the #1 recall gap — `absence_of_evidence = 0.000` — with the general mechanism absence detection requires: enumerate the FDA/ICH required items applicable to a submission from the rulebook's requirement index, check which the submission does not address, and emit each absence as a grounded candidate. Thicken thin ICH/FDA coverage to per-requirement granularity first. Driven by the rulebook, never by knowledge of a specific corpus.
-**Verified:** 2026-08-06T00:35:00Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Verified:** 2026-08-06T00:35:00Z (re-verified 2026-08-06T01:05:00Z)
+**Status:** passed
+**Re-verification:** Yes — both human_needed items resolved (held-out witness run & passed; WR-01/WR-02 hardened, commits 37b27e4/e9c0ff8/700277e/ca0e30c). See `human_verification_resolution` in frontmatter.
 
 ## Goal Achievement
 
@@ -28,7 +34,7 @@ human_verification:
 | --- | --- | --- | --- |
 | SC1 | Rulebook/requirement-index enriched to per-requirement granularity, measurably past the ich=4/fda=1 baseline, with `{source,citation,version,license,url}` + ICH copyright per new chunk | ✓ VERIFIED | `rulebook/ich/Q1A-R2_Guideline.pdf` vendored (264,104 bytes); manifest row carries citation `ICH Q1A(R2)`, version `2003-02-06`, `license: ICH_LEGAL_NOTICE`, `url`, `sha256: bc7124e1...`. `build_ich(update_manifest=False)` returns no error rows, Q1A present. `load_requirement_index()` → **25 entries** (>15 baseline), `REQUIREMENT_INDEX_VERSION="5"`, every entry re-opens byte-exact through the loader gate. coverage-gate reports `ich=5` (>4). |
 | SC2 | System enumerates applicable required items and flags each unaddressed one as a grounded absence candidate dual-cited to the rule — **recovering `absence_of_evidence` above the 0.000 floor on the Phase-0 eval set** | ✓ VERIFIED | **Live:** `python -m evals.run absence-gate` exit 0 → `ABSENCE-GATE OK: non_held_out_aggregate=1.000 (>0.000, SC2) threshold=0.04 per_document={'mvr1381': {'absence_recall': 1.0, 'emitted': 8, 'required': 11}, 'minispec': {'absence_recall': 1.0, 'emitted': 8, 'required': 1}}`. Both docs MEASURED (not skipped), 8 grounded candidates each. `enumerate_absences` = `enumerate_requirements` ∘ `search_corpus` ∘ `emit_absence_finding` (absence.py:107,140,77). Mechanism is general (threshold read from JSON baseline, query is always `entry.trigger`, applicability flows from manifest). |
-| SC3 | Enumeration is corpus-general: a guard test proves no submission-specific constant; a held-out corpus yields candidates from the same rulebook logic; folder renames don't change applicability | ⚠️ VERIFIED-WITH-WARNING | Mechanism general by construction: no corpus constant in absence.py (grep clean), no threshold constant, no loop coupling. NO-CONSTANT + RENAME-INVARIANCE tripwires present and pass locally; SAME-LOGIC + THRESHOLD-TRANSFER present. **BUT** the two held-out-witness invariants are `@pytest.mark.slow` (deselected by default), RENAME-INVARIANCE `pytest.skip`s without the gitignored held-out PDF, and CI (`test.yml` → `uv run pytest -q`) runs neither the gates nor the slow lane — so in the automated pipeline only NO-CONSTANT (a 4-string denylist) executes. See Human Verification. |
+| SC3 | Enumeration is corpus-general: a guard test proves no submission-specific constant; a held-out corpus yields candidates from the same rulebook logic; folder renames don't change applicability | ✓ VERIFIED | Mechanism general by construction: no corpus constant in absence.py (structural grep clean), no threshold constant, no loop coupling. **Held-out witness independently run at re-verification** (`pytest -m slow` → SAME-LOGIC + THRESHOLD-TRANSFER PASSED, 58.5s). Enforcement hardened (WR-01/WR-02, commits 37b27e4/e9c0ff8): NO-CONSTANT is now a structural + case-insensitive check (rejects CTD-family `3.2.[SP].` + hardcoded threshold floats), and `test.yml` now enforces coverage-gate + absence-gate every build plus a corpus-gated `pytest-slow` job. Residual (documented, not hidden): SAME-LOGIC/THRESHOLD-TRANSFER/RENAME remain corpus-gated in stock GitHub CI. |
 | SC4 | Every absence candidate is grounded + re-openable — names the rule clause it violates and the coverage-manifest evidence — so a downstream verifier can re-open both sides | ✓ VERIFIED | `emit_absence_finding` keeps the RULE half byte-exact (ledger `was_issued` + RULEBOOK store membership + `open_span` HashMismatch guard, emit_finding.py:170-189); optional claim CORPUS span re-opened byte-exact via same path (192-214); `unanchored_absence` rejects a non-re-derivable anchor (217-221). Every Fault carries `verdict=GAP`, `rule_span_id`, and a re-derivable `CoverageAbsenceAnchor` (profile, family, requirement_id, threshold, sub_threshold_hits, manifest_span_ids). **Fabricated/never-issued span is provably unemittable** (tests pass, see below). |
 
 **Score:** 4/4 truths verified (SC3 verified with a WARNING on automated-enforcement strength).
