@@ -166,12 +166,21 @@ The phases below replace the superseded v1.0 agentic-recall Phases 4–6. Depend
 **Plans**: 7 plans in 5 waves
 
 Plans:
+**Wave 1**
 - [ ] 05-01-PLAN.md — Wave 0 foundation: shared envelope (D-ENV1), guard vocab (D-GRD3), parse-layer hyperlink/link backfill, synthetic fixture (D-GRD1/D-GRD4), test scaffolds (RECALL-02/03/04/05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 05-02-PLAN.md — RECALL-05 retrieval surface: D-R5A dense cosine score, D-R5B per-submission index persistence (RECALL-05)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 05-03-PLAN.md — RECALL-02 structural leg: detect_structural_inconsistencies, emit_structural_finding, structural-gate (RECALL-02)
 - [ ] 05-04-PLAN.md — RECALL-03 reference graph: extract_references, detect_reference_anomalies, emit_reference_finding, reference-gate (RECALL-03)
 - [ ] 05-05-PLAN.md — RECALL-04 precedent leg: search_precedents, detect_precedent_candidates, emit_precedent_finding (RECALL-04)
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 05-06-PLAN.md — Guard extension: NO-CONSTANT parametrized, SAME-LOGIC/THRESHOLD-TRANSFER/RENAME-INVARIANCE in fast CI, deterministic-recall-gate (RECALL-05)
+
+**Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 05-07-PLAN.md — Integration: fill follow_reference stub, FailureFamily extension, phase5-gate SC5 (RECALL-02/03/04/05)
 
 ### Phase 6: On-Prem Verifier Model + Weak-Model Reliability (β)
