@@ -55,6 +55,15 @@ finetune = [
 pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# `slow` marks real-embedding held-out-corpus tests (search_corpus re-embeds every chunk per query
+# on the CPU-only backend, so a full held-out absence pass runs in minutes). Deselected by default
+# so the standard suite stays fast; opt in with `pytest -m slow`. The always-on generality tripwires
+# (no-constant, rename-invariance) plus the `absence-gate` CLI cover the recovery/overfitting
+# contract on every run.
+markers = [
+    "slow: real-embedding held-out-corpus test; opt in with `-m slow` (deselected by default).",
+]
+addopts = "-m 'not slow'"
 
 [tool.ruff]
 line-length = 100
