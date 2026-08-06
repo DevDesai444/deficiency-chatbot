@@ -346,7 +346,12 @@ def cmd_absence_gate(args: argparse.Namespace) -> int:
     floor). A submission that fails to ingest is recorded and SKIPPED (mirrors cmd_retrieval_gate),
     never crashes the gate -- a missing local corpus file must not fail the build.
 
-    Two independent checks:
+    When EVERY non-held-out absence doc is skipped (clean checkout / CI where `data/` is gitignored,
+    so nothing could be measured), the gate emits a distinct `ABSENCE-GATE SKIPPED (no local corpus)`
+    and returns 0 (WR-03): "nothing to measure" is NOT a recall regression, and must not fail-close
+    the build. The real recall-failure checks below are only reached once >=1 doc was measured.
+
+    Two independent checks (only when at least one doc was actually measured):
     (i) HARD (SC2, W3): the measured absence_of_evidence recall on the NON-HELD-OUT EVAL-SET
         AGGREGATE (mvr1381 + minispec -- every doc with held_out=False) must be strictly > 0.000.
         The recall is matched-vs-required absence items accumulated across all processed non-held-out
@@ -386,6 +391,7 @@ def cmd_absence_gate(args: argparse.Namespace) -> int:
     per_doc: dict[str, dict | str] = {}
     matched_total = 0
     required_total = 0
+    measured_docs = 0  # docs that actually ran the pass (ingested), vs. skipped for missing corpus
     for doc in eval_set.documents:
         if doc.held_out:
             continue
@@ -408,13 +414,26 @@ def cmd_absence_gate(args: argparse.Namespace) -> int:
         matched = required if emitted > 0 else 0
         matched_total += matched
         required_total += required
+        measured_docs += 1
         per_doc[doc.doc_id] = {
             "absence_recall": (matched / required) if required else 0.0,
             "emitted": emitted,
             "required": required,
         }
 
-    aggregate = (matched_total / required_total) if required_total else 0.0
+    # WR-03: distinguish "nothing to measure" from "measured and not recovered". On a clean checkout /
+    # CI where `data/` is gitignored, every absence doc fails to ingest and is skipped -> measured_docs
+    # == 0 and required_total == 0. That is a MISSING-CORPUS condition, not a recall regression --
+    # mirror cmd_retrieval_gate's tolerance ("a missing local corpus file must not fail the build") and
+    # return 0 with a distinct SKIPPED message, rather than a false-negative "gap not recovered".
+    if measured_docs == 0 or required_total == 0:
+        print(
+            "ABSENCE-GATE SKIPPED (no local corpus): no non-held-out absence document could be "
+            f"measured ({measured_docs} measured) -- per_document={per_doc}"
+        )
+        return 0
+
+    aggregate = matched_total / required_total
 
     if aggregate <= 0.0:
         print(
