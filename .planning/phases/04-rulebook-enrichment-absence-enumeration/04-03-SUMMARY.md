@@ -119,3 +119,8 @@ None — this plan introduces no new network endpoint, auth path, file-access pa
 ## Known Stubs
 
 None — `enumerate_absences` is fully wired to real applicability, retrieval, and the byte-exact emit gate; the absence-gate scores against the real eval set. The candidate PRUNING consumer (Phase-7 verifier) lands in a later phase by design; the recall layer's over-emit contract (D-ABS2) is complete and gate-proven.
+
+## Self-Check: PASSED
+
+- All 5 created files present on disk (absence.py, absence_threshold.json, test_absence.py, test_generality_guard.py, 04-03-SUMMARY.md).
+- All 3 commits present in git history (c310a3a, 97c82d0, cef1a1f).
