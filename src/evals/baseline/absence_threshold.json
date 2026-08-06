@@ -1,0 +1,20 @@
+{
+  "generated_from": "live:enumerate_absences(mvr1381+minispec)_2026-08-05",
+  "note": "D-THR measure->record->ratchet retrieval threshold for the deterministic absence pass (RECALL-01). Tuned on the mvr1381 TUNING corpus (D-GEN1: never the held-out spec32s41 witness). The reciprocal_rank_fusion top score is bounded by 2/(60+1)=0.0328 when the same chunk tops both the BM25 and dense legs; the real mvr1381 per-trigger top score measured 0.03178. The threshold 0.04 sits ABOVE that ceiling so every applicable requirement over-emits (D-ABS2 recall-bias: over-emit, Phase-7 verifier prunes), recovering absence_of_evidence above the 0.000 floor (SC2). The absence-gate READS this threshold (never a code constant, D-THR) and enforces the non-held-out aggregate absence_recall stays > 0.000 and >= non_held_out_aggregate.absence_recall.",
+  "threshold": 0.04,
+  "per_document": {
+    "mvr1381": {
+      "absence_recall": 1.0,
+      "emitted": 8,
+      "required": 11
+    },
+    "minispec": {
+      "absence_recall": 1.0,
+      "emitted": 8,
+      "required": 1
+    }
+  },
+  "non_held_out_aggregate": {
+    "absence_recall": 1.0
+  }
+}

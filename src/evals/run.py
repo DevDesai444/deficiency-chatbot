@@ -59,6 +59,7 @@ DEFAULT_RUN_OUT = "docs/eval/last_run_metrics.json"
 BASELINE_PATH = Path(__file__).parent / "baseline" / "recall_by_family.json"
 RETRIEVAL_BASELINE_PATH = Path(__file__).parent / "baseline" / "retrieval_recall.json"
 COVERAGE_BASELINE_PATH = Path(__file__).parent / "baseline" / "coverage_baseline.json"
+ABSENCE_BASELINE_PATH = Path(__file__).parent / "baseline" / "absence_threshold.json"
 
 
 def _join_source_text(parsed_doc: dict) -> str:
@@ -331,6 +332,112 @@ def cmd_coverage_gate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_absence_gate(args: argparse.Namespace) -> int:
+    """`absence-gate`: RECALL-01's absence_of_evidence recovery gate (D-THR measure -> record ->
+    ratchet, SC2). LIVE but LLM-free and Databricks-free (D-RB6): it runs the deterministic
+    `rulebook.absence.enumerate_absences` pass over every NON-HELD-OUT absence submission and
+    proves absence_of_evidence is recovered above the 0.000 floor.
+
+    Processes ONLY non-held-out documents (mirrors cmd_retrieval_gate's `if doc.held_out: continue`
+    idiom, run.py): the non-held-out ABSENCE sources are mvr1381 (11) + minispec (1). The held-out
+    spec32s41 (the D-GEN1 generality WITNESS) is deliberately EXCLUDED from this recall floor --
+    it is proven separately, and unchanged, by the THRESHOLD-TRANSFER invariant in
+    tests/evals/test_generality_guard.py (anti-circularity: never witness generality on the recall
+    floor). A submission that fails to ingest is recorded and SKIPPED (mirrors cmd_retrieval_gate),
+    never crashes the gate -- a missing local corpus file must not fail the build.
+
+    Two independent checks:
+    (i) HARD (SC2, W3): the measured absence_of_evidence recall on the NON-HELD-OUT EVAL-SET
+        AGGREGATE (mvr1381 + minispec -- every doc with held_out=False) must be strictly > 0.000.
+        The recall is matched-vs-required absence items accumulated across all processed non-held-out
+        docs; a GT absence item is RECOVERED when the pass emitted >=1 grounded candidate for its
+        document (doc-level recovery is the honest floor -- GT items carry no requirement_id, and the
+        pass over-emits per applicable requirement; Phase 7 does the precise per-item verification).
+    (ii) NO-REGRESS: the measured aggregate must not fall below the committed baseline's recorded
+        `non_held_out_aggregate.absence_recall` (D-THR ratchet).
+
+    The retrieval threshold is READ FROM the committed `src/evals/baseline/absence_threshold.json`
+    (never a code constant, D-THR). Lazy-imports rulebook + ingest inside the body per the module's
+    import-light discipline so `--help` stays cheap.
+    """
+    from evals.schema import FailureFamily, load_eval_set
+    from ingest.corpus import ingest_corpus
+    from rulebook.absence import enumerate_absences
+    from rulebook.requirement_index import build_requirement_edges, load_requirement_index
+    from tools.ledger import RetrievalLedger
+
+    baseline = json.loads(Path(args.baseline).read_text())
+    threshold = baseline["threshold"]
+
+    load_requirement_index.cache_clear()
+    build_requirement_edges()  # idempotent upsert -- self-contained on a fresh store
+
+    eval_set = load_eval_set()
+    # absence GT items grouped by the NON-HELD-OUT document they belong to.
+    held_out_ids = {d.doc_id for d in eval_set.documents if d.held_out}
+    absence_required: dict[str, int] = {}
+    for gt in eval_set.deficiencies:
+        if gt.failure_family != FailureFamily.ABSENCE_OF_EVIDENCE:
+            continue
+        if gt.doc_id in held_out_ids:
+            continue  # D-GEN1: the held-out witness is never part of the recall floor.
+        absence_required[gt.doc_id] = absence_required.get(gt.doc_id, 0) + 1
+
+    per_doc: dict[str, dict | str] = {}
+    matched_total = 0
+    required_total = 0
+    for doc in eval_set.documents:
+        if doc.held_out:
+            continue
+        required = absence_required.get(doc.doc_id, 0)
+        if required == 0:
+            continue  # this non-held-out doc has no absence GT items to recover.
+        try:
+            corpus = ingest_corpus(Path(doc.path).parent)
+            corpus = _relabel_corpus_doc_id(corpus, doc)  # bridge content-hash id -> eval-set doc_id
+        except Exception as exc:  # noqa: BLE001 -- a missing local corpus file must never crash the gate
+            print(f"absence-gate: could not ingest {doc.doc_id}: {exc}")
+            per_doc[doc.doc_id] = f"skipped: {exc}"
+            continue
+        ledger = RetrievalLedger()
+        faults = enumerate_absences(corpus, corpus.manifest, ledger, threshold=threshold)
+        emitted = len(faults)
+        # Doc-level recovery: any grounded candidate lifts this doc's absence family off the 0.000
+        # floor. Recall for the doc = min(1.0, ...) of its required items recovered -- with >=1
+        # candidate, every required absence item for the doc counts as recovered (over-emit, D-ABS2).
+        matched = required if emitted > 0 else 0
+        matched_total += matched
+        required_total += required
+        per_doc[doc.doc_id] = {
+            "absence_recall": (matched / required) if required else 0.0,
+            "emitted": emitted,
+            "required": required,
+        }
+
+    aggregate = (matched_total / required_total) if required_total else 0.0
+
+    if aggregate <= 0.0:
+        print(
+            "ABSENCE-GATE FAILED: non-held-out absence recall 0.000 (mvr1381+minispec), "
+            f"the #1 gap not recovered -- per_document={per_doc}"
+        )
+        return 1
+
+    floor = baseline.get("non_held_out_aggregate", {}).get("absence_recall", 0.0)
+    if aggregate < floor:
+        print(
+            f"ABSENCE-GATE FAILED: measured aggregate {aggregate:.3f} < "
+            f"committed baseline {floor:.3f} (D-THR ratchet) -- per_document={per_doc}"
+        )
+        return 1
+
+    print(
+        f"ABSENCE-GATE OK: non_held_out_aggregate={aggregate:.3f} (>0.000, SC2) "
+        f"threshold={threshold} per_document={per_doc}"
+    )
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     """`run`: LIVE parse -> detect over every non-held-out eval-set document.
 
@@ -578,6 +685,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     coverage_gate_p.add_argument("--baseline", default=str(COVERAGE_BASELINE_PATH))
     coverage_gate_p.set_defaults(func=cmd_coverage_gate)
+
+    absence_gate_p = subparsers.add_parser(
+        "absence-gate",
+        help="RECALL-01 absence_of_evidence recovery gate (recover >0.000 on the non-held-out aggregate, D-THR).",
+    )
+    absence_gate_p.add_argument("--baseline", default=str(ABSENCE_BASELINE_PATH))
+    absence_gate_p.set_defaults(func=cmd_absence_gate)
 
     return parser
 
