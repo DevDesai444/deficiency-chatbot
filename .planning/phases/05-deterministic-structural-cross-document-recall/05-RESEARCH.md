@@ -1053,22 +1053,25 @@ No new security surface beyond existing ingest/store patterns. The per-submissio
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should rule_span_id be required for STRUCTURAL findings, and if so, which rule?**
    - What we know: `emit_finding` requires `rule_span_id`. Pure aggregate arithmetic (Table 19 total < single component) has no specific single FDA/ICH rule — it's internal consistency.
    - What's unclear: Does the ICH Q2(R2) or Q6A general "results must be internally consistent" requirement suffice as the rule span? Or should the emit gate be relaxed for STRUCTURAL leg?
    - Recommendation: Add a general "data consistency" rule entry to the requirement index (e.g., ICH Q2 "reportable value" clause) that can serve as the rule span for aggregate checks. Alternatively, relax the gate for STRUCTURAL: `rule_span_id` optional (consistent with absence finding's different submission half). Raise with senior reviewer.
+   - **RESOLVED (D-STR6):** rule_span_id is nullable for the STRUCTURAL leg. Pure internal-consistency findings (aggregate recompute, summary-vs-detail mismatch) emit with no rule span (rule_span_id=None); only result-exceeds-spec-limit cites the rulebook limit span when available. Do NOT invent a general data-consistency rule — the emit gate is relaxed to permit null ruleId for STRUCTURAL findings per D-ENV1 ("rule span attached only when a rule applies"). Decided in CONTEXT.md D-STR6.
 
 2. **Multi-doc submission fixture for true X1 test (QOS vs Module cross-reference)**
    - What we know: Current mvr1381/minispec eval corpora are single-document. True X1 (QOS 2.3 vs Module 3.2.P.5 cross-doc mismatch) requires two documents.
    - What's unclear: Does Phase 5 SC2 ("catching at least one X1") require adding a multi-doc eval fixture, or is the minispec's intra-document MS-01/MS-02 sufficient proxy?
    - Recommendation: The synthetic fixture (D-GRD1) should be a multi-doc submission (doc_a = QOS analog, doc_b = Module analog) and serve double duty: (a) anti-overfitting guard corpus, (b) provides the cross-document X1/X2 testable scenario. Raise with senior reviewer before authoring the fixture.
+   - **RESOLVED (D-GRD4):** The committed synthetic fixture is multi-document — doc_a (QOS analog, PDF) and doc_b (Module 3.2 analog, DOCX) — with planted X1 (value in doc_a cross-referenced to doc_b with a contradiction) and X2 (cross-doc value inconsistency). It serves double duty: (a) anti-overfitting guard corpus for SAME-LOGIC/THRESHOLD-TRANSFER/RENAME invariants, and (b) the cross-document end-to-end catch for SC2. A separate fixture_b (distinct surface forms) is also committed for the THRESHOLD-TRANSFER invariant proper. Decided in CONTEXT.md D-GRD4.
 
 3. **DOCX hyperlink extraction — extend parse layer vs. re-open DOCX from root path?**
    - What we know: `parse/docx.py` currently extracts paragraph text and tables but NOT hyperlinks. The corpus cache stores canonical text but not the raw DOCX bytes.
    - What's unclear: Is it acceptable to extend `extract_docx()` to also emit a `hyperlinks: list[dict]` field in the parsed dict, or should the reference extractor re-open the DOCX from `CorpusIndex.root / DocEntry.filename`?
    - Recommendation: Extend `extract_docx()` to emit hyperlinks in the parsed dict (stored in cache under `"hyperlinks"` key). This preserves the offline guarantee (no re-parsing at query time) and keeps all extraction at ingest time. The planner should allocate a Wave 0 task to add this to `parse/docx.py`.
+   - **RESOLVED:** extend `extract_docx()` at ingest to emit a `hyperlinks` field in the parsed dict (list of {rId, target, paragraph_index}), keeping all extraction at ingest time and preserving the offline cache guarantee. This is implemented in Plan 01 Wave-0 Task 1a (parse-layer backfill). Decided by planner following the recommendation.
 
 ---
 
