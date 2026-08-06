@@ -150,7 +150,7 @@ The phases below replace the superseded v1.0 agentic-recall Phases 4–6. Depend
 **Plans**: 3 plans in 2 waves
 - [x] 04-01-PLAN.md — Rulebook + requirement-index enrichment: vendor ICH Q1A(R2), decompose Q3A/Q3B/Q6A per-requirement, expand closure edges, coverage baseline + traceability gate (RULES-06)
 - [x] 04-02-PLAN.md — Emit-gate absence variant: CoverageAbsenceAnchor schema + emit_absence_finding (byte-exact rule half, re-derivable anchor) (RECALL-01)
-- [ ] 04-03-PLAN.md — Deterministic absence pass: enumerate_requirements ∘ search_corpus ∘ emit_absence_finding, mvr1381-tuned threshold, absence-gate (recover absence>0.000), D-GEN3 generality CI guard (RECALL-01)
+- [x] 04-03-PLAN.md — Deterministic absence pass: enumerate_requirements ∘ search_corpus ∘ emit_absence_finding, mvr1381-tuned threshold, absence-gate (recover absence>0.000), D-GEN3 generality CI guard (RECALL-01)
 
 ### Phase 5: Deterministic Structural & Cross-Document Recall (β)
 **Goal**: Own the rest of recall in general deterministic code — intra-document structural inconsistencies (summary-vs-detail value mismatch, reported result exceeding its spec limit), a cross-document reference graph (hyperlinks, "see §X", numeric value cross-refs) that flags unresolved references / absent referenced content or documents / cross-document value contradictions, and precedent-similarity candidates over the past-deficiency corpus. This completes `follow_reference`'s reference-graph backing and subsumes the old cross-document checks (X1/X2). Every check emits a grounded candidate and stays rulebook/structure/graph-general behind an enforced anti-overfitting guard.
