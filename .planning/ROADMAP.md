@@ -163,7 +163,16 @@ The phases below replace the superseded v1.0 agentic-recall Phases 4–6. Depend
   3. The system **surfaces candidate deficiencies by similarity to the past-deficiency (precedent) corpus**, each carrying its source anchor, so precedent recall is measured as its own family on the harness.
   4. **Anti-overfitting is enforced by a guard test**: every deterministic recall check (structural, reference-graph, precedent) is rulebook/structure/graph-general — the guard asserts no submission-specific constant (batch number, doc name, spec value, section path) is embedded in check logic, and the checks run unchanged against a held-out corpus. The eval corpus is a proxy; any check tuned to recover a specific item on *this* corpus fails the guard.
   5. On the Phase 0 eval set, combined deterministic recall (absence + structural + cross-document + precedent) moves **recall-by-family above the 0.071 baseline** with **zero true positives lost**, and every emitted candidate is grounded to a re-openable verbatim quote.
-**Plans**: TBD
+**Plans**: 7 plans in 5 waves
+
+Plans:
+- [ ] 05-01-PLAN.md — Wave 0 foundation: shared envelope (D-ENV1), guard vocab (D-GRD3), parse-layer hyperlink/link backfill, synthetic fixture (D-GRD1/D-GRD4), test scaffolds (RECALL-02/03/04/05)
+- [ ] 05-02-PLAN.md — RECALL-05 retrieval surface: D-R5A dense cosine score, D-R5B per-submission index persistence (RECALL-05)
+- [ ] 05-03-PLAN.md — RECALL-02 structural leg: detect_structural_inconsistencies, emit_structural_finding, structural-gate (RECALL-02)
+- [ ] 05-04-PLAN.md — RECALL-03 reference graph: extract_references, detect_reference_anomalies, emit_reference_finding, reference-gate (RECALL-03)
+- [ ] 05-05-PLAN.md — RECALL-04 precedent leg: search_precedents, detect_precedent_candidates, emit_precedent_finding (RECALL-04)
+- [ ] 05-06-PLAN.md — Guard extension: NO-CONSTANT parametrized, SAME-LOGIC/THRESHOLD-TRANSFER/RENAME-INVARIANCE in fast CI, deterministic-recall-gate (RECALL-05)
+- [ ] 05-07-PLAN.md — Integration: fill follow_reference stub, FailureFamily extension, phase5-gate SC5 (RECALL-02/03/04/05)
 
 ### Phase 6: On-Prem Verifier Model + Weak-Model Reliability (β)
 **Goal**: Stand up the reasoning/verification model the β verifier runs on — NVIDIA Llama-3.3-Nemotron-Super-49B-v1.5, served **self-hosted on Databricks** alongside Llama 3.3 70B + Qwen MoE, with **no external LLM API ever called** — and prove it is production-wired before Phase 7 depends on it. Because the verifier still runs on weaker open-weights models, harden tool-call reliability here: server-side guided decoding, field-level actionable errors, and targeted semantic arg coercion — so the KEEP|DOWNGRADE verdicts in Phase 7 parse reliably instead of dropping findings to malformed args.
@@ -212,8 +221,8 @@ Phase 0 (Eval Harness) is also the **continuous gate**: its recall-by-family met
 | 1. Ingestion Foundation | 9/9 | Complete | 2026-07-31 |
 | 2. Retrieval, Navigation Tools & Rulebook | 9/9 | Complete | 2026-07-31 |
 | 3. Drive-Loop Spike (GO/NO-GO) | 20/20 | Complete — NO-GO (superseded by β) | 2026-08-05 |
-| 4. Rulebook Enrichment + Absence Enumeration (β) | 0 / TBD | Not started | - |
-| 5. Deterministic Structural & Cross-Document Recall (β) | 0 / TBD | Not started | - |
+| 4. Rulebook Enrichment + Absence Enumeration (β) | 3 / 3 | Complete | 2026-08-06 |
+| 5. Deterministic Structural & Cross-Document Recall (β) | 0 / 7 | In progress | - |
 | 6. On-Prem Verifier Model + Weak-Model Reliability (β) | 0 / TBD | Not started | - |
 | 7. Multi-Agent Verification + Interpretive Tail (β) | 0 / TBD | Not started | - |
 | 8. Cost Governor (β) | 0 / TBD | Not started | - |
