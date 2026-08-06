@@ -118,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-05 — milestone v2.0 (β) started after the v1.0 agentic-recall spike NO-GO*
+*Last updated: 2026-08-06 — Phase 4 (Rulebook Enrichment + Absence Enumeration, β) complete: absence_of_evidence recovered 0.000→1.000 via a deterministic pre-loop pass (RULES-06, RECALL-01 validated). Next: Phase 5 deterministic structural + cross-document recall.*
