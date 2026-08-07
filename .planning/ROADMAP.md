@@ -178,7 +178,7 @@ Plans:
 - [x] 05-05-PLAN.md — RECALL-04 precedent leg: search_precedents, detect_precedent_candidates, emit_precedent_finding (RECALL-04)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 05-06-PLAN.md — Guard extension: NO-CONSTANT parametrized, SAME-LOGIC/THRESHOLD-TRANSFER/RENAME-INVARIANCE in fast CI, deterministic-recall-gate (RECALL-05)
+- [x] 05-06-PLAN.md — Guard extension: NO-CONSTANT parametrized, SAME-LOGIC/THRESHOLD-TRANSFER/RENAME-INVARIANCE in fast CI, deterministic-recall-gate (RECALL-05)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 05-07-PLAN.md — Integration: fill follow_reference stub, FailureFamily extension, phase5-gate SC5 (RECALL-02/03/04/05)
