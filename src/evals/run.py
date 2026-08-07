@@ -647,6 +647,313 @@ def cmd_agent_run(args: argparse.Namespace) -> int:
     return 0 if run_completed else 1
 
 
+# =============================================================================
+# Phase 5 gate CLI commands (Plan 06, Wave 4 — Ruling 4: ALL Phase 5 gate wiring here)
+# Plans 03/04/05 removed run.py from their files_modified; this is the ONLY plan
+# that writes run.py for Phase 5. Additive-only: existing cmd_* functions untouched.
+# =============================================================================
+
+
+def cmd_structural_gate(args: argparse.Namespace) -> int:
+    """`structural-gate`: RECALL-02 structural-inconsistency gate (Plan 06, Ruling 4).
+
+    Runs detect_structural_inconsistencies on the committed synthetic fixture_a and
+    hard-fails (return 1) when 0 structural findings are produced. PASS when >= 1 Fault
+    with a structural_anchor is found. LIVE but LLM-free and Databricks-free (D-RB6).
+    """
+    import pathlib
+    import tempfile
+
+    from ingest.corpus import ingest_corpus
+    from rulebook.structural import detect_structural_inconsistencies
+    from tools.ledger import RetrievalLedger
+
+    fixture = pathlib.Path("src/evals/dataset/synthetic_fixture")
+    if not fixture.exists():
+        print("ERROR: structural-gate — synthetic fixture missing at src/evals/dataset/synthetic_fixture")
+        return 1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        corpus = ingest_corpus(fixture, cache_dir=tmp + "/cache")
+        ledger = RetrievalLedger()
+        faults = detect_structural_inconsistencies(corpus, corpus.manifest, ledger)
+
+    struct_faults = [f for f in faults if f.structural_anchor is not None]
+    print(f"  structural: {len(struct_faults)} finding(s) with structural_anchor")
+    if not struct_faults:
+        print("FAIL: structural-gate — 0 structural findings on synthetic fixture")
+        return 1
+    print("PASS: structural-gate")
+    return 0
+
+
+def cmd_reference_gate(args: argparse.Namespace) -> int:
+    """`reference-gate`: RECALL-03 reference-anomaly gate (Plan 06, Ruling 4).
+
+    Degraded behavior per binding_reviewer_addition_SC2 (PATH B):
+    Runs extract_references + detect_reference_anomalies on the committed synthetic fixture_a.
+    Hard-fails (return 1) when 0 reference findings are produced. Currently yields ~22
+    UNRESOLVED_REF / 0 VALUE_CONTRADICTION (VALUE_CONTRADICTION deferred to Wave 5 when
+    follow_reference is wired). PASS when >= 1 Fault with a reference_anchor is found.
+    LIVE but LLM-free and Databricks-free (D-RB6).
+    """
+    import pathlib
+    import tempfile
+
+    from ingest.corpus import ingest_corpus
+    from rulebook.references import detect_reference_anomalies, extract_references
+    from tools.ledger import RetrievalLedger
+
+    fixture = pathlib.Path("src/evals/dataset/synthetic_fixture")
+    if not fixture.exists():
+        print("ERROR: reference-gate — synthetic fixture missing at src/evals/dataset/synthetic_fixture")
+        return 1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        corpus = ingest_corpus(fixture, cache_dir=tmp + "/cache")
+        edges_db = tmp + "/edges.db"
+        extract_references(corpus, corpus.manifest, db_path=edges_db)
+        ledger = RetrievalLedger()
+        faults = detect_reference_anomalies(corpus, corpus.manifest, ledger, db_path=edges_db)
+
+    ref_faults = [f for f in faults if f.reference_anchor is not None]
+    print(f"  reference: {len(ref_faults)} finding(s) with reference_anchor")
+    if not ref_faults:
+        print("FAIL: reference-gate — 0 reference findings on synthetic fixture")
+        return 1
+    print("PASS: reference-gate")
+    return 0
+
+
+def cmd_precedent_gate(args: argparse.Namespace) -> int:
+    """`precedent-gate`: RECALL-04 precedent-similarity gate (Plan 06, Ruling 4 + Ruling 8).
+
+    Hard-fail/skip behavior (Ruling 8 sentinel check):
+    - data/rulebook.faiss ABSENT: structured skip (exit 0 + SKIP message). Fast CI still
+      gates on structural + reference legs which have no FAISS dependency. Not an error.
+    - data/rulebook.faiss PRESENT: hard-fail (return 1) when 0 precedent findings are found.
+      A live FAISS asset that produces nothing is a real failure, not a dependency gap.
+
+    LIVE but LLM-free and Databricks-free when FAISS is local (D-PIX3 / D-RB6).
+    """
+    import pathlib
+    import tempfile
+
+    faiss_path = pathlib.Path("data/rulebook.faiss")
+    if not faiss_path.exists():
+        print("SKIP: data/rulebook.faiss not present — precedent leg not yet indexed.")
+        print("(Structured skip, not an error. Build rulebook.faiss to enable hard-fail mode.)")
+        return 0  # Exit 0: structured skip so fast CI still passes
+
+    # FAISS asset present — hard-fail on 0 findings (real failure)
+    from ingest.corpus import ingest_corpus
+    from rulebook.precedent_search import detect_precedent_candidates
+    from tools.ledger import RetrievalLedger
+
+    fixture = pathlib.Path("src/evals/dataset/synthetic_fixture")
+    if not fixture.exists():
+        print("ERROR: precedent-gate — synthetic fixture missing at src/evals/dataset/synthetic_fixture")
+        return 1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        corpus = ingest_corpus(fixture, cache_dir=tmp + "/cache")
+        ledger = RetrievalLedger()
+        faults = detect_precedent_candidates(corpus, corpus.manifest, ledger)
+
+    print(f"  precedent: {len(faults)} candidate(s) with precedent_anchor")
+    if not faults:
+        print("FAIL: precedent-gate — rulebook.faiss present but 0 precedent candidates found")
+        return 1
+    print(f"PASS: precedent-gate ({len(faults)} candidate(s))")
+    return 0
+
+
+def cmd_phase5_gate(args: argparse.Namespace) -> int:
+    """`phase5-gate`: combined Phase 5 gate — runs all four legs in sequence (Plan 06, Ruling 4).
+
+    Dispatches internally (no subprocess) to:
+      - absence-gate  (RECALL-01, existing Phase 4 gate)
+      - structural-gate (RECALL-02, Phase 5 new)
+      - reference-gate  (RECALL-03, Phase 5 new, degraded per SC2 PATH B)
+      - precedent-gate  (RECALL-04, Phase 5 new, hard-fail/skip per Ruling 8)
+
+    Includes SC2/X1 state-aware assertion (binding_reviewer_addition_SC2):
+      - Probes follow_reference on the 3-doc fixture cross-doc reference.
+      - If follow_reference still stubbed (_CROSS_DOC_PENDING): emit LOUD WARN and
+        continue degraded (exit 0 from this sub-check). Wave 5 will wire the hard path.
+      - If follow_reference resolves cross-doc: HARD-ASSERT >= 1 VALUE_CONTRADICTION
+        with Compound-B numbers (0.18 and 0.15). Return 1 if absent.
+
+    PASS only when ALL hard-fail gates return 0 (precedent-gate may return 0 via
+    structured-skip when FAISS absent). Prints per-gate summary.
+    """
+    import pathlib
+    import tempfile
+
+    gates: list[tuple[str, object]] = [
+        ("absence-gate", cmd_absence_gate),
+        ("structural-gate", cmd_structural_gate),
+        ("reference-gate", cmd_reference_gate),
+        ("precedent-gate", cmd_precedent_gate),
+    ]
+
+    results: dict[str, str] = {}
+    for name, fn in gates:
+        print(f"\n--- {name} ---")
+        rc = fn(args)  # type: ignore[call-arg]
+        results[name] = "PASS" if rc == 0 else "FAIL"
+
+    # --- SC2/X1 state-aware assertion (binding_reviewer_addition_SC2, PATH B) ---
+    print("\n--- SC2/X1 value-contradiction probe ---")
+    sc2_rc = 0
+    fixture = pathlib.Path("src/evals/dataset/synthetic_fixture")
+
+    if fixture.exists():
+        from ingest.corpus import ingest_corpus
+        from tools.follow_reference import _CROSS_DOC_PENDING, follow_reference
+        from tools.ledger import RetrievalLedger
+
+        with tempfile.TemporaryDirectory() as tmp:
+            corpus = ingest_corpus(fixture, cache_dir=tmp + "/cache")
+            ledger = RetrievalLedger()
+            doc_ids = [d.doc_id for d in corpus.manifest.documents]
+
+            if doc_ids:
+                probe_result = follow_reference(corpus, doc_ids[0], "doc_b", ledger)
+                probe_status = probe_result.get("status", "")
+
+                if probe_status == _CROSS_DOC_PENDING:
+                    # DEFERRED path: stubbed — emit LOUD WARN, continue degraded
+                    print(
+                        "WARN: SC2 X1 value-contradiction catch DEFERRED to Wave 5 — "
+                        "follow_reference cross-doc resolution not yet wired; "
+                        "reference-gate running DEGRADED (findings>0 only)."
+                    )
+                    # sc2_rc = 0 (pass degraded)
+                else:
+                    # HARD path: follow_reference resolved cross-doc — enforce full X1 catch
+                    from rulebook.references import detect_reference_anomalies, extract_references
+                    with tempfile.TemporaryDirectory() as tmp2:
+                        corpus2 = ingest_corpus(fixture, cache_dir=tmp2 + "/cache")
+                        edges_db = tmp2 + "/edges.db"
+                        extract_references(corpus2, corpus2.manifest, db_path=edges_db)
+                        ledger2 = RetrievalLedger()
+                        faults = detect_reference_anomalies(
+                            corpus2, corpus2.manifest, ledger2, db_path=edges_db
+                        )
+                    vc_faults = [
+                        f for f in faults
+                        if f.reference_anchor is not None
+                        and f.reference_anchor.anomaly == "VALUE_CONTRADICTION"
+                    ]
+                    all_details = " ".join((f.detail or "") for f in vc_faults)
+                    if not vc_faults or ("0.18" not in all_details or "0.15" not in all_details):
+                        print(
+                            "FAIL: SC2 X1 — follow_reference resolved cross-doc but "
+                            f"found {len(vc_faults)} VALUE_CONTRADICTION fault(s) without "
+                            "Compound-B numbers (0.18 and 0.15). "
+                            "X1 value-contradiction catch must be active post-Wave-5."
+                        )
+                        sc2_rc = 1
+                    else:
+                        print(
+                            f"PASS: SC2 X1 — {len(vc_faults)} VALUE_CONTRADICTION fault(s) "
+                            "with Compound-B numbers detected."
+                        )
+    else:
+        print("SKIP: SC2 probe — synthetic fixture absent")
+
+    # --- Summary ---
+    print("\nPhase5 gate summary:")
+    for name, status in results.items():
+        print(f"  {name}: {status}")
+    if sc2_rc != 0:
+        print("  SC2/X1 probe: FAIL")
+    else:
+        print("  SC2/X1 probe: PASS (or DEFERRED)")
+
+    failed = [n for n, s in results.items() if s == "FAIL"]
+    if failed or sc2_rc != 0:
+        failures = failed + (["SC2/X1"] if sc2_rc != 0 else [])
+        print(f"FAIL: phase5-gate ({len(failures)} gate(s) failed: {', '.join(failures)})")
+        return 1
+    print("PASS: phase5-gate (all gates passed)")
+    return 0
+
+
+def cmd_deterministic_recall_gate(args: argparse.Namespace) -> int:
+    """`deterministic-recall-gate`: combined three-leg recall report (Plan 06, Ruling 4).
+
+    Runs all three deterministic recall legs (structural, reference, precedent) on the
+    committed synthetic fixture_a, reports per-family counts, hard-fails on structural or
+    reference legs producing 0 findings. Precedent is reported but not hard-failed (FAISS
+    dependency — see cmd_precedent_gate for the hard-fail/skip logic).
+
+    LIVE but LLM-free and Databricks-free (D-RB6). Distinct from phase5-gate in that it
+    focuses on the three RECALL-02/03/04 legs only (no absence-gate or SC2 probe).
+    """
+    import pathlib
+    import tempfile
+
+    fixture = pathlib.Path("src/evals/dataset/synthetic_fixture")
+    if not fixture.exists():
+        print("ERROR: deterministic-recall-gate — synthetic fixture missing at "
+              "src/evals/dataset/synthetic_fixture")
+        return 1
+
+    from ingest.corpus import ingest_corpus
+    from rulebook.references import detect_reference_anomalies, extract_references
+    from rulebook.structural import detect_structural_inconsistencies
+    from tools.ledger import RetrievalLedger
+
+    exit_code = 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        corpus = ingest_corpus(fixture, cache_dir=tmp + "/cache")
+
+        # Structural leg (RECALL-02)
+        ledger_struct = RetrievalLedger()
+        struct_faults = [
+            f for f in detect_structural_inconsistencies(corpus, corpus.manifest, ledger_struct)
+            if f.structural_anchor is not None
+        ]
+        print(f"  structural (RECALL-02): {len(struct_faults)} finding(s)")
+        if not struct_faults:
+            print("  FAIL: structural leg — 0 findings on synthetic fixture")
+            exit_code = 1
+
+        # Reference leg (RECALL-03)
+        edges_db = tmp + "/edges.db"
+        extract_references(corpus, corpus.manifest, db_path=edges_db)
+        ledger_ref = RetrievalLedger()
+        ref_faults = [
+            f for f in detect_reference_anomalies(corpus, corpus.manifest, ledger_ref,
+                                                   db_path=edges_db)
+            if f.reference_anchor is not None
+        ]
+        print(f"  reference (RECALL-03): {len(ref_faults)} finding(s)")
+        if not ref_faults:
+            print("  FAIL: reference leg — 0 findings on synthetic fixture")
+            exit_code = 1
+
+        # Precedent leg (RECALL-04) — report only, no hard-fail (FAISS dependency)
+        faiss_path = pathlib.Path("data/rulebook.faiss")
+        if faiss_path.exists():
+            from rulebook.precedent_search import detect_precedent_candidates
+            ledger_prec = RetrievalLedger()
+            prec_faults = detect_precedent_candidates(corpus, corpus.manifest, ledger_prec)
+            print(f"  precedent (RECALL-04): {len(prec_faults)} candidate(s)")
+        else:
+            print("  precedent (RECALL-04): SKIP (data/rulebook.faiss absent)")
+
+    if exit_code != 0:
+        print("FAIL: deterministic-recall-gate")
+        return 1
+
+    print("PASS: deterministic-recall-gate")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m evals.run", description="DefPredict eval harness CI-style CLI."
@@ -711,6 +1018,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     absence_gate_p.add_argument("--baseline", default=str(ABSENCE_BASELINE_PATH))
     absence_gate_p.set_defaults(func=cmd_absence_gate)
+
+    # --- Phase 5 gates (Plan 06, Wave 4 — Ruling 4: ALL Phase 5 gate wiring here) ---
+
+    subparsers.add_parser(
+        "structural-gate",
+        help="RECALL-02 structural-inconsistency gate: hard-fail on 0 findings on synthetic fixture.",
+    ).set_defaults(func=cmd_structural_gate)
+
+    subparsers.add_parser(
+        "reference-gate",
+        help="RECALL-03 reference-anomaly gate (degraded per SC2 PATH B): hard-fail on 0 findings.",
+    ).set_defaults(func=cmd_reference_gate)
+
+    subparsers.add_parser(
+        "precedent-gate",
+        help="RECALL-04 precedent gate: hard-fail when data/rulebook.faiss present + 0 findings; "
+             "structured-skip (exit 0) when absent (Ruling 8).",
+    ).set_defaults(func=cmd_precedent_gate)
+
+    phase5_p = subparsers.add_parser(
+        "phase5-gate",
+        help="Combined Phase 5 gate: absence + structural + reference + precedent + SC2 probe. "
+             "PASS only when all hard-fail gates return 0.",
+    )
+    phase5_p.add_argument("--baseline", default=str(ABSENCE_BASELINE_PATH))
+    phase5_p.set_defaults(func=cmd_phase5_gate)
+
+    subparsers.add_parser(
+        "deterministic-recall-gate",
+        help="RECALL-02/03/04 combined recall report on synthetic fixture. Hard-fails on structural "
+             "or reference 0 findings; reports precedent without hard-fail (FAISS dependency).",
+    ).set_defaults(func=cmd_deterministic_recall_gate)
 
     return parser
 
