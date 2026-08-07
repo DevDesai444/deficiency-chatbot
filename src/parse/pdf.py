@@ -268,6 +268,24 @@ def extract_pdf(path: str | Path) -> dict:
     if ocr_count:
         log.info("ocr_pages", count=ocr_count, filename=path.name)
 
+    # D-REF1 / T-05W0-02: collect link annotations per page.
+    # Security (T-05W0-02 Tampering): each page.get_links() call is wrapped in try/except;
+    # a malformed/corrupt page silently returns [] for that page.
+    links: list[dict] = []
+    try:
+        for page in doc:
+            try:
+                for lnk in page.get_links():
+                    links.append({
+                        "kind": lnk.get("kind", 0),
+                        "uri": lnk.get("uri", None),
+                        "page": page.number + 1,
+                    })
+            except Exception:  # noqa: BLE001 — corrupt page annotation, skip silently
+                pass
+    except Exception:  # noqa: BLE001 — doc already closed or corrupt
+        pass
+
     page_count = len(doc)
     doc.close()
-    return {"filename": path.name, "page_count": page_count, "toc": toc, "pages": pages}
+    return {"filename": path.name, "page_count": page_count, "toc": toc, "pages": pages, "links": links}

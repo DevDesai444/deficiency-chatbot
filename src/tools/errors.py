@@ -60,4 +60,8 @@ KNOWN_REASON_CODES: dict[str, str] = {
     "span_ref_unparseable": "The span reference string did not match the [doc_id:start:end] form the tools render.",
     "span_ref_unknown_doc": "The span reference names a document that is not in the expected store.",
     "span_ref_out_of_range": "The span reference's offsets fall outside the document's canonical text.",
+    # Phase-5 structural/reference leg codes (D-STR3, D-REF2)
+    "unanchored_structural": "emit_structural_finding StructuralAnchor has no independent basis spans after deduplication (Pitfall 2: all basis cells resolve to the same merged cell).",
+    "no_comparison_basis": "Structural comparison has fewer than 2 independent basis cells after deduplication; abstaining per D-STR3.",
+    "unanchored_reference": "emit_reference_finding ReferenceAnchor is missing a source span that passes byte-exact validation.",
 }

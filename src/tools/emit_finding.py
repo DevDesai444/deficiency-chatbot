@@ -32,7 +32,16 @@ from ingest.anchors import HashMismatch, open_span
 from ingest.corpus import CorpusIndex
 from rulebook.store import DEFAULT_RULEBOOK_CACHE_DIR, rulebook_nt_for
 from schemas.documents import NormalizedText, OffsetRun, SpanID
-from schemas.faults import ComplianceVerdict, CoverageAbsenceAnchor, EvidenceClass, Fault, Tier
+from schemas.faults import (
+    ComplianceVerdict,
+    CoverageAbsenceAnchor,
+    EvidenceClass,
+    Fault,
+    PrecedentAnchor,
+    ReferenceAnchor,
+    StructuralAnchor,
+    Tier,
+)
 from tools.errors import ToolRejected
 from tools.ledger import RetrievalLedger
 
@@ -227,4 +236,282 @@ def emit_absence_finding(
         verdict=ComplianceVerdict.GAP, rule_span_id=rule_span_id, submission_span_id=None,
         absence_anchor=absence_anchor, source="tool:emit_absence_finding",
         guidance_refs=[rule_citation or rule_span_id.doc_id] + ([requirement_id] if requirement_id else []),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase-5 shared helper + three deterministic emit gates (D-ENV1, Ruling 1)
+# ---------------------------------------------------------------------------
+
+def issue_cached_span(
+    ledger: RetrievalLedger,
+    span_id: SpanID,
+    nt: NormalizedText,
+) -> SpanID | ToolRejected:
+    """Record a cache-derived span in the ledger (issuance) then verify byte-exact via open_span.
+
+    Ruling 1: the bridge between cache-derived spans and the emit gate.
+    Deterministic detectors in Plans 03/04/05 retrieve spans from the corpus cache index
+    (tables.py, not from a model tool call), so they never naturally call ledger.record_span.
+    Without this helper, every deterministic finding becomes ToolRejected because
+    emit gates check ledger.was_issued() BEFORE accepting any span.
+
+    Replicates the Phase-4 pattern from rulebook/absence.py::_emit_candidate:
+      open_span(span, nt) [byte-exact check] -> ledger.record_span(span) [issuance] -> return span
+
+    After this call, ledger.was_issued(span_id) == True.
+    The caller (emit gate) then accepts the span.
+
+    Returns span_id on success; ToolRejected(reason_code="not_byte_exact") on hash mismatch.
+    """
+    try:
+        open_span(span_id, nt, span_id.doc_id)
+    except HashMismatch:
+        return ToolRejected(
+            tool="issue_cached_span",
+            reason_code="not_byte_exact",
+            half="submission",
+            reason="span_id does not re-open byte-exact against the corpus store",
+            hint="re-fetch the current text and cite its freshly-issued span-ID",
+        )
+    ledger.record_span(span_id)
+    return span_id
+
+
+def emit_structural_finding(
+    corpus: CorpusIndex,
+    rule_span_id: SpanID | None,
+    structural_anchor: StructuralAnchor,
+    ledger: RetrievalLedger,
+    title: str = "",
+    detail: str = "",
+    rulebook_cache_dir: str = DEFAULT_RULEBOOK_CACHE_DIR,
+) -> Fault | ToolRejected:
+    """Phase-5 structural-leg grounding gate (D-STR3, D-STR6, Ruling 1+2).
+
+    Validates a structural inconsistency anchor: claim span + basis spans (D-STR3).
+    D-STR6: rule_span_id is OPTIONAL (nullable) for pure arithmetic/aggregate checks
+    (labeled-aggregate recompute, summary-vs-detail) that violate no specific FDA/ICH rule.
+    Only result-exceeds-spec-limit findings provide a rule span from the rulebook.
+
+    Ruling 2 compliance: returns tier=Tier.VERIFIED (str 'verified') and
+    evidence_class=EvidenceClass.CODE_VERIFIED (str 'code_verified').
+    Only existing StrEnum members are used; no non-existent enum values.
+    """
+    # --- 1. RULE half (D-STR6: nullable for pure arithmetic checks) ---------------------------
+    if rule_span_id is not None:
+        if not ledger.was_issued(rule_span_id):
+            return ToolRejected(
+                tool="emit_structural_finding", reason_code="not_retrieved_this_session",
+                half="rule",
+                reason="rule_span_id was never actually retrieved this session",
+                hint="re-fetch via read_guideline, then pass its returned span-ID as rule_span_id",
+            )
+        rule_nt = rulebook_nt_for(rule_span_id.doc_id, cache_dir=rulebook_cache_dir)
+        if rule_nt is None:
+            return ToolRejected(
+                tool="emit_structural_finding", reason_code="wrong_store", half="rule",
+                reason=f"rule_span_id.doc_id={rule_span_id.doc_id!r} does not resolve in the RULEBOOK store",
+                hint="rule_span_id must come from read_guideline, not get_section",
+            )
+        try:
+            open_span(rule_span_id, rule_nt, rule_span_id.doc_id)
+        except HashMismatch:
+            return ToolRejected(
+                tool="emit_structural_finding", reason_code="not_byte_exact", half="rule",
+                reason="rule_span_id no longer re-opens byte-exact against the rulebook store",
+                hint="re-fetch the current rule text via read_guideline and cite its freshly-issued span-ID",
+            )
+
+    # --- 2. CLAIM span: issue via cache (Ruling 1) --------------------------------------------
+    claim_span_id = structural_anchor.claim_span_id
+    corpus_cache = corpus.cached_entry(claim_span_id.doc_id)
+    if corpus_cache is None:
+        return ToolRejected(
+            tool="emit_structural_finding", reason_code="wrong_store", half="submission",
+            reason=f"claim_span_id.doc_id={claim_span_id.doc_id!r} does not resolve in the CORPUS store",
+            hint="claim_span_id must come from tables.py/get_section over THIS corpus",
+        )
+    claim_nt = NormalizedText(
+        canonical=corpus_cache["canonical"], raw_serialized=corpus_cache["raw_serialized"],
+        offset_map=[OffsetRun.model_validate(r) for r in corpus_cache["offset_map"]],
+        normalizer_version=corpus_cache["normalizer_version"],
+        serializer_version=corpus_cache["serializer_version"],
+    )
+    claim_result = issue_cached_span(ledger, claim_span_id, claim_nt)
+    if isinstance(claim_result, ToolRejected):
+        return claim_result
+
+    # --- 3. BASIS spans: issue via cache (D-ABS2 over-emit: accumulate failures, don't drop) --
+    issued_basis: list[SpanID] = []
+    seen_keys: set[tuple[str, int, int]] = set()
+    for basis_span in structural_anchor.basis_span_ids:
+        key = (basis_span.doc_id, basis_span.start, basis_span.end)
+        if key in seen_keys:
+            continue  # deduplicate by (doc_id,start,end)
+        seen_keys.add(key)
+        basis_cache = corpus.cached_entry(basis_span.doc_id)
+        if basis_cache is None:
+            continue  # over-emit: missing basis cache entry -> silently skip (D-ABS2)
+        basis_nt = NormalizedText(
+            canonical=basis_cache["canonical"], raw_serialized=basis_cache["raw_serialized"],
+            offset_map=[OffsetRun.model_validate(r) for r in basis_cache["offset_map"]],
+            normalizer_version=basis_cache["normalizer_version"],
+            serializer_version=basis_cache["serializer_version"],
+        )
+        basis_result = issue_cached_span(ledger, basis_span, basis_nt)
+        if not isinstance(basis_result, ToolRejected):
+            issued_basis.append(basis_span)
+
+    # Require at least 1 independent basis span (Pitfall 2: merged cells collapsing to same span)
+    if len(issued_basis) < 1:
+        return ToolRejected(
+            tool="emit_structural_finding", reason_code="unanchored_structural", half="submission",
+            reason="StructuralAnchor has no independent basis spans after deduplication (Pitfall 2: all basis cells may resolve to the same merged cell)",
+            hint="ensure basis_span_ids contains at least one distinct, non-merged cell addressable via tables.py",
+        )
+
+    # --- 4. Construct the structural Fault (VIOLATION; Ruling 2: VERIFIED + CODE_VERIFIED) ----
+    dedup_key = f"{claim_span_id.doc_id}:{claim_span_id.start}:null"
+    return Fault(
+        title=title or "Structural inconsistency detected",
+        detail=detail,
+        leg_tag="STRUCTURAL",
+        structural_anchor=structural_anchor,
+        submission_span_id=claim_span_id,
+        rule_span_id=rule_span_id,
+        tier=Tier.VERIFIED,
+        evidence_class=EvidenceClass.CODE_VERIFIED,
+        confidence=0.9,
+        verdict=ComplianceVerdict.VIOLATION,
+        dedup_key=dedup_key,
+        confidence_tier=structural_anchor.scoping_confidence,
+        source="tool:emit_structural_finding",
+    )
+
+
+def emit_reference_finding(
+    corpus: CorpusIndex,
+    reference_anchor: ReferenceAnchor,
+    ledger: RetrievalLedger,
+    rule_span_id: SpanID | None = None,
+    title: str = "",
+    detail: str = "",
+    rulebook_cache_dir: str = DEFAULT_RULEBOOK_CACHE_DIR,
+) -> Fault | ToolRejected:
+    """Phase-5 reference-leg grounding gate (D-REF2, Ruling 1+2).
+
+    Validates a reference anomaly anchor: src span (required) + optional dst span.
+    No rule span required: reference anomalies (UNRESOLVED_REF, ABSENT_TARGET,
+    VALUE_CONTRADICTION) are structural integrity failures, not rule violations.
+
+    Ruling 2 compliance: returns tier=Tier.VERIFIED + evidence_class=EvidenceClass.CODE_VERIFIED.
+    """
+    src_span_id = reference_anchor.src_span_id
+
+    # --- 1. SRC span: issue via cache (Ruling 1) ----------------------------------------------
+    src_cache = corpus.cached_entry(src_span_id.doc_id)
+    if src_cache is None:
+        return ToolRejected(
+            tool="emit_reference_finding", reason_code="wrong_store", half="submission",
+            reason=f"src_span_id.doc_id={src_span_id.doc_id!r} does not resolve in the CORPUS store",
+            hint="src_span_id must come from follow_reference/get_section over THIS corpus",
+        )
+    src_nt = NormalizedText(
+        canonical=src_cache["canonical"], raw_serialized=src_cache["raw_serialized"],
+        offset_map=[OffsetRun.model_validate(r) for r in src_cache["offset_map"]],
+        normalizer_version=src_cache["normalizer_version"],
+        serializer_version=src_cache["serializer_version"],
+    )
+    src_result = issue_cached_span(ledger, src_span_id, src_nt)
+    if isinstance(src_result, ToolRejected):
+        return ToolRejected(
+            tool="emit_reference_finding", reason_code="unanchored_reference", half="submission",
+            reason=f"ReferenceAnchor src_span_id failed byte-exact validation: {src_result.reason}",
+            hint="re-fetch the source span via get_section/follow_reference and cite its freshly-issued span-ID",
+        )
+
+    # --- 2. Construct the reference Fault (VIOLATION; Ruling 2: VERIFIED + CODE_VERIFIED) -----
+    dedup_key = f"{src_span_id.doc_id}:{src_span_id.start}:null"
+    return Fault(
+        title=title or f"Reference anomaly: {reference_anchor.anomaly}",
+        detail=detail,
+        leg_tag="REFERENCE",
+        reference_anchor=reference_anchor,
+        submission_span_id=src_span_id,
+        rule_span_id=rule_span_id,
+        tier=Tier.VERIFIED,
+        evidence_class=EvidenceClass.CODE_VERIFIED,
+        confidence=0.85,
+        verdict=ComplianceVerdict.VIOLATION,
+        dedup_key=dedup_key,
+        confidence_tier=reference_anchor.scoping_confidence,
+        source="tool:emit_reference_finding",
+    )
+
+
+def emit_precedent_finding(
+    corpus: CorpusIndex,
+    precedent_anchor: PrecedentAnchor,
+    ledger: RetrievalLedger,
+    title: str = "",
+    detail: str = "",
+    rulebook_cache_dir: str = DEFAULT_RULEBOOK_CACHE_DIR,
+) -> Fault | ToolRejected:
+    """Phase-5 precedent-leg grounding gate (D-PRC2, Ruling 1+2).
+
+    Validates a precedent similarity anchor: submission span + precedent evidence.
+    No rule span (D-ENV1: precedent is evidence of past deficiency pattern,
+    not a direct rule violation; grounding lives on the submission side per D-RB2(5)).
+
+    Ruling 2 compliance: returns tier=Tier.ADVISORY (str 'advisory') +
+    evidence_class=EvidenceClass.CODE_VERIFIED (str 'code_verified').
+    Only existing StrEnum members are used; no non-existent enum values.
+    confidence_tier is always 'low' for precedent findings (soft leads per D-ENV1).
+    """
+    submission_span_id = precedent_anchor.submission_span_id
+
+    # --- 1. SUBMISSION span: issue via cache (Ruling 1) ---------------------------------------
+    sub_cache = corpus.cached_entry(submission_span_id.doc_id)
+    if sub_cache is None:
+        return ToolRejected(
+            tool="emit_precedent_finding", reason_code="wrong_store", half="submission",
+            reason=f"submission_span_id.doc_id={submission_span_id.doc_id!r} does not resolve in the CORPUS store",
+            hint="submission_span_id must come from search_corpus/get_section over THIS corpus",
+        )
+    sub_nt = NormalizedText(
+        canonical=sub_cache["canonical"], raw_serialized=sub_cache["raw_serialized"],
+        offset_map=[OffsetRun.model_validate(r) for r in sub_cache["offset_map"]],
+        normalizer_version=sub_cache["normalizer_version"],
+        serializer_version=sub_cache["serializer_version"],
+    )
+    sub_result = issue_cached_span(ledger, submission_span_id, sub_nt)
+    if isinstance(sub_result, ToolRejected):
+        return ToolRejected(
+            tool="emit_precedent_finding", reason_code="not_retrieved_this_session", half="submission",
+            reason=f"PrecedentAnchor submission_span_id failed byte-exact validation: {sub_result.reason}",
+            hint="re-fetch the submission span via search_corpus/get_section and cite its freshly-issued span-ID",
+        )
+
+    # --- 2. Construct the precedent Fault (ADVISORY + CODE_VERIFIED; Ruling 2) ----------------
+    confidence = (
+        precedent_anchor.similarity_scores[0]
+        if precedent_anchor.similarity_scores
+        else 0.5
+    )
+    dedup_key = f"{submission_span_id.doc_id}:{submission_span_id.start}:null"
+    return Fault(
+        title=title or "Precedent similarity candidate",
+        detail=detail,
+        leg_tag="PRECEDENT",
+        precedent_anchor=precedent_anchor,
+        submission_span_id=submission_span_id,
+        rule_span_id=None,
+        tier=Tier.ADVISORY,
+        evidence_class=EvidenceClass.CODE_VERIFIED,
+        confidence=confidence,
+        verdict=ComplianceVerdict.AMBIGUOUS,
+        dedup_key=dedup_key,
+        confidence_tier="low",
+        source="tool:emit_precedent_finding",
     )

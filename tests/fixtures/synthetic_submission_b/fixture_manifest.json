@@ -1,0 +1,87 @@
+{
+  "generated": "2026-08-06",
+  "purpose": "Anti-overfitting guard fixtures for Phase 5 RECALL-02/03/04/05",
+  "fixture_a": {
+    "path": "src/evals/dataset/synthetic_fixture/",
+    "planted_violations": [
+      {
+        "id": "X1",
+        "type": "VALUE_CONTRADICTION",
+        "leg": "REFERENCE",
+        "doc_src": "doc_a.pdf",
+        "doc_dst": "doc_b.docx",
+        "src_value": "NMT 0.15%",
+        "dst_value": "Compound B 0.18%",
+        "arithmetic_check": "0.18 > 0.15 = TRUE VIOLATION (Compound B exceeds single-impurity NMT limit)"
+      },
+      {
+        "id": "X2a",
+        "type": "LABELED_AGGREGATE_MAX",
+        "leg": "STRUCTURAL",
+        "doc": "doc_b.docx",
+        "table": "Table 1 (Impurity Profile)",
+        "claim_cell": "Total Impurities 0.12%",
+        "basis_max": "Compound B 0.18%",
+        "arithmetic_check": "0.12 < 0.18 = TRUE VIOLATION (total < max single component; arithmetically impossible for non-negative sum)"
+      },
+      {
+        "id": "X2b",
+        "type": "LABELED_AGGREGATE_SUM",
+        "leg": "STRUCTURAL",
+        "doc": "doc_b.docx",
+        "table": "Table 1 (Impurity Profile)",
+        "claim_cell": "Total Impurities 0.12%",
+        "basis_sum": "Compound A 0.10% + Compound B 0.18% = 0.28%",
+        "arithmetic_check": "0.12 != 0.28 = TRUE VIOLATION (stated total does not equal true sum)"
+      },
+      {
+        "id": "X2c",
+        "type": "LABELED_AGGREGATE_MAX",
+        "leg": "STRUCTURAL",
+        "doc": "doc_b.docx",
+        "table": "Table 2 (Batch Data)",
+        "claim_cell": "Maximum Measured Value 42.3",
+        "true_max": "57.8 (Batch 2)",
+        "arithmetic_check": "42.3 < 57.8 = TRUE VIOLATION (stated max 42.3 is less than true max 57.8)"
+      },
+      {
+        "id": "X3",
+        "type": "RESULT_EXCEEDS_SPEC",
+        "leg": "STRUCTURAL",
+        "doc": "doc_c.pdf",
+        "table": "Table 1 (Analytical Results)",
+        "result": "Impurity C 0.22% w/w",
+        "limit": "NMT 0.10%",
+        "arithmetic_check": "0.22 > 0.10 = TRUE VIOLATION (result exceeds specification limit)",
+        "deferral_note": "If doc_c.pdf table cells are not addressable by tables.py (fitz PDF table extraction may not parse simple inline tables), this violation is DEFERRED TO PHASE 7 interpretive tail per D-STR5 (Phase 5 structural checks restricted to addressable table cells). The table is present in the PDF for testing purposes."
+      }
+    ]
+  },
+  "fixture_b": {
+    "path": "tests/fixtures/synthetic_submission_b/",
+    "domain": "dissolution (DIFFERENT from fixture_a impurity/CMC domain — THRESHOLD-TRANSFER guard)",
+    "surface_forms": "different doc names (doc_x, doc_y), different compound names (Sample/Unit vs Compound), different values, different vocabulary (dissolution/release vs impurity), different regulatory terms (USP <711> vs ICH Q3A)",
+    "planted_violations": [
+      {
+        "id": "Y1",
+        "type": "LABELED_AGGREGATE_MEAN",
+        "leg": "STRUCTURAL",
+        "doc": "doc_y.docx",
+        "table": "Table A (Individual Unit Dissolution Results)",
+        "claim_cell": "Total Average 63%",
+        "true_mean": "(65 + 78) / 2 = 71.5%",
+        "arithmetic_check": "63 < 65 = minimum individual (TRUE VIOLATION: average below any single measurement) AND 63 != 71.5 (TRUE VIOLATION: stated mean does not equal true mean)"
+      },
+      {
+        "id": "Y2",
+        "type": "LABELED_AGGREGATE_MAX",
+        "leg": "STRUCTURAL",
+        "doc": "doc_y.docx",
+        "table": "Table B (Batch Release Data)",
+        "claim_cell": "Maximum Release 66%",
+        "true_max": "72% (Unit 2)",
+        "arithmetic_check": "66 < 72 = TRUE VIOLATION (stated maximum 66% is less than true maximum 72%)"
+      }
+    ]
+  }
+}

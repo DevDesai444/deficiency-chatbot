@@ -1,0 +1,6 @@
+{
+  "threshold": 0.0,
+  "measured_on": "synthetic_fixture",
+  "measured_date": "2026-08-06",
+  "note": "D-PRC4: general absolute dense-cosine threshold. Placeholder; will be measured after precedent-leg implementation."
+}

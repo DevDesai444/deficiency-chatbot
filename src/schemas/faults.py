@@ -10,6 +10,7 @@ report is built).
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -84,6 +85,81 @@ class CoverageAbsenceAnchor(BaseModel):
     claim_span_id: SpanID | None = Field(default=None, description="D-ABS4: the unsupported narrative-claim CORPUS span when one exists (mvr/MS-03), else None.")
 
 
+class StructuralAnchor(BaseModel):
+    """D-STR3: re-derivable structural inconsistency anchor (sibling of CoverageAbsenceAnchor).
+
+    Carries one claim span + N basis span-IDs + relation enum + expected-vs-actual values.
+    Re-derivable: the Phase-7 verifier re-runs the computation, never trusts the snapshot.
+    Cells resolved via tables.py (table_id,row,col)->SpanID; each basis span validated
+    against its own store (CORPUS vs RULEBOOK).
+    """
+
+    claim_span_id: SpanID = Field(
+        description="D-STR3: the span of the cell that contains the claimed aggregate/summary value.")
+    basis_span_ids: list[SpanID] = Field(
+        default_factory=list,
+        description="D-STR3: spans of the cells whose values were combined to derive the expected value.")
+    relation: Literal["EQUALS", "LEQ", "GEQ", "SUM", "MAX", "MIN", "MEAN"] = Field(
+        description="D-STR3: the arithmetic relation that must hold between basis values and the claim.")
+    expected_value: str = Field(
+        default="",
+        description="D-STR3: the re-derived expected value (deterministic computation over basis spans).")
+    actual_value: str = Field(
+        default="",
+        description="D-STR3: the value actually found in the claim span.")
+    comparison_store: Literal["CORPUS", "RULEBOOK"] = Field(
+        default="CORPUS",
+        description="D-STR3: which store the basis spans live in (CORPUS for intra-doc; RULEBOOK for spec limits).")
+    scoping_confidence: Literal["full", "low"] = Field(
+        default="full",
+        description="D-ABS2: 'low' when a basis cell is not cleanly addressable; over-emit rather than drop.")
+
+
+class ReferenceAnchor(BaseModel):
+    """D-REF2: cross-reference edge + anomaly anchor (sibling of CoverageAbsenceAnchor).
+
+    A single typed anchor carrying anomaly enum + src span + optional dst span(s).
+    One re-derivation path, one verifier branch (D-REF2).
+    """
+
+    src_span_id: SpanID = Field(
+        description="D-REF2: the span in the source document that contains the reference.")
+    dst_span_id: SpanID | None = Field(
+        default=None,
+        description="D-REF2: the span in the target document the reference points to, if resolved.")
+    edge_type: Literal["hyperlink", "textual_ref", "value_crossref"] = Field(
+        description="D-REF1: the kind of reference edge connecting src to dst.")
+    anomaly: Literal["UNRESOLVED_REF", "ABSENT_TARGET", "VALUE_CONTRADICTION"] = Field(
+        description="D-REF2: the detected reference anomaly type.")
+    scoping_confidence: Literal["full", "low"] = Field(
+        default="full",
+        description="D-REF3: 'low' for label-match-only contradictions (no confirmed edge); 'full' for edge-linked contradictions.")
+
+
+class PrecedentAnchor(BaseModel):
+    """D-PRC2: precedent similarity evidence anchor.
+
+    The re-openable submission span (the grounded claim) + precedent chunk ids +
+    similarity scores as attached supporting evidence. Grounding lives on the submission
+    side; precedent text is never a finding source (D-RB2(5)).
+    """
+
+    submission_span_id: SpanID = Field(
+        description="D-PRC2: the re-openable submission span the precedent similarity is anchored to.")
+    precedent_doc_ids: list[str] = Field(
+        default_factory=list,
+        description="D-PRC2: IDs of the precedent corpus chunks with above-threshold similarity.")
+    similarity_scores: list[float] = Field(
+        default_factory=list,
+        description="D-PRC4: cosine similarity scores for each precedent_doc_id (same order).")
+    threshold: float = Field(
+        default=0.0,
+        description="D-PRC4: the absolute dense-cosine threshold used in this run (not a constant here — caller reads from baseline JSON).")
+    anda_excluded: list[str] = Field(
+        default_factory=list,
+        description="D-PRC3: ANDA numbers filtered out of this retrieval (same-ANDA exclusion).")
+
+
 class Fault(BaseModel):
     """One candidate deficiency."""
 
@@ -99,6 +175,22 @@ class Fault(BaseModel):
     rule_span_id: SpanID | None = Field(default=None, description="GROUND-03: the exact rule clause span this finding cites, re-openable by Phase 5's verifier.")
     submission_span_id: SpanID | None = Field(default=None, description="GROUND-01: the exact submission span this finding rests on, so the finding is fully re-openable.")
     absence_anchor: CoverageAbsenceAnchor | None = Field(default=None, description="D-GATE1: the submission half for an absence-typed finding; mutually exclusive with a submission_span_id in practice.")
+
+    # D-ENV1 FULL: Phase-5 typed anchor fields (additive — no existing field changed or removed)
+    structural_anchor: StructuralAnchor | None = Field(
+        default=None, description="D-STR3: re-derivable structural inconsistency anchor.")
+    reference_anchor: ReferenceAnchor | None = Field(
+        default=None, description="D-REF2: cross-reference edge + anomaly.")
+    precedent_anchor: PrecedentAnchor | None = Field(
+        default=None, description="D-PRC2: precedent similarity evidence.")
+    leg_tag: Literal["ABSENCE", "STRUCTURAL", "REFERENCE", "PRECEDENT"] | None = Field(
+        default=None, description="D-ENV1: which recall leg produced this Fault.")
+    dedup_key: str | None = Field(
+        default=None,
+        description="D-CON1: dedup key '{doc_id}:{section_id}:{rule_id_or_null}'; rule_id is nullable for structural/precedent findings.")
+    confidence_tier: Literal["full", "low"] | None = Field(
+        default=None,
+        description="D-ENV1: top-level confidence tier; 'low' = scoping-confidence flag, label-match-only, or precedent soft-lead. Required for D-CON1 ordering.")
 
     evidence: str = Field(default="", description="Verbatim span or cell the finding rests on.")
     section: str = Field(default="", description="Section heading the fault sits in.")
@@ -116,7 +208,7 @@ class Fault(BaseModel):
 
 
 class FaultReport(BaseModel):
-    """The detection layer's output → frontend."""
+    """The detection layer's output -> frontend."""
 
     job_id: str = ""
     faults: list[Fault] = Field(default_factory=list)
