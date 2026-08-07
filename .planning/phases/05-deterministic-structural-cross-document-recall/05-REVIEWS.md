@@ -109,3 +109,29 @@ Fixes cluster in **Plan 01** (envelope + enums + emit-gate contract) and **Wave 
 ```
 /gsd-plan-phase 5 --reviews
 ```
+
+---
+
+## Reviewer Adjudication — BINDING (do not re-litigate)
+
+**Ruling:** Phase 5 architecture and locked decisions are **APPROVED**. Plans as written are **NOT EXECUTABLE** — the codex HIGH blockers are verified real (reviewer re-checked `emit_finding.py:67`, the `faults.py` enums, the Wave-3 `run.py` overlap, and `follow_reference`'s on-disk signature). Apply the pre-decided rulings below during `--reviews` replanning. The planner must implement these as given, not reopen them.
+
+1. **Span-issuance contract** — Reuse the Phase-4 pattern (`rulebook/absence.py:76` — validate byte-exact via `open_span` → `ledger.record_span` → emit). Land it as **ONE shared helper in Plan 01** (e.g. `issue_cached_span(ledger, span_id, nt)`) used identically by all three legs. Add a composition test proving a cache-derived span passes the emit gate end-to-end.
+
+2. **Schema — use EXISTING enum values.** Structural/reference recomputes are `EvidenceClass.CODE_VERIFIED`; precedent candidates are `Tier.ADVISORY`. Extend an enum ONLY if a mapping is genuinely lossy, with **lowercase** values and backward-compat tests. No uppercase string literals.
+
+3. **D-ENV1 envelope** — Plan 01 must land the **FULL** envelope as locked, including `dedup_key` and the single top-level confidence-tier field, or D-CON1 consolidation is dead on arrival.
+
+4. **Wave-3 conflict** — Move ALL `evals/run.py` gate wiring (`structural-gate`, `reference-gate`, `precedent-gate`) into **Plan 06**. Plans 03/04/05 touch only their own leg modules + tests.
+
+5. **Structural leg (Plan 03)** — Rewrite around explicit table primitives (label-cell vs value-cell pairing, numeric basis, units, comparator, stated-precision rounding per D-STR4) with tests matching the **REAL** fixture table shape. `result-exceeds-spec-limit` must be **table-based** in the fixture (D-STR5 binds to addressable cells); if it cannot be, **defer that check honestly to Phase 7 and say so in the plan** — do not leave SC1 silently uncovered.
+
+6. **Reference leg (Plan 04)** — Specify the concrete edge→value resolution algorithm (target table selection, label matching, comparator extraction, unit compatibility, confidence downgrade). **Re-verify the planted X1/X2 fixture numbers are arithmetically real violations** — one codex arithmetic claim did not reproduce at `05-04:169`; check the fixture spec itself in `05-01`.
+
+7. **`follow_reference` (Plan 07)** — Explicitly spec the signature change (add `db_path` or equivalent), enumerate call sites, and update them.
+
+8. **Guard** — Behavior-based transfer tests (SAME-LOGIC / THRESHOLD-TRANSFER / RENAME-INVARIANCE) are the **PRIMARY** guard; source scans are secondary tripwires with the D-GRD3 registered-vocab allowlist. `precedent-gate` **hard-fails when the local FAISS asset is present**, structured-skip otherwise, and is included in `phase5-gate`.
+
+9. **MEDIUM items accepted as written** — Fold in: `.npy` atomic-write suffix fix, index key exposure, dense-score coverage for lexical-only hits, threshold-loader literal exemption, fixture generator script.
+
+**Post-replan gate:** run the plan-checker, then **STOP for reviewer adjudication before any execution. Do not begin Wave 1.**
