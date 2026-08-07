@@ -15,6 +15,10 @@ from parse.section_splitter import split_document
 _MERGED = "tests/ingest/fixtures/merged_cells.docx"
 _MINISPEC = "src/evals/dataset/docs/mini_spec.docx"
 _PDF_KEYS = {"filename", "page_count", "toc", "pages"}
+# D-REF1 Phase-5 additive: extract_docx additionally emits 'hyperlinks' (DOCX rels extraction)
+# extract_pdf additionally emits 'links' (fitz page.get_links()).
+# These are format-specific keys: DOCX has hyperlink relationships, PDF has link annotations.
+_DOCX_KEYS = _PDF_KEYS | {"hyperlinks"}
 _PDF_PAGE_KEYS = {
     "page_number", "page_label", "width", "height", "rotation",
     "source", "is_scanned", "blocks", "tables", "figures",
@@ -23,7 +27,7 @@ _PDF_PAGE_KEYS = {
 
 def test_dict_shape_matches_extract_pdf():
     d = extract_docx(_MINISPEC)
-    assert set(d) == _PDF_KEYS, set(d)
+    assert set(d) == _DOCX_KEYS, set(d)
     assert d["page_count"] is None
     page = d["pages"][0]
     assert set(page) == _PDF_PAGE_KEYS, set(page)
