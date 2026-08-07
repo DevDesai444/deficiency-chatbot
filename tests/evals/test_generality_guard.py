@@ -530,63 +530,67 @@ def test_guard_vocab_contains_no_corpus_token():
 
 
 def test_phase5_gate_sc2_x1_deferred_branch():
-    """SC2 / X1 state-aware assertion — DEFERRED path (follow_reference still stubbed).
+    """SC2 / X1 state-aware assertion — sentinel constant verification (Wave 5 post-wiring).
 
-    Phase5-gate probes follow_reference's status on the 3-doc fixture cross-doc reference
-    (doc_a -> doc_b). While follow_reference is still stubbed (_CROSS_DOC_PENDING), this
-    function verifies the deferred path:
-      - Returns exit code 0 (pass degraded)
-      - Emits a LOUD, explicit WARN line acknowledging the deferral
+    After Wave 5, follow_reference is fully wired for cross-document resolution and no longer
+    returns _CROSS_DOC_PENDING. This test verifies the state transition:
+      - _CROSS_DOC_PENDING constant still exists (for back-compat with run.py:813 import)
+      - follow_reference returns a REAL status (not the pending sentinel)
+      - The SC2 HARD path is now active: run.py:813 probe will always take the hard branch
 
-    The HARD path (post-Wave-5) is validated in test_phase5_gate_sc2_x1_hard_path_logic.
-    SC2 catch is non-silent: any CI that swallows the WARN and passes is still making an
-    explicit decision to defer (not silently ignoring the gap).
+    Wave 4 (DEFERRED): follow_reference returned _CROSS_DOC_PENDING — run.py took the
+      DEFERRED (exit-0) path and emitted a WARN. That behavior is now retired (Wave 5).
+    Wave 5 (WIRED): follow_reference returns 'resolved_cross_doc' or 'UNRESOLVED_REF' —
+      run.py always takes the HARD path (VALUE_CONTRADICTION must be present).
+
+    SC2 catch is non-silent: any CI that passes without the HARD path VALUE_CONTRADICTION
+    is making an explicit, visible decision.
     """
-    from ingest.corpus import ingest_corpus
-    from tools.follow_reference import _CROSS_DOC_PENDING, follow_reference
-    from tools.ledger import RetrievalLedger
+    from tools.follow_reference import _CROSS_DOC_PENDING
 
+    # Verify the sentinel constant is still importable (back-compat for run.py:813)
+    assert _CROSS_DOC_PENDING == "cross_document_resolution_pending_phase_4", (
+        "_CROSS_DOC_PENDING sentinel must be retained for run.py:813 back-compat import "
+        "(Plan 06 owns run.py; do not delete the constant)."
+    )
+
+    # Verify the sentinel value is a well-known string (not None / empty)
+    assert isinstance(_CROSS_DOC_PENDING, str) and len(_CROSS_DOC_PENDING) > 10, (
+        "_CROSS_DOC_PENDING must be a non-empty string sentinel."
+    )
+
+    # Verify that follow_reference no longer returns the pending sentinel
+    # (probe the fixture to confirm the HARD path is active post-Wave-5)
     assert _SYNTHETIC_FIXTURE_DIR.exists(), (
         f"Fixture_a missing at {_SYNTHETIC_FIXTURE_DIR} (required for SC2 probe)."
     )
 
     with __import__("tempfile").TemporaryDirectory() as tmp:
+        from ingest.corpus import ingest_corpus
+        from tools.follow_reference import follow_reference
+        from tools.ledger import RetrievalLedger
+
         corpus = ingest_corpus(_SYNTHETIC_FIXTURE_DIR, cache_dir=tmp + "/cache")
         ledger = RetrievalLedger()
-
-        # Find any doc in the fixture (use the first one for the probe)
         doc_ids = [d.doc_id for d in corpus.manifest.documents]
         assert doc_ids, "fixture must have at least one document"
 
         probe_doc_id = doc_ids[0]
         result = follow_reference(corpus, probe_doc_id, "doc_b", ledger)
-
         status = result.get("status", "")
-        is_stubbed = status == _CROSS_DOC_PENDING
 
-    if is_stubbed:
-        # DEFERRED path: follow_reference still returns _CROSS_DOC_PENDING
-        # This test asserts exit-code-0 behavior (pass degraded) and logs the deferral
-        warn_msg = (
-            "WARN: SC2 X1 value-contradiction catch DEFERRED to Wave 5 — "
-            "follow_reference cross-doc resolution not yet wired; "
-            "reference-gate running DEGRADED (findings>0 only)."
-        )
-        print(warn_msg)
-        # The deferred path returns 0 (pass degraded) — assert this is the current state
-        assert is_stubbed, (
-            "Expected follow_reference to be stubbed (_CROSS_DOC_PENDING) in Wave 4. "
-            "If follow_reference now resolves cross-doc references, "
-            "run test_phase5_gate_sc2_x1_hard_path_logic instead."
-        )
-    else:
-        # follow_reference has been wired — this test's premise is violated
-        # Fail so the CI knows to run the hard path test
-        raise AssertionError(
-            f"follow_reference returned non-stub status {status!r}. "
-            "SC2 deferred-branch test is no longer valid — "
-            "test_phase5_gate_sc2_x1_hard_path_logic should be active."
-        )
+    # Post-Wave-5: the DEFERRED sentinel must NEVER be returned
+    assert status != _CROSS_DOC_PENDING, (
+        f"follow_reference returned _CROSS_DOC_PENDING on Wave 5 — the sentinel should "
+        f"never be returned after follow_reference was wired for cross-doc resolution. "
+        f"status={status!r}"
+    )
+    # Post-Wave-5: must return a real typed status
+    assert status in ("resolved_cross_doc", "UNRESOLVED_REF", "resolved") or result.get("resolved"), (
+        f"follow_reference must return a real typed status post-Wave-5 "
+        f"(resolved_cross_doc, UNRESOLVED_REF, or resolved=True). Got status={status!r}, result={result!r}"
+    )
+    print(f"SC2 state: follow_reference returns status={status!r} (HARD path active post-Wave-5).")
 
 
 def test_phase5_gate_sc2_x1_hard_path_logic(monkeypatch):
@@ -639,23 +643,19 @@ def test_phase5_gate_sc2_x1_hard_path_logic(monkeypatch):
         (f.detail or "") for f in value_contradictions
     )
 
-    # The hard-path assertion logic (active post-Wave-5):
-    # assert "0.18" in all_details and "0.15" in all_details, (
-    #     "SC2 X1 hard assertion: VALUE_CONTRADICTION fault must carry Compound-B numbers "
-    #     "(0.18 and 0.15) once follow_reference resolves cross-doc. "
-    #     f"VALUE_CONTRADICTION count: {len(value_contradictions)}"
-    # )
-
-    # Wave 4 behavior: 0 VALUE_CONTRADICTION (DEFERRED) — assert deferred count is 0
-    # This test structure will automatically become the hard assertion once Wave 5 lands
-    # and VALUE_CONTRADICTION count rises from 0 to >= 1 with Compound-B numbers.
-    # The test documents the assertion logic without pytest.skip (D-GRD2: no skip in PRIMARY).
-    if value_contradictions:
-        # Wave 5+ path: enforce the full X1 catch
-        assert "0.18" in all_details and "0.15" in all_details, (
-            "SC2 X1 hard assertion: VALUE_CONTRADICTION fault must carry Compound-B numbers "
-            "(0.18 and 0.15) once follow_reference resolves cross-doc. "
-            f"VALUE_CONTRADICTION count: {len(value_contradictions)}, "
-            f"details sample: {all_details[:200]!r}"
-        )
-    # Wave 4: 0 VALUE_CONTRADICTION is the expected deferred state (assertion passes)
+    # Wave 5 HARD path: VALUE_CONTRADICTION must be present with Compound-B numbers.
+    # follow_reference is now wired for cross-doc resolution — the edge from doc_a to doc_b
+    # must resolve so detect_reference_anomalies can surface the 0.18% vs NMT 0.15% violation.
+    assert value_contradictions, (
+        "SC2 X1 HARD assertion (Wave 5): extract_references + detect_reference_anomalies must "
+        "produce >= 1 VALUE_CONTRADICTION fault on fixture_a. "
+        f"Got {len(faults)} total faults, 0 with VALUE_CONTRADICTION. "
+        "Check: references.py must resolve '(doc_b.docx)' or 'Analytical Procedures' to doc_b "
+        "so Ruling-6 pipeline fires on Compound B (0.18% vs NMT 0.15%)."
+    )
+    assert "0.18" in all_details and "0.15" in all_details, (
+        "SC2 X1 hard assertion: VALUE_CONTRADICTION fault must carry Compound-B numbers "
+        "(0.18 and 0.15) once follow_reference resolves cross-doc. "
+        f"VALUE_CONTRADICTION count: {len(value_contradictions)}, "
+        f"details sample: {all_details[:200]!r}"
+    )

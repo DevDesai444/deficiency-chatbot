@@ -136,6 +136,14 @@ _REF_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"(?:Module|Section)\s+(3\.2\.[SP]\.[\d\.]+)", re.IGNORECASE),
     # D-GRD3: general section-number reference (§X or Section X.Y)
     re.compile(r"§\s*(\d+[\.\d]*)", re.IGNORECASE),
+    # D-GRD3: general parenthesized-filename pattern — any filename with a document extension
+    # inside parentheses. NOT corpus-specific: matches ANY parenthesized filename with a
+    # recognized document extension. Enables cross-doc resolution of explicit filename citations
+    # like "(doc_b.docx)", "(procedures.pdf)", "(spec_v2.xlsx)", etc.
+    re.compile(
+        r"\(([\w\-]+\.(?:docx?|pdf|xlsx?|pptx?|txt|csv))\)",
+        re.IGNORECASE,
+    ),
 ]
 
 # D-GRD3: general NMT / limit extraction patterns — all inside re.compile().
@@ -229,6 +237,30 @@ def _units_compatible(a: str, b: str) -> bool:
 # extract_references: pure side-effect — register edges
 # ---------------------------------------------------------------------------
 
+def _build_doc_first_lines(corpus: CorpusIndex, manifest: CoverageManifest) -> dict[str, str]:
+    """Build a mapping of doc_id -> first non-empty line from canonical text.
+
+    General: extracts the actual heading/title from the parsed document content,
+    independent of the classification label (which may use a CTD family name
+    rather than the document's own heading). Used by _find_doc_by_outline to match
+    reference text against document headings.
+    D-GRD3: no corpus-specific constant — derived entirely from document content.
+    """
+    first_lines: dict[str, str] = {}
+    for doc_entry in manifest.documents:
+        cache = corpus.cached_entry(doc_entry.doc_id)
+        if cache is None:
+            continue
+        canonical: str = cache.get("canonical", "") or ""
+        # First non-empty line from canonical text (may be the document heading)
+        for line in canonical.splitlines():
+            stripped = line.strip()
+            if stripped and len(stripped) >= 4:
+                first_lines[doc_entry.doc_id] = stripped.lower()
+                break
+    return first_lines
+
+
 def extract_references(
     corpus: CorpusIndex,
     manifest: CoverageManifest,
@@ -242,6 +274,8 @@ def extract_references(
     T-05W2B-04: capped at _EDGE_CAP_PER_DOC edges per document.
     """
     doc_ids = {d.doc_id for d in manifest.documents}
+    # Build first-line index for general content-title matching (D-GRD3: no constants)
+    doc_first_lines = _build_doc_first_lines(corpus, manifest)
 
     for doc_entry in manifest.documents:
         if doc_entry.status in ("parse_failed", "unsupported"):
@@ -338,7 +372,7 @@ def extract_references(
                 src_id = f"{doc_id}:{src_span.start}"
                 # Try to find target doc from the matched text
                 ref_text = m.group(0)
-                dst_doc = _find_doc_by_outline(ref_text, manifest, doc_ids)
+                dst_doc = _find_doc_by_outline(ref_text, manifest, doc_ids, doc_first_lines)
                 dst_id = f"{dst_doc}:0" if dst_doc else "unresolved"
                 provenance = json.dumps(src_span.model_dump())
                 try:
@@ -376,7 +410,7 @@ def extract_references(
                 src_span = _span_at_offset(doc_id, canonical, match_offset, normalizer_version)
                 src_id = f"{doc_id}:{src_span.start}"
                 # find referenced dst doc
-                dst_doc = _find_doc_by_outline(ctx_text, manifest, doc_ids)
+                dst_doc = _find_doc_by_outline(ctx_text, manifest, doc_ids, doc_first_lines)
                 dst_id = f"{dst_doc}:0" if dst_doc else "unresolved"
                 provenance = json.dumps(src_span.model_dump())
                 try:
@@ -419,23 +453,88 @@ def _resolve_target_doc(target: str, doc_ids: set[str], manifest: CoverageManife
 # ---------------------------------------------------------------------------
 # Helper: find a doc by cross-referencing the match text against doc outlines
 # ---------------------------------------------------------------------------
-def _find_doc_by_outline(ref_text: str, manifest: CoverageManifest, doc_ids: set[str]) -> str | None:
-    """Try to find a referenced doc by matching ref_text against doc titles and outline labels.
+def _find_doc_by_outline(
+    ref_text: str,
+    manifest: CoverageManifest,
+    doc_ids: set[str],
+    doc_first_lines: dict[str, str] | None = None,
+) -> str | None:
+    """Try to find a referenced doc by matching ref_text against doc titles, filenames and outline labels.
 
-    Returns the doc_id of the first match, or None.
-    General search: checks doc titles and outline section labels.
-    D-GRD3: no corpus-specific constant; purely string containment.
+    Resolution strategy (general, D-GRD3: no corpus-specific constant):
+    1. Parenthesized filename: if ref_text contains a parenthesized filename that matches a corpus
+       doc's filename, return that doc (most precise resolution path).
+    2. Bidirectional title containment: checks doc.title, outline labels, and first-line content
+       (from doc_first_lines if provided) against ref_text using leading-phrase matching.
+       This handles the case where the classification label differs from the document's own
+       heading (e.g. classified as "Drug Substance Specification" but heading starts with
+       "Analytical Procedures — Impurity Profile").
+    3. Filename stem: the doc filename without extension appears in ref_text.
+
+    D-GRD3: all resolution is based on actual doc metadata and corpus content, never corpus-specific
+    constants. The caller is responsible for passing the manifest with populated .title / .outline.
+
+    Parameters
+    ----------
+    ref_text      : the reference text to match against (regex match or context span)
+    manifest      : corpus coverage manifest with doc metadata
+    doc_ids       : set of known doc_ids (for fast membership checks)
+    doc_first_lines : optional {doc_id -> first_line_lower} from _build_doc_first_lines;
+                      when provided, enables first-line heading resolution so that a reference
+                      like "Analytical Procedures, Table 1" resolves to the doc whose canonical
+                      text starts with "Analytical Procedures — Impurity Profile".
     """
     ref_lower = ref_text.lower()
+
+    # --- Pass 1: parenthesized filename (most precise) ---
+    # Extract any "(filename.ext)" pattern from ref_text and match against doc filenames.
+    # D-GRD3: general regex for any parenthesized document-extension filename.
+    _PAREN_FNAME_RE = re.compile(
+        r"\(([\w\-]+\.(?:docx?|pdf|xlsx?|pptx?|txt|csv))\)",
+        re.IGNORECASE,
+    )
+    for m in _PAREN_FNAME_RE.finditer(ref_text):
+        fname = m.group(1)
+        resolved = _resolve_target_doc(fname, doc_ids, manifest)
+        if resolved:
+            return resolved
+
+    # --- Pass 2: bidirectional title / first-line containment ---
     for doc in manifest.documents:
-        if doc.title and doc.title.lower() in ref_lower:
-            return doc.doc_id
-        if doc.filename and doc.filename.lower().split(".")[0] in ref_lower:
-            return doc.doc_id
+        # Build candidate title strings from all available sources:
+        # (a) classification label  (b) outline entry labels  (c) first-line canonical heading
+        candidate_titles: list[str] = []
+        if doc.title:
+            candidate_titles.append(doc.title.lower())
         for outline_entry in doc.outline:
-            label_lower = outline_entry.label.lower()
-            if label_lower and label_lower in ref_lower:
+            if outline_entry.label:
+                candidate_titles.append(outline_entry.label.lower())
+        if doc_first_lines and doc.doc_id in doc_first_lines:
+            candidate_titles.append(doc_first_lines[doc.doc_id])
+
+        for candidate_title in candidate_titles:
+            if not candidate_title:
+                continue
+            # Forward: full candidate title appears inside ref_lower
+            if candidate_title in ref_lower:
                 return doc.doc_id
+            # Bidirectional: leading N words of candidate title appear as a phrase in ref_lower.
+            # Progressively shorter leading phrases (min 2 words, min 6 chars).
+            # General: "Analytical Procedures" from "Analytical Procedures — Impurity Profile"
+            # matches "see Analytical Procedures, Table 1" (ref truncates at comma).
+            title_words = re.split(r"[\s\-—–]+", candidate_title)
+            for length in range(len(title_words), 1, -1):
+                phrase = " ".join(title_words[:length])
+                if len(phrase) >= 6 and phrase in ref_lower:
+                    return doc.doc_id
+
+    # --- Pass 3: filename stem containment ---
+    for doc in manifest.documents:
+        if doc.filename:
+            stem = doc.filename.lower().rsplit(".", 1)[0]
+            if stem and len(stem) >= 3 and stem in ref_lower:
+                return doc.doc_id
+
     return None
 
 
