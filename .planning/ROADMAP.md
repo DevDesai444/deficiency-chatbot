@@ -181,7 +181,7 @@ Plans:
 - [x] 05-06-PLAN.md — Guard extension: NO-CONSTANT parametrized, SAME-LOGIC/THRESHOLD-TRANSFER/RENAME-INVARIANCE in fast CI, deterministic-recall-gate (RECALL-05)
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 05-07-PLAN.md — Integration: fill follow_reference stub, FailureFamily extension, phase5-gate SC5 (RECALL-02/03/04/05)
+- [x] 05-07-PLAN.md — Integration: fill follow_reference stub, FailureFamily extension, phase5-gate SC5 (RECALL-02/03/04/05)
 
 ### Phase 6: On-Prem Verifier Model + Weak-Model Reliability (β)
 **Goal**: Stand up the reasoning/verification model the β verifier runs on — NVIDIA Llama-3.3-Nemotron-Super-49B-v1.5, served **self-hosted on Databricks** alongside Llama 3.3 70B + Qwen MoE, with **no external LLM API ever called** — and prove it is production-wired before Phase 7 depends on it. Because the verifier still runs on weaker open-weights models, harden tool-call reliability here: server-side guided decoding, field-level actionable errors, and targeted semantic arg coercion — so the KEEP|DOWNGRADE verdicts in Phase 7 parse reliably instead of dropping findings to malformed args.
