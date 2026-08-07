@@ -170,7 +170,7 @@ Plans:
 - [x] 05-01-PLAN.md — Wave 0 foundation: shared envelope (D-ENV1), guard vocab (D-GRD3), parse-layer hyperlink/link backfill, synthetic fixture (D-GRD1/D-GRD4), test scaffolds (RECALL-02/03/04/05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 05-02-PLAN.md — RECALL-05 retrieval surface: D-R5A dense cosine score, D-R5B per-submission index persistence (RECALL-05)
+- [x] 05-02-PLAN.md — RECALL-05 retrieval surface: D-R5A dense cosine score, D-R5B per-submission index persistence (RECALL-05)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 05-03-PLAN.md — RECALL-02 structural leg: detect_structural_inconsistencies, emit_structural_finding, structural-gate (RECALL-02)
