@@ -221,9 +221,94 @@ def test_emit_structural_finding_empty_basis_rejected(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Stub: Wave-2 plans implement these against the real structural.py
+# Gate tests for Wave-2 (Plan 05-03)
 # ---------------------------------------------------------------------------
 
-def test_aggregate_violation_stub():
-    """Placeholder: structural.py aggregate recompute tests live in tests/rulebook/test_structural.py."""
-    pytest.skip("Wave-2 structural.py implementation not yet present")
+def test_fabricated_claim_span_rejected(tmp_path):
+    """A SpanID fabricated for a non-existent doc must be rejected by emit_structural_finding.
+
+    Tests the 'wrong_store' path: claim_span_id.doc_id does not resolve in the corpus
+    (corpus.cached_entry returns None). The emit gate must return ToolRejected.
+    """
+    from ingest.anchors import short_hash
+    from ingest.normalize import NORMALIZER_VERSION
+
+    # Build a real corpus with a known doc_id
+    corpus = build_corpus_index(tmp_path, "real-doc", [_block("Real corpus text.")])
+
+    # Fabricate a span for a doc_id that does NOT exist in the corpus
+    fabricated_span = SpanID(
+        doc_id="nonexistent-doc",  # not in corpus
+        start=0,
+        end=4,
+        hash=short_hash("fake", NORMALIZER_VERSION),
+    )
+
+    ledger = RetrievalLedger()
+    # Do NOT call issue_cached_span — span is both fabricated and unissued
+
+    anchor = StructuralAnchor(
+        claim_span_id=fabricated_span,
+        basis_span_ids=[fabricated_span],
+        relation="SUM",
+        expected_value="0.28%",
+        actual_value="0.12%",
+    )
+    result = emit_structural_finding(
+        corpus=corpus,
+        rule_span_id=None,
+        structural_anchor=anchor,
+        ledger=ledger,
+    )
+    assert isinstance(result, ToolRejected), (
+        f"Fabricated span for non-existent doc must be ToolRejected, got {type(result)}"
+    )
+    assert result.reason_code == "wrong_store", (
+        f"reason_code must be 'wrong_store', got {result.reason_code!r}"
+    )
+
+
+def test_merged_cell_dedup_abstains(tmp_path):
+    """All basis_span_ids resolve to the same span after dedup -> ToolRejected (unanchored_structural).
+
+    Pitfall 2 (merged cells): when multiple basis span_ids all have the same
+    (doc_id, start, end) — as happens with merged table cells — emit_structural_finding
+    deduplicates them to a single span and requires >= 1 independent basis span.
+    If after deduplication there are zero issued basis spans, the emit gate returns
+    ToolRejected(reason_code='unanchored_structural').
+
+    This test provides an anchor with basis_span_ids=[] (empty after dedup):
+    """
+    doc_text = "Stability data table with merged cells."
+    corpus = build_corpus_index(tmp_path, "merged-doc", [_block(doc_text)])
+    cache = corpus.cached_entry("merged-doc")
+    nt = _nt_from_cache(cache)
+
+    claim_text = "Stability data"
+    start = nt.canonical.index(claim_text)
+    end = start + len(claim_text)
+    claim_span = mint_span(nt.canonical, start, end, "merged-doc", nt.normalizer_version)
+
+    ledger = RetrievalLedger()
+    issue_cached_span(ledger, claim_span, nt)
+
+    # Empty basis_span_ids -> no independent basis after dedup -> unanchored_structural
+    anchor = StructuralAnchor(
+        claim_span_id=claim_span,
+        basis_span_ids=[],  # empty = all merged to zero independent cells
+        relation="SUM",
+        expected_value="0.28%",
+        actual_value="0.12%",
+    )
+    result = emit_structural_finding(
+        corpus=corpus,
+        rule_span_id=None,
+        structural_anchor=anchor,
+        ledger=ledger,
+    )
+    assert isinstance(result, ToolRejected), (
+        f"Empty basis after dedup must return ToolRejected, got {type(result)}"
+    )
+    assert result.reason_code == "unanchored_structural", (
+        f"reason_code must be 'unanchored_structural', got {result.reason_code!r}"
+    )

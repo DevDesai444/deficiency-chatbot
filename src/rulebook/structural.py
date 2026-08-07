@@ -196,19 +196,41 @@ def _find_value_column(
     return max(col_numeric_count, key=col_numeric_count.__getitem__)
 
 
+def _contains_aggregate_word(text: str) -> bool:
+    """Return True if any word in `text` (case-insensitive) is in AGGREGATE_LEXICON.
+
+    D-STR1 general engine: aggregate label cells have names like "Total Impurities",
+    "Maximum Measured Value", "Minimum Reported", "Average Release" — multi-word labels
+    where ONE of the words is in AGGREGATE_LEXICON. Exact-match on the full label would
+    miss all multi-word labels, so this function checks word-by-word.
+
+    No submission-specific string is introduced here (D-GEN2): only the general vocabulary
+    from AGGREGATE_LEXICON (frozenset{"total","sum","maximum","max","minimum","min",
+    "average","mean"}) determines whether a cell is a label candidate.
+    """
+    words = re.split(r'\W+', text.strip().lower())
+    return any(w in AGGREGATE_LEXICON for w in words if w)
+
+
 def _infer_relation(label_text: str) -> str:
     """Map aggregate label text to a relation enum string.
 
     D-STR1: ONE general engine mapping AGGREGATE_LEXICON labels to relations.
-    Returns "SUM" as the default for unrecognized aggregate labels.
-    All comparisons case-insensitive.
+    Scans all words in the label text (case-insensitive) to find a recognized keyword.
+    Returns "SUM" as the default for labels where no specific relation keyword is found.
+
+    Examples:
+    - "Total Impurities" -> words ["total", "impurities"] -> "total" -> SUM
+    - "Maximum Measured Value" -> words ["maximum", ...] -> "maximum" -> MAX
+    - "Minimum Reported" -> "minimum" -> MIN
+    - "Average Release" -> "average" -> MEAN
     """
-    lower = label_text.strip().lower()
-    if lower in ("maximum", "max"):
+    words = set(re.split(r'\W+', label_text.strip().lower()))
+    if words & {"maximum", "max"}:
         return "MAX"
-    if lower in ("minimum", "min"):
+    if words & {"minimum", "min"}:
         return "MIN"
-    if lower in ("average", "mean"):
+    if words & {"average", "mean"}:
         return "MEAN"
     # "total", "sum", and any other AGGREGATE_LEXICON member -> SUM
     return "SUM"
@@ -287,10 +309,11 @@ def _scan_tables(
         if value_col is None:
             continue
 
-        # Find ALL aggregate label rows: cells in non-value columns whose text is in AGGREGATE_LEXICON
+        # Find ALL aggregate label rows: cells in non-value columns whose text CONTAINS
+        # at least one word from AGGREGATE_LEXICON (e.g. "Total Impurities" contains "total")
         aggregate_label_rows: set[int] = set()
         for (row, col), text in cell_texts.items():
-            if col != value_col and text.strip().lower() in AGGREGATE_LEXICON:
+            if col != value_col and _contains_aggregate_word(text):
                 aggregate_label_rows.add(row)
 
         # For each aggregate label cell, detect violations
@@ -298,7 +321,7 @@ def _scan_tables(
             if col == value_col:
                 continue  # value cells are not label candidates
             text = cell_texts.get((row, col), "")
-            if text.strip().lower() not in AGGREGATE_LEXICON:
+            if not _contains_aggregate_word(text):
                 continue
 
             # Found aggregate label at (row, col)
@@ -311,8 +334,10 @@ def _scan_tables(
             if claim_text is None:
                 continue
 
-            # BASIS = all non-aggregate-label rows in the value_col
+            # BASIS = all non-aggregate-label rows in the value_col that contain numeric text
             # Ruling 5: basis cells are value-column cells for ALL non-aggregate rows
+            # We collect spans and numeric values together to avoid counting non-numeric
+            # header cells as basis (e.g. "% w/w" header is in col 1 but not a data cell)
             max_row = max(r for (r, c) in cells)
             basis_positions = [
                 (r, value_col)
@@ -321,28 +346,31 @@ def _scan_tables(
                 and r != row                         # not the current aggregate row
                 and r not in aggregate_label_rows    # not any other aggregate label row
             ]
-            basis_spans = [cells[pos] for pos in basis_positions if pos in cells]
 
-            # Deduplicate basis spans (Pitfall 2: merged cells -> same SpanID)
-            unique_basis = _deduplicate_basis(basis_spans)
+            # Read basis cell texts and collect only numeric-parseable ones
+            basis_spans_all = [cells[pos] for pos in basis_positions if pos in cells]
+            basis_nums: list[float] = []
+            basis_spans_numeric: list[SpanID] = []
+            for pos in basis_positions:
+                bt = cell_texts.get(pos)
+                if bt is None:
+                    continue
+                num = _parse_numeric(bt)
+                if num is not None:
+                    basis_nums.append(num)
+                    if pos in cells:
+                        basis_spans_numeric.append(cells[pos])
+
+            # Deduplicate numeric basis spans (Pitfall 2: merged cells -> same SpanID)
+            unique_basis = _deduplicate_basis(basis_spans_numeric)
             if len(unique_basis) < 2:
-                # Abstain: no_comparison_basis (fewer than 2 independent basis cells)
+                # Abstain: no_comparison_basis (fewer than 2 independent numeric basis cells)
                 log.debug(
                     "structural: abstain no_comparison_basis",
                     doc_id=doc_id, table_id=table_id, row=row, col=col,
                     unique_basis_count=len(unique_basis),
                 )
                 continue
-
-            # Read basis numeric values from cell texts
-            basis_texts = [cell_texts.get(pos) for pos in basis_positions]
-            basis_nums: list[float] = []
-            for bt in basis_texts:
-                if bt is None:
-                    continue
-                num = _parse_numeric(bt)
-                if num is not None:
-                    basis_nums.append(num)
 
             if not basis_nums:
                 # Abstain: no numeric basis values
