@@ -1,0 +1,83 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Impurity acceptance criteria gap",
+      "detail": "The impurity acceptance criteria are not fully specified, as required by ICH Q3A(R2). [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q3A-R2",
+        "start": 15246,
+        "end": 15453,
+        "hash": "48dcb8f770a3e7bc"
+      },
+      "submission_span_id": {
+        "doc_id": "minispec",
+        "start": 307,
+        "end": 439,
+        "hash": "f04e0a436b97b138"
+      },
+      "evidence": "Impurity\tResult (%)\tLimit\nImpurity A\t0.08\t0.10\nImpurity B\t0.15\t0.10\nImpurity C\t0.19\t0.20\nTotal impurities\t0.14\t0.20\nMaximum\t0.15\tN/A",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "ICH Q3A(R2)",
+        "Q3A-SPECIFIED-IMPURITY-COMPLETENESS"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Specificity test record gap",
+      "detail": "The specificity test record is incomplete, as it does not include a statement of the method used in the testing of the sample, as required by 21 CFR 211.194(a)(2). [verdict: gap]",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "quote_anchored",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ecfr-211.194",
+        "start": 543,
+        "end": 742,
+        "hash": "fc9b4f185bc9bece"
+      },
+      "submission_span_id": {
+        "doc_id": "mvr1381",
+        "start": 1219,
+        "end": 1341,
+        "hash": "ad62e47dac444cbc"
+      },
+      "evidence": "1.4.1\nSpecificity ......................................................................................................9\n",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_finding",
+      "guidance_refs": [
+        "21 CFR 211.194(a)(2)",
+        "CFR-211194-CALCULATIONS"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [],
+  "parse_failures": [],
+  "analysis_seconds": 42.4,
+  "stop_reason": "breaker",
+  "budget_exhausted": false
+}

@@ -806,6 +806,7 @@ def cmd_phase5_gate(args: argparse.Namespace) -> int:
     # --- SC2/X1 state-aware assertion (binding_reviewer_addition_SC2, PATH B) ---
     print("\n--- SC2/X1 value-contradiction probe ---")
     sc2_rc = 0
+    sc2_deferred = False
     fixture = pathlib.Path("src/evals/dataset/synthetic_fixture")
 
     if fixture.exists():
@@ -829,7 +830,7 @@ def cmd_phase5_gate(args: argparse.Namespace) -> int:
                         "follow_reference cross-doc resolution not yet wired; "
                         "reference-gate running DEGRADED (findings>0 only)."
                     )
-                    # sc2_rc = 0 (pass degraded)
+                    sc2_deferred = True  # sc2_rc = 0 (pass degraded)
                 else:
                     # HARD path: follow_reference resolved cross-doc — enforce full X1 catch
                     from rulebook.references import detect_reference_anomalies, extract_references
@@ -869,8 +870,10 @@ def cmd_phase5_gate(args: argparse.Namespace) -> int:
         print(f"  {name}: {status}")
     if sc2_rc != 0:
         print("  SC2/X1 probe: FAIL")
+    elif sc2_deferred:
+        print("  SC2/X1 probe: DEFERRED (follow_reference not wired — reference-gate degraded)")
     else:
-        print("  SC2/X1 probe: PASS (or DEFERRED)")
+        print("  SC2/X1 probe: PASS (hard — X1 Compound-B value-contradiction caught)")
 
     failed = [n for n, s in results.items() if s == "FAIL"]
     if failed or sc2_rc != 0:

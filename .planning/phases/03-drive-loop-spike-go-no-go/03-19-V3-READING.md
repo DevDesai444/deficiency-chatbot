@@ -3,6 +3,8 @@
 Senior-reviewer gate reading of the v3.2 scored set, recorded verbatim. Set closed; no
 re-roll. Numbers via the frozen `metrics`/`statistics` paths (`03-19-V3-RUN-NOTES.md`).
 
+> Note: the v3.2 scored artifacts these numbers come from live at `runs/agent-run-v3.2-{1,2,3}.{json,jsonl,-summary.json}` (restored from `fe4c408` after commit `4ecf0af` overwrote the `agent-run-v3-*` names in place with the v3.3 set).
+
 ## Ruling (verbatim)
 
 > REVIEWER RULING (v3.2, against e8de55a): NO-GO — clauses (a) and (b) both fail (overall
