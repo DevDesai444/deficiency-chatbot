@@ -59,7 +59,8 @@ def test_search_corpus_returns_bounded_span_grounded_ledger_recorded_results(
     assert isinstance(results, list)
     assert len(results) >= 1
     for r in results:
-        assert set(r) == {"doc_id", "span_id", "score", "snippet"}
+        # D-R5A: rrf_score is now a separate field; score is the dense cosine (0-1)
+        assert set(r) == {"doc_id", "span_id", "score", "rrf_score", "snippet"}
         assert r["doc_id"] == "doc-x"
         span = SpanID.model_validate(r["span_id"])
         # every returned span-ID is ledger.record_span-ed BEFORE being returned (D-GRAN)

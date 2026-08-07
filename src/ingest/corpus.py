@@ -57,6 +57,19 @@ class CorpusIndex(BaseModel):
                 return read_doc_cache(self.cache_dir, key)
         return None
 
+    def cache_key_for(self, doc_id: str) -> str | None:
+        """Return the per-doc cache_key for `doc_id`, or None if not found.
+
+        D-R5B / Ruling 9 (index key exposure): exposes the content-hash-keyed sidecar
+        key so search_corpus can locate per-doc index sidecars at query time without
+        re-hashing the file bytes.  The key is derived from the DocEntry.content_hash
+        already stored in the manifest — no re-IO required.
+        """
+        for d in self.manifest.documents:
+            if d.doc_id == doc_id:
+                return cache_key(d.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION, PARSER_VERSION)
+        return None
+
 
 def _degradation(parsed: dict) -> str:
     """Return a reason string if any page/table degraded (source FACT / _parse_failed), else ''."""
@@ -163,6 +176,14 @@ def ingest_corpus(root: str | Path, cache_dir: str = DEFAULT_CACHE_DIR, model: s
             "table_index": {k: v.model_dump() for k, v in table_index.items()},
             "doc_entry": entry.model_dump(),
         })
+        # D-R5B: build per-doc search index sidecars at ingest time so search_corpus
+        # can load them at query time instead of re-embedding the whole corpus.
+        # Errors here must never abort ingest (D-16 never-abort contract).
+        try:
+            from tools.search_corpus import build_doc_index
+            build_doc_index(cache_dir, key, nt, doc_id)
+        except Exception as _exc:  # noqa: BLE001
+            log.warning("build_doc_index_failed", doc_id=doc_id, error=str(_exc)[:200])
 
     counts: dict[str, int] = {}
     for e in entries:
