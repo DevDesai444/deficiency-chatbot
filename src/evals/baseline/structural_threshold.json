@@ -1,0 +1,6 @@
+{
+  "threshold": 0.0,
+  "measured_on": "synthetic_fixture",
+  "measured_date": "2026-08-06",
+  "note": "D-STR4: general threshold, not corpus-tuned. Placeholder; will be updated after structural-gate measurement."
+}

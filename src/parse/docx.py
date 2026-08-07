@@ -16,6 +16,9 @@ by the corpus walker (Plan 09).
 """
 from __future__ import annotations
 
+import structlog
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 import docx
@@ -24,6 +27,11 @@ from docx.text.paragraph import Paragraph
 
 from schemas.documents import ExtractedTable, LayoutBlock
 from schemas.llm import ParseFailed
+
+log = structlog.get_logger()
+
+_MAX_HYPERLINKS = 1000
+_RELS_XMLNS = "http://schemas.openxmlformats.org/package/2006/relationships"
 
 
 def iter_block_items(document):
@@ -110,6 +118,47 @@ def _docx_toc(document) -> list[dict]:
     return toc
 
 
+def _extract_hyperlinks(path: str | Path) -> list[dict]:
+    """D-REF1 / T-05W0-01: Extract relationship-based hyperlinks from a DOCX zip.
+
+    Reads word/_rels/document.xml.rels and parses <Relationship> elements to find
+    external (and internal) link targets. Returns a list of dicts with keys:
+      {rId: str, target: str, paragraph_index: int | None}
+
+    Security (T-05W0-01 Tampering): ET.fromstring on rels_xml is wrapped in try/except;
+    any malformed XML returns []. Also prevents XXE: ET's default parser does not resolve
+    external entities.
+
+    DoS mitigation (T-05W0-04): capped at _MAX_HYPERLINKS entries with a warning log.
+    """
+    try:
+        with zipfile.ZipFile(str(path), "r") as zf:
+            rels_path = "word/_rels/document.xml.rels"
+            if rels_path not in zf.namelist():
+                return []
+            rels_xml = zf.read(rels_path)
+    except (zipfile.BadZipFile, KeyError, OSError):
+        return []
+
+    try:
+        root = ET.fromstring(rels_xml)
+    except ET.ParseError:
+        return []
+
+    hyperlinks: list[dict] = []
+    for rel in root.findall(f"{{{_RELS_XMLNS}}}Relationship"):
+        r_id = rel.get("Id", "")
+        target = rel.get("Target", "")
+        if not r_id or not target:
+            continue
+        hyperlinks.append({"rId": r_id, "target": target, "paragraph_index": None})
+        if len(hyperlinks) >= _MAX_HYPERLINKS:
+            log.warning("docx_hyperlinks_capped", path=str(path), limit=_MAX_HYPERLINKS)
+            break
+
+    return hyperlinks
+
+
 def extract_docx(path: str | Path) -> dict:
     """Parse a DOCX into the SAME structured-document dict `parse.pdf.extract_pdf` emits (D-20)."""
     document = docx.Document(str(path))
@@ -137,10 +186,12 @@ def extract_docx(path: str | Path) -> dict:
                     ).model_dump()}
                 )
             order += 1
+    hyperlinks = _extract_hyperlinks(path)
     return {
         "filename": Path(path).name,
         "page_count": None,
         "toc": _docx_toc(document),
+        "hyperlinks": hyperlinks,
         "pages": [
             {
                 "page_number": None,
