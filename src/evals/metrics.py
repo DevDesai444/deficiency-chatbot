@@ -18,6 +18,32 @@ from evals.match import score
 from evals.schema import EvalSet, FailureFamily
 from schemas.faults import FaultReport, Tier
 
+# ---------------------------------------------------------------------------
+# Frozen measurement pin (Blocker 1 fix — Wave 5).
+#
+# The by-family rows in the frozen `score` output are a property of the
+# GROUND-TRUTH DATASETS committed at this snapshot, NOT of whatever the
+# FailureFamily enum currently holds.  When new enum members are added for
+# new eval legs (structural / reference_graph / precedent_similarity), they
+# must NOT silently appear in the frozen `score` output and break byte-identity
+# against the pre-Wave baseline hashes.
+#
+# _GROUND_TRUTH_FAMILIES = the 4 GT families that have committed deficiency
+# ground-truth in the EvalSet (src/evals/dataset/*.deficiencies.json).
+# _end_to_end_by_family iterates THIS tuple, not the full enum, so the
+# frozen `score` path is frozen against future enum growth.
+#
+# The 3 new Phase-5 families (structural / reference_graph / precedent_similarity)
+# are exposed SEPARATELY via deterministic_leg_breakdown() which is NOT called
+# within the `score` command output path.
+# ---------------------------------------------------------------------------
+_GROUND_TRUTH_FAMILIES: tuple[FailureFamily, ...] = (
+    FailureFamily.ABSENCE_OF_EVIDENCE,
+    FailureFamily.DERIVATION_PLAUSIBILITY,
+    FailureFamily.CROSS_REFERENCE_INTEGRITY,
+    FailureFamily.REGULATORY_FRAMING,
+)
+
 # Numeric/identifier token >=4 chars total, mirroring `agents.detection.verify._anchored`'s own
 # `len(n) >= 4` verbatim-anchoring floor -- applied PER-TOKEN (not to the whole evidence string)
 # so a composite, multi-citation Fault.evidence field can still be credited if ANY ONE of its
@@ -56,12 +82,19 @@ def _end_to_end(report: FaultReport, eval_set: EvalSet, doc_id: str) -> dict:
 
 def _end_to_end_by_family(report: FaultReport, eval_set: EvalSet, doc_id: str) -> dict:
     """Per-family precision/recall/tp/fp/fn -- the same finding list scored against each
-    family's GT subset in turn, per family. All four family keys are always present (even a
-    family with zero GT items in this doc would report precision=recall=0.0 via the
-    `_precision_recall` zero-guard, never a KeyError)."""
+    GT family's subset in turn.  ALL four _GROUND_TRUTH_FAMILIES keys are always present
+    (even a family with zero GT items in this doc reports precision=recall=0.0 via the
+    `_precision_recall` zero-guard, never a KeyError).
+
+    IMPORTANT (Blocker 1 freeze pin): iterates _GROUND_TRUTH_FAMILIES, NOT the full
+    FailureFamily enum.  This keeps the frozen `score` output byte-identical regardless of
+    future enum growth — new eval legs (structural / reference_graph / precedent_similarity)
+    are NOT ground-truth families and must NOT appear in the frozen measurement path.
+    See `deterministic_leg_breakdown` for the separate, additive leg surface.
+    """
     faults = [f.model_dump() for f in report.faults]
     by_family: dict[str, dict] = {}
-    for family in FailureFamily:
+    for family in _GROUND_TRUTH_FAMILIES:
         family_gts = [
             gt for gt in eval_set.deficiencies if gt.doc_id == doc_id and gt.failure_family == family
         ]
@@ -70,6 +103,35 @@ def _end_to_end_by_family(report: FaultReport, eval_set: EvalSet, doc_id: str) -
             len(result.matched_gt_ids), len(result.fp_findings), len(result.fn_gt_ids)
         )
     return by_family
+
+
+def deterministic_leg_breakdown(report: FaultReport, eval_set: EvalSet, doc_id: str) -> dict:
+    """Precision/recall breakdown for the THREE new Phase-5 deterministic legs.
+
+    Covers: structural / reference_graph / precedent_similarity.
+    These are NOT ground-truth families in the committed EvalSet and therefore
+    are NOT in the frozen `score` output path (_end_to_end_by_family).
+    This function is a SEPARATE, ADDITIVE surface for the gate/harness to use
+    without affecting byte-identity of the frozen `score` output.
+
+    Returns a dict keyed by the three new FailureFamily values.
+    """
+    _NEW_LEG_FAMILIES: tuple[FailureFamily, ...] = (
+        FailureFamily.structural,
+        FailureFamily.reference_graph,
+        FailureFamily.precedent_similarity,
+    )
+    faults = [f.model_dump() for f in report.faults]
+    breakdown: dict[str, dict] = {}
+    for family in _NEW_LEG_FAMILIES:
+        family_gts = [
+            gt for gt in eval_set.deficiencies if gt.doc_id == doc_id and gt.failure_family == family
+        ]
+        result = score(faults, family_gts, doc_id)
+        breakdown[family.value] = _precision_recall(
+            len(result.matched_gt_ids), len(result.fp_findings), len(result.fn_gt_ids)
+        )
+    return breakdown
 
 
 def _retrieval_recall_at_k(report: FaultReport, eval_set: EvalSet, doc_id: str):

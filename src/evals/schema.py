@@ -19,16 +19,29 @@ from pydantic import BaseModel, Field
 
 
 class FailureFamily(StrEnum):
-    """The four ground-truth failure families.
+    """The four ground-truth failure families plus three Phase-5 deterministic legs.
 
-    Fixed by ROADMAP Phase 0 success criterion 2 — these are the exact section headers
-    used in docs/eval/MEASUREMENT.md's "Missed (26/28) ... by failure family" breakdown.
+    The original four values are Fixed by ROADMAP Phase 0 success criterion 2 — the
+    exact section headers used in docs/eval/MEASUREMENT.md's "Missed (26/28) ... by
+    failure family" breakdown.  They are UNCHANGED (byte-identical to the Phase-0
+    definition) — Ruling C strict additivity.
+
+    Phase 5 (Plan 07, Wave 5) — three new families added AFTER the existing four.
+    ZERO modifications to existing members or their string values.
     """
 
     ABSENCE_OF_EVIDENCE = "absence_of_evidence"
     DERIVATION_PLAUSIBILITY = "derivation_plausibility"
     CROSS_REFERENCE_INTEGRITY = "cross_reference_integrity"
     REGULATORY_FRAMING = "regulatory_framing"
+
+    # Phase-5 deterministic legs (RECALL-02/03/04) — additive only (Ruling C)
+    # These map to the leg_tag values set by emit_structural_finding,
+    # emit_reference_finding, and emit_precedent_finding (D-ENV1: "STRUCTURAL",
+    # "REFERENCE", "PRECEDENT" uppercase strings).
+    structural = "structural"
+    reference_graph = "reference_graph"
+    precedent_similarity = "precedent_similarity"
 
 
 class Confidence(StrEnum):
