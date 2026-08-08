@@ -655,3 +655,139 @@ def test_value_contradiction_unit_mismatch_abstains(tmp_path):
         f"D-REF4/D-STR4: unit mismatch (mg/mL vs %) must cause abstain — no VALUE_CONTRADICTION. "
         f"Got: {[f.detail for f in contradiction_faults]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 6: CR-05 — label matching gates full confidence; non-matched over-limit
+#         rows are still emitted (recall) but at LOW confidence
+# ---------------------------------------------------------------------------
+
+def test_value_contradiction_label_match_gates_full_confidence(tmp_path):
+    """CR-05 / Ruling 6 Step 4: the referenced entity gates FULL confidence.
+
+    src limit references "Compound B" specifically. dst table has TWO over-limit
+    rows (Compound B 0.18% and Compound C 0.20%), both > NMT 0.15%.
+
+    Expected:
+      - The Compound B row (label matches the referenced entity) -> exactly ONE
+        'full'-confidence VALUE_CONTRADICTION.
+      - The Compound C row also exceeds the limit but is NOT the referenced entity;
+        it must NOT be dropped (recall) — it is emitted at 'low' confidence
+        (recall-biased handoff to the Phase-7 verifier, D-REF3).
+    """
+    import json
+    from ingest.anchors import mint_span
+    from ingest.corpus import CorpusIndex
+    from ingest.manifest import CoverageManifest, DocEntry
+    from ingest.normalize import NORMALIZER_VERSION, normalize
+    from ingest.serialize import SERIALIZER_VERSION, serialize_document
+    from ingest.store import cache_key, write_doc_cache
+    from ingest.tables import build_table_index
+    from parse.pdf import PARSER_VERSION
+    from rulebook import edges as edges_module
+    from tests.tools.conftest import make_doc_dict
+    from tools.ledger import RetrievalLedger
+
+    cache_dir = str(tmp_path / "cache")
+    db_path = str(tmp_path / "edges.db")
+
+    src_id = "doc-a"
+    # Reference names Compound B explicitly.
+    src_text = "Compound B must be NMT 0.15% (see Analytical Procedures Table 1)"
+    src_doc = make_doc_dict([_block(src_text)], [], filename="doc-a.pdf")
+    src_raw, src_cell_ranges = serialize_document(src_doc)
+    src_nt = normalize(src_raw, serializer_version=SERIALIZER_VERSION)
+    src_table_index = build_table_index(src_nt, [], src_cell_ranges, src_id)
+    src_entry = DocEntry(
+        doc_id=src_id, filename="doc-a.pdf", content_hash="hash-doc-a",
+        status="parsed", structure="flat", tables="unavailable",
+        normalizer_version=src_nt.normalizer_version, serializer_version=src_nt.serializer_version,
+    )
+    src_key = cache_key(src_entry.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION, PARSER_VERSION)
+    write_doc_cache(cache_dir, src_key, {
+        "canonical": src_nt.canonical, "raw_serialized": src_nt.raw_serialized,
+        "offset_map": [r.model_dump() for r in src_nt.offset_map],
+        "normalizer_version": src_nt.normalizer_version, "serializer_version": src_nt.serializer_version,
+        "table_index": {k: v.model_dump() for k, v in src_table_index.items()},
+        "doc_entry": src_entry.model_dump(),
+    })
+
+    dst_id = "doc-b"
+    dst_table = _grid(
+        page=1, y0=100, y1=200,
+        headers=["Impurity", "% w/w"],
+        rows=[
+            ["Compound A", "0.10%"],   # complies -> no fault
+            ["Compound B", "0.18%"],   # over limit AND matches entity -> full
+            ["Compound C", "0.20%"],   # over limit, NOT the entity -> low (kept)
+        ],
+        title="Table 1",
+    )
+    dst_doc = make_doc_dict(
+        [_block("Analytical Procedures Table 1 Impurity Profile")], [dst_table],
+        filename="doc-b.pdf",
+    )
+    dst_raw, dst_cell_ranges = serialize_document(dst_doc)
+    dst_nt = normalize(dst_raw, serializer_version=SERIALIZER_VERSION)
+    dst_table_index = build_table_index(dst_nt, [dst_table], dst_cell_ranges, dst_id)
+    dst_entry = DocEntry(
+        doc_id=dst_id, filename="doc-b.pdf", content_hash="hash-doc-b",
+        status="parsed", structure="flat", tables="addressable",
+        normalizer_version=dst_nt.normalizer_version, serializer_version=dst_nt.serializer_version,
+    )
+    dst_key = cache_key(dst_entry.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION, PARSER_VERSION)
+    write_doc_cache(cache_dir, dst_key, {
+        "canonical": dst_nt.canonical, "raw_serialized": dst_nt.raw_serialized,
+        "offset_map": [r.model_dump() for r in dst_nt.offset_map],
+        "normalizer_version": dst_nt.normalizer_version, "serializer_version": dst_nt.serializer_version,
+        "table_index": {k: v.model_dump() for k, v in dst_table_index.items()},
+        "doc_entry": dst_entry.model_dump(),
+    })
+
+    manifest = CoverageManifest(documents=[src_entry, dst_entry])
+    corpus = CorpusIndex(root=str(tmp_path), cache_dir=cache_dir, manifest=manifest)
+
+    nmt_offset = src_nt.canonical.index("Compound B")
+    src_span = mint_span(
+        src_nt.canonical, nmt_offset,
+        min(len(src_nt.canonical), nmt_offset + len(src_text)),
+        src_id, src_nt.normalizer_version,
+    )
+    edges_module.add_edge(
+        src_id=f"{src_id}:{src_span.start}",
+        dst_id=f"{dst_id}:0",
+        edge_type="value_crossref",
+        provenance_span_id=json.dumps(src_span.model_dump()),
+        db_path=db_path,
+    )
+
+    ledger = RetrievalLedger()
+    faults = detect_reference_anomalies(corpus, manifest, ledger, db_path=db_path)
+
+    contradiction_faults = [
+        f for f in faults
+        if f.reference_anchor and f.reference_anchor.anomaly == "VALUE_CONTRADICTION"
+    ]
+    full_faults = [f for f in contradiction_faults if f.reference_anchor.scoping_confidence == "full"]
+    low_faults = [f for f in contradiction_faults if f.reference_anchor.scoping_confidence == "low"]
+
+    # Exactly one FULL-confidence contradiction, and it is the referenced entity (0.18%).
+    assert len(full_faults) == 1, (
+        f"CR-05: exactly one full-confidence VALUE_CONTRADICTION expected (Compound B). "
+        f"full={[f.detail for f in full_faults]}"
+    )
+    assert "0.18" in full_faults[0].detail, (
+        f"CR-05: the full-confidence fault must be the Compound B row (0.18%), "
+        f"got {full_faults[0].detail!r}"
+    )
+    # Compound C (0.20%) still exceeds the limit — recall must be preserved via a
+    # low-confidence lead, NOT silently dropped.
+    assert any("0.20" in f.detail for f in low_faults), (
+        f"CR-05: over-limit non-matched row (Compound C 0.20%) must be kept at low "
+        f"confidence (recall-biased handoff), not dropped. low={[f.detail for f in low_faults]}"
+    )
+    # Compound A (0.10%) complies and must not appear at all.
+    assert not any("0.10" in f.detail and "0.18" not in f.detail and "0.20" not in f.detail
+                   for f in contradiction_faults), (
+        "CR-05: compliant Compound A (0.10%) must not be flagged."
+    )

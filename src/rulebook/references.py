@@ -749,9 +749,8 @@ def detect_reference_anomalies(
             for (row, col), (cell_span, cell_text) in cell_grid.items():
                 if col != 0:  # label column is col=0
                     continue
-                # Check if this label cell text could be an entity we care about
-                # For VALUE_CONTRADICTION: iterate ALL rows, flag those that exceed limit
-                # This finds the value column (col=1 typically)
+                # cell_text here is the col-0 ROW LABEL for this row.
+                label_text = cell_text
                 value_col = _find_value_col(cell_grid, row)
                 if value_col is None:
                     continue
@@ -777,9 +776,23 @@ def detect_reference_anomalies(
 
                 # Build dst_span_id for the violating cell
                 dst_span = SpanID.model_validate(cell_span) if isinstance(cell_span, dict) else cell_span
-                # Confidence: 'full' when edge is confirmed (edge_type hyperlink or textual_ref
-                # means a real cross-ref edge was extracted); 'low' for label-match-only
-                confidence: str = "full" if edge_type in ("hyperlink", "textual_ref", "value_crossref") else "low"
+
+                # CR-05 (Ruling 6, Step 4 — LABEL MATCHING): the referenced limit
+                # governs the referenced ENTITY, not every over-limit row in the table.
+                # Emit 'full' confidence ONLY when this row's col-0 label matches the
+                # referenced entity_name (case-insensitive containment, both directions).
+                # When there is no confident entity match we do NOT drop the candidate
+                # (that would cost recall); instead we over-emit at LOWERED 'low'
+                # confidence so the Phase-7 verifier can adjudicate (recall-biased
+                # handoff, D-REF3). Only a real cross-ref edge type can ever reach 'full'.
+                label_matches = _entity_matches_label(entity_name, label_text)
+                edge_is_crossref = edge_type in ("hyperlink", "textual_ref", "value_crossref")
+                if label_matches and edge_is_crossref:
+                    confidence = "full"
+                else:
+                    # value exceeds limit but the row is not the referenced entity
+                    # (or entity was not confidently extracted): recall-biased lead.
+                    confidence = "low"
 
                 anchor = ReferenceAnchor(
                     src_span_id=src_span,
@@ -872,18 +885,67 @@ def _find_value_col(
 
 
 # ---------------------------------------------------------------------------
+# Helper: entity <-> row-label match (CR-05, Ruling 6 Step 4)
+# ---------------------------------------------------------------------------
+def _entity_matches_label(entity_name: str | None, label_text: str) -> bool:
+    """Return True when the referenced entity plausibly names this dst row.
+
+    CR-05: full-confidence VALUE_CONTRADICTION requires that the dst row's col-0
+    label corresponds to the entity the src limit governs. Match is case-insensitive
+    containment in EITHER direction (the row label may abbreviate/extend the
+    referenced entity, or vice versa). No confident entity or empty label -> no
+    match (caller then emits a LOW-confidence recall-biased lead, never drops it).
+    D-GRD3: pure string comparison over document content, no corpus constant.
+    """
+    if not entity_name:
+        return False
+    e = entity_name.strip().lower()
+    lab = (label_text or "").strip().lower()
+    if not e or not lab:
+        return False
+    return e in lab or lab in e
+
+
+# ---------------------------------------------------------------------------
 # Helper: extract entity name from src span text
 # ---------------------------------------------------------------------------
+# WR-08: general stop-phrases that the broad capitalized-prose pattern would
+# otherwise mint as a spurious "entity" (e.g. "Not More", "See Analytical",
+# "The Specification"). These are cue/limit/article words, never entity names.
+# D-GRD3: general English function words + this module's own cue vocabulary —
+# NOT a corpus-specific constant.
+_ENTITY_STOPWORDS = frozenset({
+    "the", "not", "more", "less", "than", "see", "refer", "per", "as",
+    "described", "stated", "in", "for", "any", "single", "limit",
+    "specification", "spec", "section", "module", "table", "figure", "and", "or",
+})
+
+
 def _extract_entity_name(src_text: str) -> str | None:
     """Extract a referenced entity name (compound, substance, parameter) from src text.
 
-    General: looks for capitalized multi-word tokens or known patterns.
-    Returns the first plausible entity name, or None.
+    WR-08: the previous pattern matched almost any capitalized word (plus up to two
+    trailing words), so "See Analytical", "Not More", or "The Specification" became
+    the entity. Now we require a capitalized head token that is NOT a stop/cue word,
+    and we strip trailing stop words. Returns None when no confident entity is found
+    (abstain) rather than a generic phrase — CR-05 then emits a low-confidence lead.
     D-GRD3: general extraction — no inline corpus constant.
     """
     # D-GRD3: general compound/substance name pattern — inside re.compile()
-    _ENTITY_PATTERN = re.compile(r"\b([A-Z][a-z]+\s+[A-Z])\b|([A-Z][a-z]+(?:\s+\w+){0,2})", re.UNICODE)
-    m = _ENTITY_PATTERN.search(src_text)
-    if m:
-        return (m.group(1) or m.group(2) or "").strip() or None
+    _ENTITY_PATTERN = re.compile(r"\b([A-Z][a-z]+(?:\s+[A-Z0-9][\w]*){0,2})\b", re.UNICODE)
+    for m in _ENTITY_PATTERN.finditer(src_text):
+        candidate = m.group(1).strip()
+        tokens = candidate.split()
+        # Reject if the HEAD token is a stop/cue word (kills "See ...", "Not ...",
+        # "The ...", "Section ...").
+        if tokens and tokens[0].lower() in _ENTITY_STOPWORDS:
+            continue
+        # Drop trailing stop words so "Compound A for" -> "Compound A".
+        while tokens and tokens[-1].lower() in _ENTITY_STOPWORDS:
+            tokens.pop()
+        if not tokens:
+            continue
+        result = " ".join(tokens).strip()
+        if result:
+            return result
     return None
