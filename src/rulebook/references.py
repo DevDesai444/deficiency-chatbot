@@ -173,15 +173,23 @@ _REF_PATTERNS: list[re.Pattern[str]] = [
 # D-GRD3: general NMT / limit extraction patterns — all inside re.compile().
 # Each pattern captures the numeric value AND unit (group 1 = numeric+unit).
 # Unit-bearing forms: "0.15%", "0.15 mg/mL", "0.15 % w/w" — all captured.
+#
+# WR-03: the unit alternation is a CLOSED set of recognized regulatory units. The
+# previous trailing `\w+` catch-all matched an arbitrary FOLLOWING word when no real
+# unit applied — e.g. "NMT 0.15 for" captured "0.15 for", and _units_compatible then
+# treated "for" as the unit, corrupting the unit-compatibility gate (spurious mismatch
+# -> recall loss, or coincidental match). The number is now anchored to the immediate
+# unit token only; a stray following word is no longer swallowed.
+_UNIT_ALT = r"(?:%\s*(?:w/w)?|mg/mL|mg/g|mg/kg|mg|mL|ppm|ppb|g/L|µg|ug|kg|g|L)?"
 _LIMIT_PATTERNS: list[re.Pattern[str]] = [
     # D-GRD3: "NMT 0.15%" or "NMT 0.15 mg/mL" — captures numeric+unit
-    re.compile(r"NMT\s*([\d.]+\s*(?:%\s*(?:w/w)?|mg/mL|mg/g|ppm|ppb|g/L|\w+)?)", re.IGNORECASE),
+    re.compile(r"NMT\s*([\d.]+\s*" + _UNIT_ALT + r")", re.IGNORECASE),
     # D-GRD3: "not more than 0.15%"
-    re.compile(r"not\s+more\s+than\s+([\d.]+\s*(?:%\s*(?:w/w)?|mg/mL|mg/g|ppm|ppb|g/L|\w+)?)", re.IGNORECASE),
+    re.compile(r"not\s+more\s+than\s+([\d.]+\s*" + _UNIT_ALT + r")", re.IGNORECASE),
     # D-GRD3: "limit: 0.15%" or "specification: 0.15%"
-    re.compile(r"(?:limit|specification|spec)(?:ification)?\s*[:\s]\s*([\d.]+\s*(?:%\s*(?:w/w)?|mg/mL|mg/g|ppm|ppb|g/L|\w+)?)", re.IGNORECASE),
+    re.compile(r"(?:limit|specification|spec)(?:ification)?\s*[:\s]\s*([\d.]+\s*" + _UNIT_ALT + r")", re.IGNORECASE),
     # D-GRD3: "≤ 0.15%" or "<= 0.15%"
-    re.compile(r"[≤<]=?\s*([\d.]+\s*(?:%\s*(?:w/w)?|mg/mL|mg/g|ppm|ppb|g/L|\w+)?)", re.IGNORECASE),
+    re.compile(r"[≤<]=?\s*([\d.]+\s*" + _UNIT_ALT + r")", re.IGNORECASE),
 ]
 
 # T-05W2B-04: edge-extraction DoS cap per document

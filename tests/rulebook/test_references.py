@@ -73,6 +73,33 @@ def test_fallback_compare_values_identical_to_structural():
 
 
 # ---------------------------------------------------------------------------
+# WR-03: _extract_limit must not swallow a following word as the unit
+# ---------------------------------------------------------------------------
+
+def test_extract_limit_does_not_swallow_following_word():
+    """WR-03: 'NMT 0.15 for any single impurity' -> raw limit is '0.15', not '0.15 for'.
+
+    The old trailing `\\w+` unit alternative grabbed 'for' as the unit, corrupting
+    the downstream unit-compatibility check.
+    """
+    from rulebook.references import _extract_limit
+
+    val, raw = _extract_limit("NMT 0.15 for any single impurity")
+    assert val == 0.15
+    assert "for" not in raw.lower(), f"WR-03: unit must not swallow 'for'; got raw={raw!r}"
+
+    # Real units are still captured.
+    val2, raw2 = _extract_limit("NMT 0.15 mg/mL for the drug substance")
+    assert val2 == 0.15
+    assert "mg/ml" in raw2.lower()
+    assert "for" not in raw2.lower()
+
+    val3, raw3 = _extract_limit("limit: 0.10% w/w reported")
+    assert val3 == 0.10
+    assert "%" in raw3
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
