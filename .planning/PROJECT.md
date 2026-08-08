@@ -15,14 +15,14 @@ Given **any** directory of submission documents (any format mix of PDF/DOCX, any
 **Goal:** Replace the v1.0 agentic-recall loop — a confirmed **3rd NO-GO** (`.planning/phases/03-drive-loop-spike-go-no-go/03-19-V3.3-READING.md`: median recall 0.071 < 0.107 baseline; C-01/B-08 lost every run; absence-of-evidence 0.000), which proved a model-driven loop on self-hosted local models cannot reliably do **recall** — with a **general deterministic recall pipeline** verified by isolated local-model sub-agents. DefPredict finds all real FDA/ICH deficiencies in any submission folder, fully on-premise, without chasing the eval metric.
 
 **Target features:**
-- **Recall / rulebook enumeration** — enumerate required FDA/ICH items, flag absent ones (the fix for absence = 0.000)
-- **Recall / intra-document structural checks** — summary-vs-detail, spec exceedance
-- **Recall / cross-document reference-graph integrity** — broken/absent cross-references, absent referenced docs, cross-doc value mismatches (submission-internal; not in the rulebook)
-- **Recall / precedent retrieval** — over the past-deficiency corpus
-- **Multi-agent verification** — isolated Nemotron verifier sub-agents (write-disabled, `VERDICT: KEEP|DOWNGRADE`), orchestrator consolidates + dedups
-- **Interpretive-tail reasoning** — agentic, for deficiencies no rule can express
-- **Rulebook enrichment** — thicken thin ICH/FDA coverage
-- **Weak-model reliability hardening** — guided decoding, field-level tool errors, semantic coercion for the local verifier
+- ✓ **Recall / rulebook enumeration** — enumerate required FDA/ICH items, flag absent ones (the fix for absence = 0.000) — **delivered Phase 4** (absence recall 1.000)
+- ✓ **Recall / intra-document structural checks** — summary-vs-detail, spec exceedance — **delivered Phase 5** (SUM/MAX aggregate over addressable cells)
+- ✓ **Recall / cross-document reference-graph integrity** — broken/absent cross-references, absent referenced docs, cross-doc value mismatches (submission-internal; not in the rulebook) — **delivered Phase 5** (X1 Compound-B contradiction hard-caught end-to-end)
+- ✓ **Recall / precedent retrieval** — over the past-deficiency corpus — **delivered Phase 5** (leg live; awaits `data/rulebook.faiss` asset for hard-gate)
+- **Multi-agent verification** — isolated Nemotron verifier sub-agents (write-disabled, `VERDICT: KEEP|DOWNGRADE`), orchestrator consolidates + dedups — *Phase 7 (consumes Phase-5 grounded candidates; prunes the sanctioned over-emit via `dedup_key`)*
+- **Interpretive-tail reasoning** — agentic, for deficiencies no rule can express — *Phase 7*
+- ✓ **Rulebook enrichment** — thicken thin ICH/FDA coverage — **delivered Phase 4**
+- **Weak-model reliability hardening** — guided decoding, field-level tool errors, semantic coercion for the local verifier — *Phase 6*
 
 **Foundation carried from v1.0:** Phase 0 (eval harness — continuous gate), Phase 1 (ingestion), Phase 2 (retrieval/tools/rulebook). Phase 3 (drive-loop spike) is superseded; its records are preserved as the audit trail.
 
@@ -56,7 +56,7 @@ Given **any** directory of submission documents (any format mix of PDF/DOCX, any
 - [ ] **Retrieval + context compaction**: reason over a corpus far larger than the context window (never load the whole directory)
 - [ ] **FDA + ICH rules as retrievable reference**: source and ingest an **open-source corpus of FDA guidances + ICH guidelines**; consulted like a reviewer reading the rulebook — NOT hardcoded as answer-key oracles
 - [ ] **Compliance objective**: report where the submission violates or fails to meet a specific FDA/ICH requirement, citing both the submission passage and the rule
-- [ ] **Cross-document consistency**: catch contradictions across the corpus (spec limits, methods, batch numbers, values) via the reference graph
+- [x] **Cross-document consistency**: catch contradictions across the corpus (spec limits, methods, batch numbers, values) via the reference graph — **delivered Phase 5** (reference graph + `follow_reference` cross-doc resolution; X1 spec-limit contradiction caught end-to-end)
 - [ ] **Cost controls**: prompt caching, context compaction, cheap-model triage, sub-agent isolation, hard per-run budgets — so cost scales with docs that need deep reasoning, not raw corpus size
 - [ ] **Eval harness**: measure precision/recall against ground truth — seeded from the existing ANDA deficiency data / 500-deficiency KB; artifacts under `docs/eval/`
 

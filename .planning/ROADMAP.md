@@ -24,7 +24,7 @@ This milestone evolves DefPredict from a one-shot single-document detector (meas
 - [x] **Phase 2: Retrieval, Navigation Tools & Rulebook** - Hybrid corpus retrieval + five span-ID tools + the FDA/ICH rulebook the agent reads (completed 2026-07-31)
 - [x] **Phase 3: Drive-Loop Spike (GO/NO-GO)** - One tool-using agent grounding findings within code budgets — **NO-GO** (3rd consecutive; recall 0.071 < 0.107); superseded by β, records retained as audit trail (closed 2026-08-05)
 - [x] **Phase 4: Rulebook Enrichment + Absence Enumeration (β)** - Thicken thin ICH/FDA coverage to per-requirement granularity, then enumerate applicable required items and flag the absent ones — the fix for absence-of-evidence = 0.000 (completed 2026-08-06 — `absence_of_evidence` 0.000→1.000, verified passed)
-- [ ] **Phase 5: Deterministic Structural & Cross-Document Recall (β)** - Intra-doc structural checks + cross-document reference graph + precedent retrieval, all rulebook/structure/graph-general behind an anti-overfitting guard test
+- [x] **Phase 5: Deterministic Structural & Cross-Document Recall (β)** - Intra-doc structural checks + cross-document reference graph + precedent retrieval, all rulebook/structure/graph-general behind an anti-overfitting guard test — **Complete 2026-08-08** (verified 5/5): deterministic recall engine complete — absence 1.000, structural + cross-doc X1 (Compound-B) + precedent legs live, guard-enforced general; frozen measurement preserved (byte-identical re-score), zero TP lost.
 - [ ] **Phase 6: On-Prem Verifier Model + Weak-Model Reliability (β)** - Serve Nemotron-49B self-hosted, prove its tool-call/thinking probes, and harden weak-model tool-arg reliability (guided decoding + field-level errors + semantic coercion)
 - [ ] **Phase 7: Multi-Agent Verification + Interpretive Tail (β)** - Isolated write-disabled verifier sub-agents (KEEP|DOWNGRADE, never DROP), decorrelated cross-family, orchestrator consolidate/dedup/coverage, plus the agentic interpretive-tail pass
 - [ ] **Phase 8: Cost Governor (β)** - Prompt-cache stable prefix + escalating compaction + cheap-model triage so cost scales with docs that need deep reasoning, not corpus size
@@ -183,6 +183,13 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 - [x] 05-07-PLAN.md — Integration: fill follow_reference stub, FailureFamily extension, phase5-gate SC5 (RECALL-02/03/04/05)
 
+**Phase 5 outcome (Complete 2026-08-08, verified 5/5):** deterministic recall engine complete — absence 1.000; structural (SUM/MAX aggregate) + cross-doc reference graph (X1 Compound-B 0.18 > NMT 0.15, hard-caught end-to-end) + precedent legs live; all rulebook/structure/graph-general behind the enforced anti-overfitting guard (behavior-transfer PRIMARY + NO-CONSTANT); frozen measurement preserved byte-identical; zero true positives lost. Full suite 589 passed / 0 failed.
+
+**Handoffs recorded at Phase 5 close:**
+- **→ Phase 6/precedent:** the precedent leg is wired but its FAISS asset (`data/rulebook.faiss`) is not yet built, so `precedent-gate` currently structured-SKIPs (exit 0). When the asset lands, the gate flips to **hard-fail on 0 findings** by construction — no code change needed.
+- **→ Phase 7/precision:** on the synthetic fixture the reference leg emits **17 UNRESOLVED_REF + 13 VALUE_CONTRADICTION** (the latter is a sanctioned over-emit for the single planted X1). This is the deliberate recall-biased hand-off; the Phase-7 verifier layer prunes/dedups it via the `dedup_key` envelope field. SC2 requires ≥1 VALUE_CONTRADICTION with Compound-B, which holds.
+- **→ Phase 7/baseline (OPEN, reviewer-gated):** adding `B-08` to `recall_by_family.json` `found_set` was authorized at close but **deferred** — the `gate` scores the frozen golden `mvr1381_run3.json`, which does not contain B-08, so the change fails the zero-TP-lost gate rather than strengthening it. Landing B-08 requires first re-capturing the golden report to include it (touches frozen `golden/`). Awaiting reviewer ruling.
+
 ### Phase 6: On-Prem Verifier Model + Weak-Model Reliability (β)
 **Goal**: Stand up the reasoning/verification model the β verifier runs on — NVIDIA Llama-3.3-Nemotron-Super-49B-v1.5, served **self-hosted on Databricks** alongside Llama 3.3 70B + Qwen MoE, with **no external LLM API ever called** — and prove it is production-wired before Phase 7 depends on it. Because the verifier still runs on weaker open-weights models, harden tool-call reliability here: server-side guided decoding, field-level actionable errors, and targeted semantic arg coercion — so the KEEP|DOWNGRADE verdicts in Phase 7 parse reliably instead of dropping findings to malformed args.
 **Depends on**: Phase 2 (tool layer + `structured.py` fallback the reliability hardening extends), Phase 3 records (the measured weak-model tool-arg failure modes this phase addresses)
@@ -231,7 +238,7 @@ Phase 0 (Eval Harness) is also the **continuous gate**: its recall-by-family met
 | 2. Retrieval, Navigation Tools & Rulebook | 9/9 | Complete | 2026-07-31 |
 | 3. Drive-Loop Spike (GO/NO-GO) | 20/20 | Complete — NO-GO (superseded by β) | 2026-08-05 |
 | 4. Rulebook Enrichment + Absence Enumeration (β) | 3 / 3 | Complete | 2026-08-06 |
-| 5. Deterministic Structural & Cross-Document Recall (β) | 0 / 7 | In progress | - |
+| 5. Deterministic Structural & Cross-Document Recall (β) | 7 / 7 | Complete | 2026-08-08 |
 | 6. On-Prem Verifier Model + Weak-Model Reliability (β) | 0 / TBD | Not started | - |
 | 7. Multi-Agent Verification + Interpretive Tail (β) | 0 / TBD | Not started | - |
 | 8. Cost Governor (β) | 0 / TBD | Not started | - |
