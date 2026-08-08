@@ -214,6 +214,34 @@ def _find_value_column(
     return max(col_numeric_count, key=col_numeric_count.__getitem__)
 
 
+def _find_value_columns(
+    cell_texts: dict[tuple[int, int], str],
+) -> list[int]:
+    """WR-05: return ALL candidate value columns (majority-numeric), not just one.
+
+    Real regulatory tables routinely carry several numeric columns (e.g.
+    "Result | Limit | % of Limit", or one column per stability timepoint). The old
+    _find_value_column returned the SINGLE column with the most numeric cells, so an
+    aggregate stated in a different numeric column was never checked (recall loss), and
+    basis cells summed across a column that mixes results and limits produced a nonsense
+    recompute (false positive). This returns every column whose data cells are MAJORITY
+    numeric so the caller can pair the aggregate label with the claim IN EACH numeric
+    column and recompute per column. Columns are returned in ascending index order for
+    deterministic output.
+    """
+    col_total: dict[int, int] = defaultdict(int)
+    col_numeric: dict[int, int] = defaultdict(int)
+    for (r, c), text in cell_texts.items():
+        col_total[c] += 1
+        if re.search(r'[\d.]+', text):
+            col_numeric[c] += 1
+    candidates = [
+        c for c in sorted(col_total)
+        if col_numeric[c] > 0 and col_numeric[c] * 2 >= col_total[c]  # majority-numeric
+    ]
+    return candidates
+
+
 def _contains_aggregate_word(text: str) -> bool:
     """Return True if any word in `text` (case-insensitive) is in AGGREGATE_LEXICON.
 
@@ -334,161 +362,173 @@ def _scan_tables(
         if not cell_texts:
             continue
 
-        # Identify the value column (the column with the most numeric cells)
-        value_col = _find_value_column(cells, cell_texts)
-        if value_col is None:
+        # WR-05: identify ALL candidate value columns (majority-numeric), not just the
+        # single densest one, and check the aggregate against the claim IN EACH numeric
+        # column. This recovers aggregates stated in a secondary numeric column (recall)
+        # and avoids summing a column that mixes results and limits (precision).
+        value_cols = _find_value_columns(cell_texts)
+        if not value_cols:
             continue
 
-        # Find ALL aggregate label rows: cells in non-value columns whose text CONTAINS
-        # at least one word from AGGREGATE_LEXICON (e.g. "Total Impurities" contains "total")
-        aggregate_label_rows: set[int] = set()
-        for (row, col), text in cell_texts.items():
-            if col != value_col and _contains_aggregate_word(text):
-                aggregate_label_rows.add(row)
+        # Dedup faults across value columns by claim span (a label paired with the same
+        # claim cell must not emit twice); recall-safe because distinct claim cells differ.
+        emitted_claim_keys: set[tuple[str, int, int]] = set()
 
-        # For each aggregate label cell, detect violations
-        for (row, col), span in cells.items():
-            if col == value_col:
-                continue  # value cells are not label candidates
-            text = cell_texts.get((row, col), "")
-            if not _contains_aggregate_word(text):
-                continue
+        for value_col in value_cols:
+            # Find ALL aggregate label rows: cells in non-value columns whose text CONTAINS
+            # at least one word from AGGREGATE_LEXICON (e.g. "Total Impurities" contains "total")
+            aggregate_label_rows: set[int] = set()
+            for (row, col), text in cell_texts.items():
+                if col != value_col and _contains_aggregate_word(text):
+                    aggregate_label_rows.add(row)
 
-            # Found aggregate label at (row, col)
-            # CLAIM cell = value in same row, value_col (Ruling 5: paired-column pattern)
-            claim_pos = (row, value_col)
-            if claim_pos not in cells:
-                continue
-            claim_span = cells[claim_pos]
-            claim_text = cell_texts.get(claim_pos)
-            if claim_text is None:
-                continue
-
-            # BASIS = all non-aggregate-label rows in the value_col that contain numeric text
-            # Ruling 5: basis cells are value-column cells for ALL non-aggregate rows
-            # We collect spans and numeric values together to avoid counting non-numeric
-            # header cells as basis (e.g. "% w/w" header is in col 1 but not a data cell)
-            max_row = max(r for (r, c) in cells)
-            basis_positions = [
-                (r, value_col)
-                for r in range(0, max_row + 1)
-                if (r, value_col) in cells
-                and r != row                         # not the current aggregate row
-                and r not in aggregate_label_rows    # not any other aggregate label row
-            ]
-
-            # Read basis cell texts and collect only numeric-parseable ones
-            basis_spans_all = [cells[pos] for pos in basis_positions if pos in cells]
-            basis_nums: list[float] = []
-            basis_spans_numeric: list[SpanID] = []
-            for pos in basis_positions:
-                bt = cell_texts.get(pos)
-                if bt is None:
+            # For each aggregate label cell, detect violations
+            for (row, col), span in cells.items():
+                if col == value_col:
+                    continue  # value cells are not label candidates
+                if col in value_cols:
+                    continue  # another numeric column is not a label column
+                text = cell_texts.get((row, col), "")
+                if not _contains_aggregate_word(text):
                     continue
-                num = _parse_numeric(bt)
-                if num is not None:
-                    basis_nums.append(num)
-                    if pos in cells:
-                        basis_spans_numeric.append(cells[pos])
 
-            # Deduplicate numeric basis spans (Pitfall 2: merged cells -> same SpanID)
-            unique_basis = _deduplicate_basis(basis_spans_numeric)
-            if len(unique_basis) < 2:
-                # Abstain: no_comparison_basis (fewer than 2 independent numeric basis cells)
-                log.debug(
-                    "structural: abstain no_comparison_basis",
-                    doc_id=doc_id, table_id=table_id, row=row, col=col,
-                    unique_basis_count=len(unique_basis),
+                # Found aggregate label at (row, col)
+                # CLAIM cell = value in same row, value_col (Ruling 5: paired-column pattern)
+                claim_pos = (row, value_col)
+                if claim_pos not in cells:
+                    continue
+                claim_span = cells[claim_pos]
+                claim_text = cell_texts.get(claim_pos)
+                if claim_text is None:
+                    continue
+
+                # BASIS = all non-aggregate-label rows in the value_col that contain numeric text
+                # Ruling 5: basis cells are value-column cells for ALL non-aggregate rows
+                # We collect spans and numeric values together to avoid counting non-numeric
+                # header cells as basis (e.g. "% w/w" header is in col 1 but not a data cell)
+                max_row = max(r for (r, c) in cells)
+                basis_positions = [
+                    (r, value_col)
+                    for r in range(0, max_row + 1)
+                    if (r, value_col) in cells
+                    and r != row                         # not the current aggregate row
+                    and r not in aggregate_label_rows    # not any other aggregate label row
+                ]
+
+                # Read basis cell texts and collect only numeric-parseable ones
+                basis_nums: list[float] = []
+                basis_spans_numeric: list[SpanID] = []
+                for pos in basis_positions:
+                    bt = cell_texts.get(pos)
+                    if bt is None:
+                        continue
+                    num = _parse_numeric(bt)
+                    if num is not None:
+                        basis_nums.append(num)
+                        if pos in cells:
+                            basis_spans_numeric.append(cells[pos])
+
+                # Deduplicate numeric basis spans (Pitfall 2: merged cells -> same SpanID)
+                unique_basis = _deduplicate_basis(basis_spans_numeric)
+                if len(unique_basis) < 2:
+                    # Abstain: no_comparison_basis (< 2 independent numeric basis cells)
+                    log.debug(
+                        "structural: abstain no_comparison_basis",
+                        doc_id=doc_id, table_id=table_id, row=row, col=col,
+                        value_col=value_col, unique_basis_count=len(unique_basis),
+                    )
+                    continue
+
+                if not basis_nums:
+                    # Abstain: no numeric basis values
+                    continue
+
+                # Compute recomputed value based on inferred relation.
+                # WR-04: abstain when the label carries no explicit aggregate OPERATOR
+                # keyword (relation is None) — never guess SUM for an ambiguous label.
+                relation = _infer_relation(text)
+                if relation is None:
+                    log.debug(
+                        "structural: abstain ambiguous_relation",
+                        doc_id=doc_id, table_id=table_id, row=row, label=text,
+                    )
+                    continue
+                if relation == "SUM":
+                    recomputed = sum(basis_nums)
+                elif relation == "MAX":
+                    recomputed = max(basis_nums)
+                elif relation == "MIN":
+                    recomputed = min(basis_nums)
+                elif relation == "MEAN":
+                    recomputed = sum(basis_nums) / len(basis_nums)
+                else:
+                    recomputed = sum(basis_nums)  # unreachable; _infer_relation is closed
+
+                # D-STR4 precision-derived comparison (no epsilon).
+                # CR-04: hand compare_values the FULL-PRECISION recompute so the single
+                # documented precision rule (round both operands to the coarser operand's
+                # stated precision) applies EXACTLY ONCE, inside compare_values. repr()
+                # preserves the recompute's own decimals so the claim is the coarser operand.
+                recomputed_str = repr(recomputed)
+                is_violation = compare_values(claim_text, recomputed_str, relation)
+
+                if is_violation is None:
+                    # Abstain: unparseable claim text
+                    log.debug(
+                        "structural: abstain unparseable claim",
+                        doc_id=doc_id, table_id=table_id, claim_text=claim_text,
+                    )
+                    continue
+
+                if not is_violation:
+                    # Compliant: claim matches recomputed value at stated precision
+                    continue
+
+                # WR-05: dedup across value columns — the same claim cell must not emit
+                # twice if it happens to be reachable from multiple numeric columns.
+                claim_key = (claim_span.doc_id, claim_span.start, claim_span.end)
+                if claim_key in emitted_claim_keys:
+                    continue
+
+                # Violation detected: build anchor and emit via the grounding gate
+                prec = _stated_precision(claim_text)
+                expected_str = str(round(recomputed, prec)) if prec > 0 else str(recomputed)
+                anchor = StructuralAnchor(
+                    claim_span_id=claim_span,
+                    basis_span_ids=unique_basis,
+                    relation=relation,
+                    expected_value=expected_str,
+                    actual_value=claim_text,
                 )
-                continue
-
-            if not basis_nums:
-                # Abstain: no numeric basis values
-                continue
-
-            # Compute recomputed value based on inferred relation.
-            # WR-04: abstain when the label carries no explicit aggregate OPERATOR
-            # keyword (relation is None) — never guess SUM for an ambiguous label.
-            relation = _infer_relation(text)
-            if relation is None:
-                log.debug(
-                    "structural: abstain ambiguous_relation",
-                    doc_id=doc_id, table_id=table_id, row=row, label=text,
+                result = emit_structural_finding(
+                    corpus=corpus,
+                    rule_span_id=None,  # D-STR6: pure arithmetic check, no rule span
+                    structural_anchor=anchor,
+                    ledger=ledger,
+                    title=(
+                        f"Labeled-aggregate {relation} mismatch: "
+                        f"stated {claim_text!r} != recomputed {expected_str!r}"
+                    ),
+                    detail=(
+                        f"Table {table_id!r}: aggregate cell at row {row} states {claim_text!r} "
+                        f"but recompute of {len(basis_nums)} basis values gives {expected_str!r} "
+                        f"(relation: {relation})."
+                    ),
+                    rulebook_cache_dir=rulebook_cache_dir,
                 )
-                continue
-            if relation == "SUM":
-                recomputed = sum(basis_nums)
-            elif relation == "MAX":
-                recomputed = max(basis_nums)
-            elif relation == "MIN":
-                recomputed = min(basis_nums)
-            elif relation == "MEAN":
-                recomputed = sum(basis_nums) / len(basis_nums)
-            else:
-                recomputed = sum(basis_nums)  # unreachable; _infer_relation is closed
-
-            # D-STR4 precision-derived comparison (no epsilon).
-            # CR-04: hand compare_values the FULL-PRECISION recompute, not a value
-            # pre-rounded to max(claim_prec, 2). Pre-rounding to a floor of 2 decimals
-            # was an ad-hoc epsilon: it rounded the recompute to a DIFFERENT granularity
-            # than the claim, and compare_values then re-rounded on top (double-rounding).
-            # The single documented precision rule (round both operands to the coarser
-            # operand's stated precision) must apply EXACTLY ONCE, inside compare_values.
-            # repr() preserves the recompute's own decimals so the claim is the coarser
-            # operand and governs the comparison granularity.
-            recomputed_str = repr(recomputed)
-            is_violation = compare_values(claim_text, recomputed_str, relation)
-
-            if is_violation is None:
-                # Abstain: unparseable claim text
-                log.debug(
-                    "structural: abstain unparseable claim",
-                    doc_id=doc_id, table_id=table_id, claim_text=claim_text,
-                )
-                continue
-
-            if not is_violation:
-                # Compliant: claim matches recomputed value at stated precision
-                continue
-
-            # Violation detected: build anchor and emit via the grounding gate
-            prec = _stated_precision(claim_text)
-            expected_str = str(round(recomputed, prec)) if prec > 0 else str(recomputed)
-            anchor = StructuralAnchor(
-                claim_span_id=claim_span,
-                basis_span_ids=unique_basis,
-                relation=relation,
-                expected_value=expected_str,
-                actual_value=claim_text,
-            )
-            result = emit_structural_finding(
-                corpus=corpus,
-                rule_span_id=None,  # D-STR6: pure arithmetic check, no rule span
-                structural_anchor=anchor,
-                ledger=ledger,
-                title=(
-                    f"Labeled-aggregate {relation} mismatch: "
-                    f"stated {claim_text!r} != recomputed {expected_str!r}"
-                ),
-                detail=(
-                    f"Table {table_id!r}: aggregate cell at row {row} states {claim_text!r} "
-                    f"but recompute of {len(basis_nums)} basis values gives {expected_str!r} "
-                    f"(relation: {relation})."
-                ),
-                rulebook_cache_dir=rulebook_cache_dir,
-            )
-            if isinstance(result, Fault):
-                faults.append(result)
-                log.info(
-                    "structural: violation emitted",
-                    doc_id=doc_id, table_id=table_id, row=row, relation=relation,
-                    claim=claim_text, expected=expected_str,
-                )
-            else:
-                log.debug(
-                    "structural: emit rejected",
-                    doc_id=doc_id, reason_code=getattr(result, "reason_code", "?"),
-                )
+                if isinstance(result, Fault):
+                    emitted_claim_keys.add(claim_key)
+                    faults.append(result)
+                    log.info(
+                        "structural: violation emitted",
+                        doc_id=doc_id, table_id=table_id, row=row, relation=relation,
+                        claim=claim_text, expected=expected_str,
+                    )
+                else:
+                    log.debug(
+                        "structural: emit rejected",
+                        doc_id=doc_id, reason_code=getattr(result, "reason_code", "?"),
+                    )
 
     return faults
 

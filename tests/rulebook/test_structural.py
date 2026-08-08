@@ -65,6 +65,34 @@ def _two_col_table(table_id: str, headers, data_rows, page=1):
     }
 
 
+def _grid_table(table_id: str, headers, data_rows, page=1):
+    """Build an ExtractedTable dict with an arbitrary number of columns (WR-05)."""
+    n_cols = len(headers)
+    return {
+        "kind": "grid",
+        "title": "",
+        "headers": headers,
+        "rows": data_rows,
+        "pairs": [],
+        "page": page,
+        "bbox": (72, 100, 540, 400),
+        "n_cols": n_cols,
+        "n_rows": len(data_rows) + 1,
+        "source_pages": [page],
+        "continues_from": False,
+        "continues_to": False,
+        "table_id": table_id,
+        "merged_origins": {},
+    }
+
+
+def _corpus_with_grid(tmp_path, doc_id: str, headers, data_rows, table_id="t0"):
+    """Build a CorpusIndex with a doc that has one addressable N-column table."""
+    table = _grid_table(table_id, headers, data_rows)
+    blocks = [_block("Test document with a multi-numeric-column table.")]
+    return build_corpus_index(tmp_path, doc_id, blocks, tables=[table])
+
+
 def _corpus_with_table(tmp_path, doc_id: str, headers, data_rows, table_id="t0"):
     """Build a CorpusIndex with a doc that has one addressable two-column table.
 
@@ -241,6 +269,54 @@ def test_compare_values_last_decimal_boundary():
     """
     assert compare_values("0.1", "0.16", "SUM") is True
     assert compare_values("0.1", "0.14", "SUM") is False
+
+
+# ---------------------------------------------------------------------------
+# Test 2c: WR-05 — aggregate in a SECONDARY numeric column is still checked
+# ---------------------------------------------------------------------------
+
+def test_multi_numeric_column_aggregate_detected(tmp_path):
+    """WR-05: a table with TWO numeric columns; the aggregate mismatch lives in the
+    second numeric column and must still be detected (recall).
+
+      Impurity | Result % | Limit %
+      Compound A | 0.10 | 0.20
+      Compound B | 0.18 | 0.20
+      Total Impurities | 0.28 | 0.15   <- 'Limit' column total 0.15 != SUM(0.20,0.20)=0.40
+
+    The old single-value-column code picked only the densest column and never checked
+    the second numeric column, missing this aggregate. Result column total (0.28) is
+    the correct SUM of 0.10+0.18, so the ONLY violation is in the Limit column.
+    """
+    corpus = _corpus_with_grid(
+        tmp_path,
+        doc_id="doc-multi",
+        headers=["Impurity", "Result %", "Limit %"],
+        data_rows=[
+            ["Compound A", "0.10", "0.20"],
+            ["Compound B", "0.18", "0.20"],
+            ["Total Impurities", "0.28", "0.15"],  # Result total OK; Limit total wrong
+        ],
+        table_id="t0",
+    )
+    manifest = corpus.manifest
+    ledger = RetrievalLedger()
+
+    faults = detect_structural_inconsistencies(corpus, manifest, ledger)
+
+    # Must catch the Limit-column SUM mismatch (0.15 != 0.40).
+    assert len(faults) >= 1, (
+        "WR-05: aggregate mismatch in a secondary numeric column must be detected"
+    )
+    # The violating claim must be the Limit total 0.15, not the correct Result total 0.28.
+    assert any("0.15" in f.structural_anchor.actual_value for f in faults), (
+        f"WR-05: expected the Limit-column total (0.15) to be flagged; "
+        f"got actual_values={[f.structural_anchor.actual_value for f in faults]}"
+    )
+    # The correct Result total (0.28) must NOT be flagged.
+    assert not any("0.28" in f.structural_anchor.actual_value for f in faults), (
+        "WR-05: the correct Result total (0.28 = 0.10+0.18) must not be flagged"
+    )
 
 
 # ---------------------------------------------------------------------------
