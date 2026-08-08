@@ -106,21 +106,43 @@ def follow_reference(
         all_edges = get_edges(src_id=None, db_path=db_path)
         edges = [e for e in all_edges if e[0].startswith(f"{doc_id}:")]
 
-    # Find a resolved (non-"unresolved") edge
+    # WR-07: a single src offset can carry SEVERAL resolved edges (multiple references
+    # near the same coarse offset). Returning the FIRST resolved edge regardless of
+    # ref_text meant follow_reference(doc, "Table 3", ...) could resolve to whatever
+    # edge happened to be first in DB order, not the one for "Table 3". Prefer an edge
+    # whose resolved dst_doc_id is textually related to ref_text (containment either
+    # direction, case-insensitive); only fall back to the first resolved edge when no
+    # candidate matches the ref_text (documented offset-based fallback).
+    resolved: list[tuple[str, str]] = []  # (dst_doc_id, edge_type)
     for src_id, dst_id, edge_type, _provenance in edges:
         if dst_id and dst_id != "unresolved":
-            # Parse dst_id: "{dst_doc_id}:{dst_start}"
             try:
                 dst_doc_id, _dst_start_str = dst_id.rsplit(":", 1)
             except ValueError:
                 dst_doc_id = dst_id
-            return {
-                "doc_id": dst_doc_id,
-                "resolved": True,
-                "edge_type": edge_type,
-                "label": ref_text,
-                "status": "resolved_cross_doc",
-            }
+            resolved.append((dst_doc_id, edge_type))
+
+    if resolved:
+        ref_lower = (ref_text or "").strip().lower()
+        chosen_doc, chosen_type = resolved[0]  # offset-based fallback (documented)
+        matched_by_text = False
+        if ref_lower:
+            for dst_doc_id, edge_type in resolved:
+                d = dst_doc_id.lower()
+                if d and (d in ref_lower or ref_lower in d):
+                    chosen_doc, chosen_type = dst_doc_id, edge_type
+                    matched_by_text = True
+                    break
+        return {
+            "doc_id": chosen_doc,
+            "resolved": True,
+            "edge_type": chosen_type,
+            "label": ref_text,
+            "status": "resolved_cross_doc",
+            # Signal HOW the target was selected so callers know when resolution fell
+            # back to offset order rather than a ref_text match (WR-07 transparency).
+            "resolution": "ref_text_match" if matched_by_text else "offset_first_edge",
+        }
 
     # No resolved edge found — return a typed UNRESOLVED_REF status.
     # This is a REAL typed status (not the pending sentinel) — see module docstring.
