@@ -217,6 +217,7 @@ def detect_precedent_candidates(
     from tools.emit_finding import emit_precedent_finding
     from schemas.documents import SpanID
     from tools.errors import ToolRejected
+    from schemas.faults import Fault  # WR-06: runtime import for isinstance gate
 
     threshold = _load_precedent_threshold()
     faults: list[Fault] = []
@@ -267,9 +268,13 @@ def detect_precedent_candidates(
                     f"Top similarity: {similarity_scores[0]:.3f}."
                 ),
             )
-            if isinstance(result, ToolRejected):
-                logger.debug("emit_precedent_finding rejected: %s", result.reason)
-            else:
+            # WR-06: append ONLY genuine Faults, mirroring the structural/reference legs
+            # (structural.py:isinstance(result, Fault), references.py likewise). The prior
+            # `else: faults.append(result)` after the ToolRejected check would append ANY
+            # non-ToolRejected value — including None — putting a non-Fault into a
+            # list[Fault]. emit_precedent_finding returns a Fault in production, but the
+            # asymmetric inverse check was a latent bug (the tests even stub it to None).
+            if isinstance(result, Fault):
                 faults.append(result)
-
-    return faults
+            elif isinstance(result, ToolRejected):
+                logger.debug("emit_precedent_finding rejected: %s", result.reason)
