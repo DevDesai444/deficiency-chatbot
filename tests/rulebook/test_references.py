@@ -183,6 +183,80 @@ def test_docx_hyperlink_extraction(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Test 1b: CR-01 regression — REAL DOCX hyperlink shape (paragraph_index=None)
+# ---------------------------------------------------------------------------
+
+def test_docx_hyperlink_paragraph_index_none_does_not_crash(tmp_path):
+    """CR-01 regression: real DOCX hyperlinks carry paragraph_index=None.
+
+    parse/docx.py::_extract_hyperlinks ALWAYS emits {"rId", "target",
+    "paragraph_index": None}. The prior code did `hl.get("paragraph_index", 0)`,
+    which returns None (not 0) when the key is present with a None value, then
+    computed `None * 50` -> TypeError, aborting the whole reference leg.
+
+    This test feeds the REAL parser output shape (paragraph_index=None) through
+    extract_references and asserts (a) no exception is raised and (b) the hyperlink
+    edge is still registered. It FAILS before the CR-01 fix and passes after.
+
+    Note: the pre-existing test_docx_hyperlink_extraction injected paragraph_index=0,
+    which is exactly why the bug went undetected — this closes that boundary gap.
+    """
+    from ingest.corpus import CorpusIndex
+    from ingest.manifest import CoverageManifest, DocEntry
+    from ingest.normalize import NORMALIZER_VERSION, normalize
+    from ingest.serialize import SERIALIZER_VERSION, serialize_document
+    from ingest.store import cache_key, write_doc_cache
+    from ingest.tables import build_table_index
+    from parse.pdf import PARSER_VERSION
+    from rulebook import edges as edges_module
+    from tests.tools.conftest import make_doc_dict
+
+    cache_dir = str(tmp_path / "cache")
+    db_path = str(tmp_path / "edges.db")
+
+    src_id = "doc-a"
+    dst_id = "doc-b"
+    src_text = "Analytical Procedures Table 1 for impurity data. See doc-b."
+    doc = make_doc_dict([_block(src_text)], [], filename="doc-a.pdf")
+    raw, cell_ranges = serialize_document(doc)
+    nt = normalize(raw, serializer_version=SERIALIZER_VERSION)
+    table_index = build_table_index(nt, [], cell_ranges, src_id)
+
+    src_entry = DocEntry(
+        doc_id=src_id, filename="doc-a.pdf", content_hash="hash-doc-a",
+        status="parsed", structure="flat", tables="unavailable",
+        normalizer_version=nt.normalizer_version, serializer_version=nt.serializer_version,
+    )
+    key = cache_key(src_entry.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION, PARSER_VERSION)
+    write_doc_cache(cache_dir, key, {
+        "canonical": nt.canonical, "raw_serialized": nt.raw_serialized,
+        "offset_map": [r.model_dump() for r in nt.offset_map],
+        "normalizer_version": nt.normalizer_version, "serializer_version": nt.serializer_version,
+        "table_index": {k: v.model_dump() for k, v in table_index.items()},
+        "doc_entry": src_entry.model_dump(),
+        # CR-01: the REAL parser shape — paragraph_index is None, NOT 0.
+        "hyperlinks": [{"rId": "r1", "target": dst_id, "paragraph_index": None}],
+    })
+
+    dst_entry = DocEntry(
+        doc_id=dst_id, filename="doc-b.pdf", content_hash="hash-doc-b",
+        status="parsed", structure="flat", tables="unavailable",
+    )
+    manifest = CoverageManifest(documents=[src_entry, dst_entry])
+    corpus = CorpusIndex(root=str(tmp_path), cache_dir=cache_dir, manifest=manifest)
+
+    # Must NOT raise TypeError (the CR-01 crash). Before the fix this line aborts.
+    extract_references(corpus, manifest, db_path=db_path)
+
+    all_edges = edges_module.get_edges(db_path=db_path)
+    hyperlink_edges = [e for e in all_edges if e[2] == "hyperlink"]
+    assert len(hyperlink_edges) >= 1, (
+        "CR-01: hyperlink edge from a paragraph_index=None DOCX hyperlink must still "
+        f"be registered (no crash). All edges: {all_edges}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Test 2: D-REF1 — textual reference pattern extraction
 # ---------------------------------------------------------------------------
 

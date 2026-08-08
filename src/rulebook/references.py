@@ -302,7 +302,12 @@ def extract_references(
             if not target:
                 continue
             # Determine dst: if target is a doc_id in the corpus, use it; else "unresolved"
-            para_idx = hl.get("paragraph_index", 0)
+            # CR-01: the real DOCX parser (parse/docx.py::_extract_hyperlinks) always sets
+            # paragraph_index=None, so `.get("paragraph_index", 0)` returns None (the KEY is
+            # present with value None; the .get default only applies when the key is ABSENT).
+            # `None * 50` then raised TypeError and aborted the entire reference leg on any
+            # real DOCX carrying a hyperlink. Coerce a missing/None index to 0.
+            para_idx = hl.get("paragraph_index") or 0
             # Find a span in the doc that best represents this hyperlink anchor
             # Use the first reasonable position in canonical text
             if not canonical:
