@@ -206,6 +206,44 @@ def test_precision_derived_complies(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Test 2b: CR-03 / CR-04 — precision rule (coarser operand, no epsilon)
+# ---------------------------------------------------------------------------
+
+def test_compare_values_half_integer_mean_not_rounded_away():
+    """CR-03: a MEAN like 71.5 vs a whole-number claim 72 must NOT be masked.
+
+    Old code rounded both to prec=min(0,1)=0 -> round(71.5,0)=72 -> complies (WRONG).
+    Fixed rule: when only one operand omits decimals, use the finer operand's
+    precision (1 here), so 71.5 vs 72.0 -> violation.
+    """
+    assert compare_values("72", "71.5", "MEAN") is True
+    # A genuinely-matching mean does NOT false-positive:
+    assert compare_values("71.5", "71.5", "MEAN") is False
+
+
+def test_compare_values_integer_aggregate_exact():
+    """CR-03: both operands whole numbers -> exact integer comparison (prec 0)."""
+    assert compare_values("100", "100", "SUM") is False
+    assert compare_values("100", "99", "SUM") is True
+
+
+def test_compare_values_coarser_operand_rounding():
+    """law 3 fixture: 0.104 vs NMT 0.10 complies (coarser operand = 2 decimals)."""
+    assert compare_values("0.104", "0.10", "LEQ") is False
+    assert compare_values("0.106", "0.10", "LEQ") is True
+
+
+def test_compare_values_last_decimal_boundary():
+    """CR-04 boundary: aggregate differs from claim only in the claim's last decimal.
+
+    Claim '0.1' (prec 1), true SUM 0.16 -> round to 1 place -> 0.2 vs 0.1 -> violation.
+    Claim '0.1' (prec 1), true SUM 0.14 -> round to 1 place -> 0.1 vs 0.1 -> complies.
+    """
+    assert compare_values("0.1", "0.16", "SUM") is True
+    assert compare_values("0.1", "0.14", "SUM") is False
+
+
+# ---------------------------------------------------------------------------
 # Test 3: Unavailable table tier skipped (D-STR5)
 # ---------------------------------------------------------------------------
 

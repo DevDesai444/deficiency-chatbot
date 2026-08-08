@@ -77,43 +77,67 @@ log = logging.getLogger(__name__)
 try:
     from rulebook.structural import compare_values
 except ImportError:
+    # CR-02 (project law 4 — ONE ENGINE): structural.py is committed, so this
+    # fallback only fires under an import-order edge case. When it does, it MUST be
+    # behavior-identical to rulebook.structural.compare_values: the full comparator
+    # set (EQUALS, LEQ/NMT, GEQ/NLT, SUM, MAX, MIN, MEAN), the same relation token
+    # spellings, the same precision-derived rule (round BOTH operands to the coarser
+    # operand's stated decimal precision, no epsilon), and abstain-on-unparseable.
+    # The previous fallback handled only LEQ/GEQ/EQ (misspelled "EQ", not "EQUALS")
+    # and returned None for SUM/MAX/MIN/MEAN, silently dropping real contradictions.
     def _stated_precision(text: str) -> int:
-        """Return decimal places in the first numeric literal found in text."""
-        m = re.search(r"\d+\.(\d+)", text)
-        return len(m.group(1)) if m else 0
+        """Number of decimal places in the first numeric literal, else 0.
+
+        Mirrors rulebook.structural._stated_precision exactly.
+        """
+        m = re.search(r"(\d+)\.(\d+)", text)
+        return len(m.group(2)) if m else 0
+
+    def _parse_numeric(text: str) -> float | None:
+        """Extract first numeric value, else None (abstain).
+
+        Mirrors rulebook.structural._parse_numeric exactly.
+        """
+        if text is None:
+            return None
+        m = re.search(r"[\d.]+", text)
+        if m is None:
+            return None
+        try:
+            return float(m.group())
+        except ValueError:
+            return None
 
     def compare_values(claim_text: str, ref_text: str, comparator: str) -> bool | None:
-        """Precision-derived comparator (D-STR4 / D-REF4): no epsilon constant.
+        """Behavior-identical mirror of rulebook.structural.compare_values (CR-02).
 
-        Returns True = violation (claim exceeds ref limit for LEQ),
-                False = complies,
-                None  = abstain (unparseable).
-        comparator: 'LEQ' means claim must be <= ref (NMT limit check).
+        Returns True = violation, False = complies, None = abstain (unparseable).
+        Precision-derived (D-STR4): round both operands to the coarser operand's
+        stated precision, then compare exact-equal / strict-inequality.
         """
-        def _parse(t: str) -> float | None:
-            m = re.search(r"[\d.]+", t.replace(",", "."))
-            if not m:
-                return None
-            try:
-                return float(m.group())
-            except ValueError:
-                return None
-
-        claim_val = _parse(claim_text)
-        ref_val = _parse(ref_text)
-        if claim_val is None or ref_val is None:
+        claim_num = _parse_numeric(claim_text)
+        ref_num = _parse_numeric(ref_text)
+        if claim_num is None or ref_num is None:
             return None
-        prec = min(_stated_precision(claim_text), _stated_precision(ref_text))
-        claim_r = round(claim_val, prec) if prec > 0 else claim_val
-        ref_r = round(ref_val, prec) if prec > 0 else ref_val
-        if comparator == "LEQ":
-            # LEQ: claim must be <= ref; if claim > ref -> violation (True)
-            return claim_r > ref_r
-        if comparator == "GEQ":
-            return claim_r < ref_r
-        if comparator == "EQ":
-            return claim_r != ref_r
-        return None
+
+        # CR-03 mirror: coarser-operand precision, but never round to 0 places when
+        # only ONE operand omits decimals (that discards a stated fractional value).
+        prec_claim = _stated_precision(claim_text)
+        prec_ref = _stated_precision(ref_text)
+        prec = min(prec_claim, prec_ref)
+        if prec == 0 and max(prec_claim, prec_ref) > 0:
+            prec = max(prec_claim, prec_ref)
+        rc = round(claim_num, prec)
+        rr = round(ref_num, prec)
+
+        if comparator in ("SUM", "MAX", "MIN", "MEAN", "EQUALS"):
+            return rc != rr
+        if comparator in ("LEQ", "NMT"):
+            return rc > rr
+        if comparator in ("GEQ", "NLT"):
+            return rc < rr
+        # Default: equality check for unknown comparators (matches structural.py)
+        return rc != rr
 
 
 # ---------------------------------------------------------------------------

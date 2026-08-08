@@ -95,18 +95,28 @@ def _parse_numeric(text: str) -> float | None:
 def compare_values(claim_text: str, ref_text: str, comparator: str) -> bool | None:
     """Compare claim_text against ref_text using the precision-derived comparator.
 
-    D-STR4: precision-derived comparison, zero free parameters.
+    D-STR4: precision-derived comparison, zero free parameters (no epsilon).
     - Parse both values as floats; if either fails, abstain (return None).
-    - Determine precision = min(stated decimal places in claim_text, stated decimal
-      places in ref_text).
-    - Round both to that precision, then compare.
+    - Round BOTH operands to the stated decimal precision of the COARSER operand
+      (the one with FEWER declared decimals), then compare exact-equal / strict-
+      inequality. This is the USP/ICH General-Notices rounding rule.
+
+    CR-03: the coarser-operand precision is `min(prec_claim, prec_ref)` ONLY when
+    both operands actually state a fractional part. When one operand states NO
+    decimals (prec 0, e.g. an integer count or a whole-number limit), rounding
+    BOTH to 0 places is destructive — it collapses distinct values (round(0.4,0)
+    == round(-0.4,0) == 0) and silently rounds a MEAN like 71.5 up to 72, masking
+    a real violation. So when the naive coarser precision is 0, fall back to the
+    MORE precise operand's stated precision (which preserves the value under test).
+    When neither operand states any decimals, both are genuine whole numbers and a
+    0-place comparison is exact and correct.
 
     Returns:
       True  — violation (claim does NOT satisfy the stated relation vs ref)
       False — complies
       None  — abstain (unparseable input)
 
-    For SUM/MAX/MIN/MEAN: violation when claim != recomputed (at precision).
+    For SUM/MAX/MIN/MEAN/EQUALS: violation when claim != recomputed (at precision).
     For LEQ/NMT: violation when claim > ref (claim exceeds limit).
     For GEQ/NLT: violation when claim < ref (claim is below lower bound).
     """
@@ -115,7 +125,15 @@ def compare_values(claim_text: str, ref_text: str, comparator: str) -> bool | No
     if claim_num is None or ref_num is None:
         return None
 
-    prec = min(_stated_precision(claim_text), _stated_precision(ref_text))
+    prec_claim = _stated_precision(claim_text)
+    prec_ref = _stated_precision(ref_text)
+    # Coarser-operand precision (fewer declared decimals). CR-03: never round to 0
+    # places when only ONE operand omits decimals — that discards a genuinely-stated
+    # fractional value. Use the finer operand's precision in that case; use 0 only
+    # when BOTH operands are whole numbers (an exact integer comparison).
+    prec = min(prec_claim, prec_ref)
+    if prec == 0 and max(prec_claim, prec_ref) > 0:
+        prec = max(prec_claim, prec_ref)
     rc = round(claim_num, prec)
     rr = round(ref_num, prec)
 
@@ -389,8 +407,16 @@ def _scan_tables(
             else:
                 recomputed = sum(basis_nums)  # default to SUM
 
-            # D-STR4 precision-derived comparison (no epsilon)
-            recomputed_str = str(round(recomputed, max(_stated_precision(claim_text), 2)))
+            # D-STR4 precision-derived comparison (no epsilon).
+            # CR-04: hand compare_values the FULL-PRECISION recompute, not a value
+            # pre-rounded to max(claim_prec, 2). Pre-rounding to a floor of 2 decimals
+            # was an ad-hoc epsilon: it rounded the recompute to a DIFFERENT granularity
+            # than the claim, and compare_values then re-rounded on top (double-rounding).
+            # The single documented precision rule (round both operands to the coarser
+            # operand's stated precision) must apply EXACTLY ONCE, inside compare_values.
+            # repr() preserves the recompute's own decimals so the claim is the coarser
+            # operand and governs the comparison granularity.
+            recomputed_str = repr(recomputed)
             is_violation = compare_values(claim_text, recomputed_str, relation)
 
             if is_violation is None:
