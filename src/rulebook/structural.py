@@ -43,7 +43,6 @@ Design decisions honored:
 """
 from __future__ import annotations
 
-import logging
 import re
 from collections import defaultdict
 
@@ -56,9 +55,10 @@ from rulebook.store import DEFAULT_RULEBOOK_CACHE_DIR
 from schemas.documents import NormalizedText, OffsetRun, SpanID
 from schemas.faults import Fault, StructuralAnchor
 from tools.emit_finding import emit_structural_finding
-from tools.errors import ToolRejected
 from tools.ledger import RetrievalLedger
 
+# WR-09: removed the unused `import logging` (this module logs via structlog) and the
+# unused `from tools.errors import ToolRejected` (callers only isinstance(result, Fault)).
 log = structlog.get_logger()
 
 

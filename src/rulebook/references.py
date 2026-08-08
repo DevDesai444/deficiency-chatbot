@@ -50,9 +50,10 @@ T-05W2B-04 (DoS): edges extracted per doc capped at 1000; warning logged when ca
 from __future__ import annotations
 
 import json
-import logging
 import re
 from collections import defaultdict
+
+import structlog
 
 from ingest.anchors import mint_span
 from ingest.corpus import CorpusIndex
@@ -63,10 +64,13 @@ from rulebook.store import DEFAULT_RULEBOOK_CACHE_DIR
 from schemas.documents import NormalizedText, OffsetRun, SpanID
 from schemas.faults import Fault, ReferenceAnchor
 from tools.emit_finding import emit_reference_finding
-from tools.errors import ToolRejected
 from tools.ledger import RetrievalLedger
 
-log = logging.getLogger(__name__)
+# WR-09: standardize on structlog across the recall legs (structural.py already uses it)
+# and drop the unused `ToolRejected` import. Using structlog also fixes the previously
+# latent stdlib-logging calls that passed structured kwargs (doc_id=, edge_type=) which
+# stdlib logging.Logger.warning does not accept.
+log = structlog.get_logger()
 
 # ---------------------------------------------------------------------------
 # D-REF4: import compare_values from structural (same engine, zero divergence).
