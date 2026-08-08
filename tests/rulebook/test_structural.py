@@ -29,6 +29,7 @@ structural = pytest.importorskip(
 detect_structural_inconsistencies = structural.detect_structural_inconsistencies
 compare_values = structural.compare_values
 _stated_precision = structural._stated_precision
+_find_value_columns = structural._find_value_columns
 
 
 # ---------------------------------------------------------------------------
@@ -420,3 +421,56 @@ def test_fixture_cosine_regime():
         )
     except ImportError:
         pytest.skip("python-docx not available for cosine-regime check")
+
+
+# ---------------------------------------------------------------------------
+# Regression: sparse value column must qualify (C-01 / Table-20 recall guard)
+# ---------------------------------------------------------------------------
+
+def test_sparse_value_column_qualifies_over_nonempty_cells():
+    """Regression for the C-01 loss: a genuine value column in a WIDE, SPARSE table.
+
+    Real-corpus Table 20 (mvr1381) is a 29-row change-history table whose
+    "Theoretical plates" column carries only ~13 values among ~29 cells (many blank,
+    plus a text header). A majority-of-ALL-cells qualifier (13*2 < 29) sank EVERY
+    column to zero candidates -> _scan_tables ran no aggregate check -> the
+    "Maximum 11477 vs true 12601" deficiency was silently dropped. Measuring density
+    over NON-EMPTY cells recovers the column. Empty cells must not count against a
+    column, and >=2 values are required to form a column.
+    """
+    # col 0 is a non-numeric label column; col 1 is a sparse value column
+    # (header + 4 values + 5 blanks). Under the old all-cells denominator col 1 had
+    # 4 values / 10 total -> 8 < 10 -> did NOT qualify (the C-01 regression).
+    cell_texts = {
+        (0, 0): "Change", (0, 1): "Theoretical plates (NLT 7000)",
+        (1, 0): "Original issue", (1, 1): "11400",
+        (2, 0): "Editorial", (2, 1): "11477",
+        (3, 0): "Reformat", (3, 1): "9816",
+        (4, 0): "Maximum", (4, 1): "12601",
+        (5, 0): "", (5, 1): "",
+        (6, 0): "", (6, 1): "",
+        (7, 0): "", (7, 1): "",
+        (8, 0): "", (8, 1): "",
+        (9, 0): "", (9, 1): "",
+    }
+    cols = _find_value_columns(cell_texts)
+    # col 1 has 4 values / 5 non-empty -> majority pure-numeric -> qualifies.
+    assert 1 in cols, f"sparse value column must qualify (got {cols})"
+    # col 0 is a prose label column (no pure-numeric cells) -> excluded.
+    assert 0 not in cols, f"label column must NOT qualify (got {cols})"
+
+
+def test_label_column_with_digits_never_qualifies():
+    """Guard preservation (c9ff2f0 intent): a "Sample N" label column has ZERO
+    pure-numeric cells, so it never qualifies regardless of the non-empty denominator.
+    This keeps the anti-overfitting behavior that the sparse-column fix must not undo.
+    """
+    cell_texts = {
+        (0, 0): "Sample 1", (0, 1): "0.10",
+        (1, 0): "Sample 2", (1, 1): "0.12",
+        (2, 0): "Sample 3", (2, 1): "0.11",
+        (3, 0): "Sample 4", (3, 1): "0.13",
+    }
+    cols = _find_value_columns(cell_texts)
+    assert 0 not in cols, f'"Sample N" label column must never qualify (got {cols})'
+    assert 1 in cols, f"the real numeric column must still qualify (got {cols})"

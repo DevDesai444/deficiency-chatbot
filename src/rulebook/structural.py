@@ -250,16 +250,29 @@ def _find_value_columns(
     pure-numeric (a number optionally followed by a unit — see _is_value_cell), so a
     label column that merely contains digits ("Sample 1") is NOT counted. Columns are
     returned in ascending index order for deterministic output.
+
+    Density is measured over NON-EMPTY cells, not all cells. Wide real-world tables are
+    sparse: a genuine value column (e.g. "Theoretical plates" in a 29-row change-history
+    table) may have many blank cells, so majority-of-ALL-cells sank every column to
+    zero candidates and silently dropped the aggregate check (recall loss — this is the
+    Table-20 "Maximum 11477 vs true 12601" case). Excluding empty cells from the
+    denominator recovers such columns WITHOUT re-admitting label columns: a "Sample 1"
+    column has ZERO pure-numeric cells (_is_value_cell rejects it), so it never qualifies
+    regardless of the denominator, keeping the anti-overfitting guard green. A value
+    column must carry at least two pure-numeric values (a lone stray number is not a
+    column). No corpus constant — pure structure.
     """
-    col_total: dict[int, int] = defaultdict(int)
+    col_nonempty: dict[int, int] = defaultdict(int)
     col_value: dict[int, int] = defaultdict(int)
     for (r, c), text in cell_texts.items():
-        col_total[c] += 1
+        if (text or "").strip():
+            col_nonempty[c] += 1
         if _is_value_cell(text):
             col_value[c] += 1
     candidates = [
-        c for c in sorted(col_total)
-        if col_value[c] > 0 and col_value[c] * 2 >= col_total[c]  # majority pure-numeric
+        c for c in sorted(col_nonempty)
+        # majority of NON-EMPTY cells are pure-numeric, and >=2 values form a column
+        if col_value[c] >= 2 and col_value[c] * 2 >= col_nonempty[c]
     ]
     return candidates
 
