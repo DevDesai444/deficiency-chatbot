@@ -1,6 +1,6 @@
 {
   "threshold": 0.0,
-  "measured_on": "synthetic_fixture",
+  "measured_on": "not_applicable",
   "measured_date": "2026-08-06",
-  "note": "D-STR4: general threshold, not corpus-tuned. Placeholder; will be updated after structural-gate measurement."
+  "note": "CR-06(b): the structural leg is THRESHOLD-FREE BY CONSTRUCTION. Its comparison is purely precision-derived (D-STR4: round both operands to the coarser operand's stated decimal precision, then compare exact-equal / strict-inequality) with ZERO free parameters and no epsilon. There is deliberately no code path in rulebook/structural.py that reads this file — a threshold read would be a spurious tuned constant and would violate NO-HARDCODING / anti-overfitting. This artifact is retained only as an explicit record that the decision was intentional; threshold=0.0 is a documentation sentinel, not a consumed value. If a future structural tuning parameter is ever introduced, wire it with a module-relative load path mirroring precedent_search._THRESHOLD_PATH and update this note."
 }

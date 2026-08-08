@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -53,7 +54,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _PRECEDENT_PREFIX = "precedent-"
-_THRESHOLD_PATH = "src/evals/baseline/precedent_threshold.json"
+# CR-06(a): resolve the baseline path RELATIVE TO THIS MODULE, not the process cwd.
+# The prior cwd-relative string ("src/evals/baseline/...") only resolved when the
+# process ran from the repo root; from any other cwd (installed package, a test that
+# chdir's) open() raised FileNotFoundError, the broad except swallowed it, and the leg
+# silently used the hardcoded 0.6 — defeating the load-from-JSON anti-overfitting
+# discipline (D-PRC4). parents[1] == the `src/` package root; the baseline lives at
+# src/evals/baseline/precedent_threshold.json regardless of cwd.
+_THRESHOLD_PATH = (
+    Path(__file__).resolve().parents[1] / "evals" / "baseline" / "precedent_threshold.json"
+)
 _MIN_SECTION_LEN = 100  # Pitfall 3: skip degenerate-embedding sections
 
 
@@ -63,11 +73,21 @@ def _load_precedent_threshold() -> float:
     All callers (search_precedents, tests) must use this function, not the literal.
     D-PRC4: the threshold is a general absolute value (0–1 real range), never hardcoded
     in module-level code or in any other function.
+
+    CR-06(a): the except is NARROWED to the concrete load-failure exceptions
+    (missing file, malformed JSON, missing key, non-numeric value) and logs a
+    WARNING before falling back, so a genuine misconfiguration is LOUD, not masked
+    by a silent 0.6. A programming error (e.g. AttributeError) is no longer swallowed.
     """
     try:
         with open(_THRESHOLD_PATH) as f:
             return float(json.load(f)["threshold"])
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        logger.warning(
+            "precedent threshold file could not be loaded (%s: %s); falling back to 0.6. "
+            "Path=%s — verify the baseline is present and well-formed.",
+            type(exc).__name__, exc, _THRESHOLD_PATH,
+        )
         return 0.6  # D-GEN2 exemption: sole inline float allowed in this function
 
 
