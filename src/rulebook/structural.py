@@ -230,18 +230,28 @@ def _contains_aggregate_word(text: str) -> bool:
     return any(w in AGGREGATE_LEXICON for w in words if w)
 
 
-def _infer_relation(label_text: str) -> str:
-    """Map aggregate label text to a relation enum string.
+def _infer_relation(label_text: str) -> str | None:
+    """Map aggregate label text to a relation enum string, or None to ABSTAIN.
 
     D-STR1: ONE general engine mapping AGGREGATE_LEXICON labels to relations.
-    Scans all words in the label text (case-insensitive) to find a recognized keyword.
-    Returns "SUM" as the default for labels where no specific relation keyword is found.
+    Scans all words in the label text (case-insensitive) for a recognized keyword.
+
+    WR-04: the previous unconditional `return "SUM"` default GUESSED the arithmetic
+    for any label that contained an AGGREGATE_LEXICON word but no explicit relation
+    keyword. A cell that merely contains an aggregate word incidentally (or a mislabeled
+    Range/Count cell) would then be recomputed as a SUM and reported as a SUM mismatch
+    — a confident false positive. Now the relation is inferred ONLY from an EXPLICIT
+    operator keyword: max/min/average/mean map to their relation; total/sum map to SUM.
+    When no unambiguous operator keyword is present we return None so the caller ABSTAINS
+    (skips the cell, logs abstain_ambiguous_relation) rather than guessing an operation.
 
     Examples:
-    - "Total Impurities" -> words ["total", "impurities"] -> "total" -> SUM
-    - "Maximum Measured Value" -> words ["maximum", ...] -> "maximum" -> MAX
-    - "Minimum Reported" -> "minimum" -> MIN
-    - "Average Release" -> "average" -> MEAN
+    - "Total Impurities"        -> "total"   -> SUM
+    - "Sum of Related Subst."   -> "sum"     -> SUM
+    - "Maximum Measured Value"  -> "maximum" -> MAX
+    - "Minimum Reported"        -> "minimum" -> MIN
+    - "Average Release"         -> "average" -> MEAN
+    - "Overall Assessment"      -> (no operator keyword) -> None (abstain)
     """
     words = set(re.split(r'\W+', label_text.strip().lower()))
     if words & {"maximum", "max"}:
@@ -250,8 +260,10 @@ def _infer_relation(label_text: str) -> str:
         return "MIN"
     if words & {"average", "mean"}:
         return "MEAN"
-    # "total", "sum", and any other AGGREGATE_LEXICON member -> SUM
-    return "SUM"
+    if words & {"total", "sum"}:
+        return "SUM"
+    # No explicit aggregate operator keyword -> abstain rather than guess (WR-04).
+    return None
 
 
 def _deduplicate_basis(basis: list[SpanID]) -> list[SpanID]:
@@ -394,8 +406,16 @@ def _scan_tables(
                 # Abstain: no numeric basis values
                 continue
 
-            # Compute recomputed value based on inferred relation
+            # Compute recomputed value based on inferred relation.
+            # WR-04: abstain when the label carries no explicit aggregate OPERATOR
+            # keyword (relation is None) — never guess SUM for an ambiguous label.
             relation = _infer_relation(text)
+            if relation is None:
+                log.debug(
+                    "structural: abstain ambiguous_relation",
+                    doc_id=doc_id, table_id=table_id, row=row, label=text,
+                )
+                continue
             if relation == "SUM":
                 recomputed = sum(basis_nums)
             elif relation == "MAX":
@@ -405,7 +425,7 @@ def _scan_tables(
             elif relation == "MEAN":
                 recomputed = sum(basis_nums) / len(basis_nums)
             else:
-                recomputed = sum(basis_nums)  # default to SUM
+                recomputed = sum(basis_nums)  # unreachable; _infer_relation is closed
 
             # D-STR4 precision-derived comparison (no epsilon).
             # CR-04: hand compare_values the FULL-PRECISION recompute, not a value
