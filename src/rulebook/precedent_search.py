@@ -233,7 +233,7 @@ def detect_precedent_candidates(
                 precedent_doc_ids=precedent_doc_ids,
                 similarity_scores=similarity_scores,
                 threshold=threshold,
-                anda_excluded=(submission_anda_number is not None),
+                anda_excluded=[submission_anda_number] if submission_anda_number else [],
             )
 
             result = emit_precedent_finding(

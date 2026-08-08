@@ -12,6 +12,7 @@ Test coverage:
 from __future__ import annotations
 
 import inspect
+from types import SimpleNamespace
 
 import pytest
 
@@ -166,3 +167,53 @@ def test_pitfall4_correct_index():
         "Use rulebook.faiss via _faiss_index from rulebook.store (B2 fix). "
         "Offending module source contains 'deficiency_kb'."
     )
+
+
+# ---------------------------------------------------------------------------
+# test_detect_precedent_anchor_anda_excluded_is_list (Wave 5, GAP 2 regression)
+# ---------------------------------------------------------------------------
+
+def _stub_manifest(section_text):
+    """Minimal duck-typed manifest: one doc, one outline entry carrying a real SpanID."""
+    from schemas.documents import SpanID
+
+    span = SpanID(doc_id="d1", start=0, end=len(section_text), hash="deadbeef")
+    outline_entry = SimpleNamespace(text=section_text, span_id=span)
+    doc_entry = SimpleNamespace(doc_id="d1", outline=[outline_entry])
+    return SimpleNamespace(documents=[doc_entry])
+
+
+@pytest.mark.parametrize(
+    "submission_anda,expected_excluded",
+    [(None, []), ("ANDA-123", ["ANDA-123"])],
+)
+def test_detect_precedent_anchor_anda_excluded_is_list(monkeypatch, submission_anda, expected_excluded):
+    """GAP 2 regression: PrecedentAnchor.anda_excluded is list[str], never bool.
+
+    Drives detect_precedent_candidates through the PrecedentAnchor construction path
+    (precedent_search.py) with and without a submission ANDA number, capturing the
+    anchor via a stubbed emit_precedent_finding. The previously-latent `bool` value
+    raised a pydantic ValidationError at construction, so reaching the capture at all
+    proves the fix; the list-value assertions lock the correct semantics.
+    """
+    _patch_faiss_fn(monkeypatch, [("precedent-xyz", 0.9)])
+    _patch_provenance(monkeypatch, {"precedent-xyz": [{"anda_number": "999"}]})
+
+    captured = {}
+
+    def _capture_emit(*, corpus, precedent_anchor, ledger, title, detail, **kw):
+        captured["anchor"] = precedent_anchor
+        return None  # not a Fault -> detect appends nothing; we assert on the capture
+
+    monkeypatch.setattr("tools.emit_finding.emit_precedent_finding", _capture_emit)
+
+    ps_module.detect_precedent_candidates(
+        corpus=None,
+        manifest=_stub_manifest(_LONG_SECTION),
+        ledger=None,
+        submission_anda_number=submission_anda,
+    )
+
+    assert "anchor" in captured, "PrecedentAnchor construction path was not reached"
+    assert isinstance(captured["anchor"].anda_excluded, list)
+    assert captured["anchor"].anda_excluded == expected_excluded

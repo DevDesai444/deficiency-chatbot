@@ -149,7 +149,11 @@ def test_cross_document_pending_is_not_retried(tmp_path):
     assert result.stop_reason == "completed"
     assert calls == [("follow_reference", json.dumps(args, sort_keys=True))]
     tool_contents = "\n".join(m["content"] for m in result.messages if m.get("role") == "tool")
-    assert "cross_document_resolution_pending_phase_4" in tool_contents
+    # Wave 5 (B4 fix, RULING A): follow_reference no longer returns the
+    # _CROSS_DOC_PENDING sentinel. An unresolvable cross-doc ref now returns the real
+    # typed status "UNRESOLVED_REF". The test's intent is unchanged: the ref is handled
+    # exactly once (asserted above), not retried, and not rejected.
+    assert "UNRESOLVED_REF" in tool_contents
     assert "REJECTED" not in tool_contents
 
 

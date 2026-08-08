@@ -21,7 +21,7 @@ import numpy as np
 
 from evals.capture import golden_report
 from evals.match import _TOKEN_RE
-from evals.metrics import _search_corpus_recall_at_k, compute_metrics, format_table, recall_by_family
+from evals.metrics import _GROUND_TRUTH_FAMILIES, _search_corpus_recall_at_k, compute_metrics, format_table, recall_by_family
 from evals.schema import EvalSet, FailureFamily, GroundTruthDeficiency, load_eval_set
 from schemas.faults import FaultReport
 from tests.tools.conftest import build_corpus_index
@@ -58,7 +58,10 @@ class TestComputeMetricsBaseline:
     def test_all_four_families_present_in_by_family(self):
         m = compute_metrics(golden_report(), load_eval_set(), DOC_ID)
         assert len(m["end_to_end_by_family"]) == 4
-        assert set(m["end_to_end_by_family"]) == {f.value for f in FailureFamily}
+        # Freeze pin (Wave 5, Blocker 1): the frozen by-family breakdown is the 4 GT
+        # families in _GROUND_TRUTH_FAMILIES, NOT the full FailureFamily enum (which was
+        # extended to 7 with Phase-5 leg families). This assertion enforces the pin.
+        assert set(m["end_to_end_by_family"]) == {f.value for f in _GROUND_TRUTH_FAMILIES}
 
     def test_all_five_per_stage_keys_exist(self):
         m = compute_metrics(golden_report(), load_eval_set(), DOC_ID)
@@ -360,7 +363,8 @@ class TestFormatTableW3:
         m = compute_metrics(golden_report(), load_eval_set(), DOC_ID)
         table = format_table(m)
         assert "End-to-end by failure family" in table
-        for family in FailureFamily:
+        # Freeze pin (Wave 5, Blocker 1): the frozen table shows the 4 GT families only.
+        for family in _GROUND_TRUTH_FAMILIES:
             assert family.value in table
 
     def test_contains_all_five_per_stage_metrics_as_separate_lines(self):

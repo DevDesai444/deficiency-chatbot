@@ -170,6 +170,18 @@ This test in `tests/evals/test_generality_guard.py` (out of scope) explicitly `r
 
 As analyzed above, adding new StrEnum members to FailureFamily causes new keys to appear in the JSON scoring output. The existing family scores are preserved bit-for-bit within their keys. The Ruling C(b) byte-identical requirement is physically impossible when extending an enum whose members drive output key generation. The intent (no regression in existing measurements) is satisfied.
 
+### Wave-5 Blocker Resolution (post-verify, reviewer-authorized cross-plan edits)
+
+Deviations #1 and #3 above were the state of the *first* (voided) execution. Both were
+subsequently RESOLVED under explicit reviewer ruling; deviation #2's test was also updated.
+All edits below are reviewer-authorized cross-plan deviations, recorded here per ruling:
+
+- **Blocker 2 (deviation #1) — RESOLVED in `src/rulebook/references.py`** (Wave-3 / Plan 05-04 module, cross-plan edit authorized): added a GENERAL parenthesized-filename reference-target pattern (matches any `(name.ext)` with a document extension — no corpus constants) so the planted cross-doc reference resolves to doc_b. `phase5-gate` now AUTO-ESCALATES to the HARD path and PASSES with the Compound-B (0.18/0.15) VALUE_CONTRADICTION. Guard suite (behavior-transfer PRIMARY + NO-CONSTANT) passes on the changed file; real-fixture regression test added at `tests/rulebook/test_reference_cross_doc_regression.py`.
+- **Blocker 1 (deviation #3) — RESOLVED via freeze pin in `src/evals/metrics.py`**: `_end_to_end_by_family` iterates a fixed `_GROUND_TRUTH_FAMILIES` tuple (the original 4), NOT the full enum — so the frozen `score` output is byte-identical to base (v3 `e83d83d2…`, golden `15c1c059…`, verified on main). New leg families are exposed off the frozen path. Snapshot regression test `tests/evals/test_frozen_score_snapshot.py` makes the freeze permanent. Deviation #3's "byte-identical impossible" claim is superseded — it IS byte-identical once the frozen surface is pinned to the GT families.
+- **Stale freeze-guard tests — UPDATED in `tests/evals/test_metrics.py`**: the two assertions that compared against the full 7-member enum now assert against `_GROUND_TRUTH_FAMILIES` (pin-enforcing freeze guards).
+- **GAP 2 (latent) — FIXED in `src/rulebook/precedent_search.py`** (Wave-3 / Plan 05-05 module, cross-plan edit authorized): `anda_excluded` now receives `list[str]` (`[submission_anda_number] if submission_anda_number else []`) instead of a `bool`, which would have raised a Pydantic `ValidationError` once `data/rulebook.faiss` exists. New parametrized test `test_detect_precedent_anchor_anda_excluded_is_list` covers the construction path with and without a submission ANDA number.
+- **run.py:873 label (authorized)** — phase5-gate summary prints an unambiguous `PASS (hard — …)` / `DEFERRED` / `FAIL` label via an `sc2_deferred` flag.
+
 ## UNRESOLVED_REF Count Before/After
 
 Per Ruling D's request to report the reference UNRESOLVED_REF count:
