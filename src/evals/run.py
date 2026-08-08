@@ -181,6 +181,34 @@ def _relabel_corpus_doc_id(corpus, doc):
     `_search_corpus_recall_at_k`'s own (separately committed, separately tested) contract.
     """
     from ingest.corpus import CorpusIndex
+    from ingest.store import cache_key, read_doc_cache
+    from ingest.normalize import NORMALIZER_VERSION
+    from ingest.serialize import SERIALIZER_VERSION
+    from parse.pdf import PARSER_VERSION
+
+    class _RelabeledCorpusIndex(CorpusIndex):
+        """5R-R2 bridge: cached_entry ALSO resolves the ORIGINAL content-hash doc_id.
+
+        Relabeling only the manifest doc_id (content-hash -> eval id) left the table_index /
+        outline spans — minted at ingest under the content-hash doc_id and stored in the cache —
+        pointing at a doc_id no manifest entry carries anymore. Emit gates then re-look-up
+        `cached_entry(claim_span_id.doc_id)` by that content-hash id and got None
+        (reason_code=wrong_store), silently dropping the STRUCTURAL leg from scored runs (the
+        reference/absence legs happen to build spans under the manifest id and survived). This
+        alias resolves the original content-hash back to the same on-disk cache so structural
+        candidates survive emit into the scored report. Harness/bridge infra only — the frozen
+        score/match/gate machinery is untouched; the alias is strictly additive (super() wins).
+        """
+
+        def cached_entry(self, doc_id: str) -> dict | None:
+            entry = super().cached_entry(doc_id)
+            if entry is not None:
+                return entry
+            for d in self.manifest.documents:
+                if d.content_hash and d.content_hash == doc_id:
+                    key = cache_key(d.content_hash, NORMALIZER_VERSION, SERIALIZER_VERSION, PARSER_VERSION)
+                    return read_doc_cache(self.cache_dir, key)
+            return None
 
     target_name = Path(doc.path).name
     relabeled = [
@@ -188,7 +216,7 @@ def _relabel_corpus_doc_id(corpus, doc):
         for d in corpus.manifest.documents
     ]
     manifest = corpus.manifest.model_copy(update={"documents": relabeled})
-    return CorpusIndex(root=corpus.root, cache_dir=corpus.cache_dir, manifest=manifest)
+    return _RelabeledCorpusIndex(root=corpus.root, cache_dir=corpus.cache_dir, manifest=manifest)
 
 
 def cmd_retrieval_gate(args: argparse.Namespace) -> int:
