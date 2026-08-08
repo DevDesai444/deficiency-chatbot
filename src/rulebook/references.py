@@ -346,6 +346,36 @@ def extract_references(
         normalizer_version: str = cache.get("normalizer_version", "")
         doc_id = doc_entry.doc_id
         edge_count = 0
+        # WR-02: de-duplicate edges at WRITE time by (src_id, dst_id, edge_type).
+        # _REF_PATTERNS overlap (the generic see/refer pattern, the §X pattern and the
+        # Table N pattern can all match around the same location) and _span_at_offset
+        # coarsens offsets, so multiple matches collapse to the same src_id and would
+        # otherwise write near-identical edges -> redundant UNRESOLVED_REF faults
+        # downstream (precision noise). Track seen keys in-memory and skip repeats.
+        seen_edges: set[tuple[str, str, str]] = set()
+
+        def _add(src_id: str, dst_id: str, edge_type: str, provenance: str) -> bool:
+            """Write one edge iff its (src_id, dst_id, edge_type) key is new.
+
+            Returns True when an edge was actually written (so the caller can bump the
+            DoS edge_count only for real writes).
+            """
+            key = (src_id, dst_id, edge_type)
+            if key in seen_edges:
+                return False
+            seen_edges.add(key)
+            try:
+                edges_module.add_edge(
+                    src_id=src_id,
+                    dst_id=dst_id,
+                    edge_type=edge_type,
+                    provenance_span_id=provenance,
+                    db_path=db_path,
+                )
+                return True
+            except Exception as exc:
+                log.warning("add_edge_failed", doc_id=doc_id, error=str(exc)[:200])
+                return False
 
         # -----------------------------------------------------------------
         # Kind 1: DOCX hyperlinks (from parse/docx.py 'hyperlinks' key)
@@ -374,17 +404,8 @@ def extract_references(
             dst_doc = _resolve_target_doc(target, doc_ids, manifest)
             dst_id = f"{dst_doc}:0" if dst_doc else "unresolved"
             provenance = json.dumps(src_span.model_dump())
-            try:
-                edges_module.add_edge(
-                    src_id=src_id,
-                    dst_id=dst_id,
-                    edge_type="hyperlink",
-                    provenance_span_id=provenance,
-                    db_path=db_path,
-                )
+            if _add(src_id, dst_id, "hyperlink", provenance):
                 edge_count += 1
-            except Exception as exc:
-                log.warning("add_edge_failed", doc_id=doc_id, error=str(exc)[:200])
 
         # -----------------------------------------------------------------
         # Kind 2: PDF links (from parse/pdf.py 'links' key)
@@ -409,17 +430,8 @@ def extract_references(
             dst_doc = _resolve_target_doc(uri, doc_ids, manifest)
             dst_id = f"{dst_doc}:0" if dst_doc else "unresolved"
             provenance = json.dumps(src_span.model_dump())
-            try:
-                edges_module.add_edge(
-                    src_id=src_id,
-                    dst_id=dst_id,
-                    edge_type="hyperlink",
-                    provenance_span_id=provenance,
-                    db_path=db_path,
-                )
+            if _add(src_id, dst_id, "hyperlink", provenance):
                 edge_count += 1
-            except Exception as exc:
-                log.warning("add_edge_failed", doc_id=doc_id, error=str(exc)[:200])
 
         # -----------------------------------------------------------------
         # Kind 3: Textual references (regex over canonical text)
@@ -440,17 +452,8 @@ def extract_references(
                 dst_doc = _find_doc_by_outline(ref_text, manifest, doc_ids, doc_first_lines)
                 dst_id = f"{dst_doc}:0" if dst_doc else "unresolved"
                 provenance = json.dumps(src_span.model_dump())
-                try:
-                    edges_module.add_edge(
-                        src_id=src_id,
-                        dst_id=dst_id,
-                        edge_type="textual_ref",
-                        provenance_span_id=provenance,
-                        db_path=db_path,
-                    )
+                if _add(src_id, dst_id, "textual_ref", provenance):
                     edge_count += 1
-                except Exception as exc:
-                    log.warning("add_edge_failed", doc_id=doc_id, error=str(exc)[:200])
 
         # -----------------------------------------------------------------
         # Kind 3b: Numeric value cross-references (NMT / limit patterns)
@@ -478,17 +481,8 @@ def extract_references(
                 dst_doc = _find_doc_by_outline(ctx_text, manifest, doc_ids, doc_first_lines)
                 dst_id = f"{dst_doc}:0" if dst_doc else "unresolved"
                 provenance = json.dumps(src_span.model_dump())
-                try:
-                    edges_module.add_edge(
-                        src_id=src_id,
-                        dst_id=dst_id,
-                        edge_type="value_crossref",
-                        provenance_span_id=provenance,
-                        db_path=db_path,
-                    )
+                if _add(src_id, dst_id, "value_crossref", provenance):
                     edge_count += 1
-                except Exception as exc:
-                    log.warning("add_edge_failed", doc_id=doc_id, error=str(exc)[:200])
 
 
 # ---------------------------------------------------------------------------
@@ -856,7 +850,42 @@ def detect_reference_anomalies(
                 if isinstance(result, Fault):
                     faults.append(result)
 
-    return faults
+    return _dedup_reference_faults(faults)
+
+
+# ---------------------------------------------------------------------------
+# Helper: de-duplicate anomaly faults (WR-02)
+# ---------------------------------------------------------------------------
+def _dedup_reference_faults(faults: list[Fault]) -> list[Fault]:
+    """WR-02: drop near-identical anomaly faults, preserving every DISTINCT one.
+
+    Edge-level dedup (in extract_references) removes duplicate edges, but overlapping
+    patterns / coarse offsets can still yield faults that describe the SAME anomaly
+    between the same document pair anchored at the same span. Dedup on a key that is
+    specific enough to NEVER merge two genuinely different findings:
+      (anomaly, src_doc, src_start, dst_doc, dst_start)
+    The src/dst START offsets keep two contradictions about different table rows (or
+    two references at different positions) as separate faults — recall-safe.
+    """
+    seen: set[tuple] = set()
+    unique: list[Fault] = []
+    for f in faults:
+        anchor = f.reference_anchor
+        if anchor is None:
+            unique.append(f)
+            continue
+        src = anchor.src_span_id
+        dst = anchor.dst_span_id
+        key = (
+            anchor.anomaly,
+            getattr(src, "doc_id", None), getattr(src, "start", None),
+            getattr(dst, "doc_id", None), getattr(dst, "start", None),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(f)
+    return unique
 
 
 # ---------------------------------------------------------------------------
