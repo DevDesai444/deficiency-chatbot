@@ -210,6 +210,40 @@ def _span_at_offset(doc_id: str, canonical: str, offset: int, normalizer_version
     return mint_span(canonical, offset, end, doc_id, normalizer_version)
 
 
+def _real_anchor_offset(canonical: str, *candidates: str) -> int:
+    """WR-01: return the offset of a REAL occurrence of the link anchor in canonical.
+
+    The prior code anchored hyperlink/PDF-link edges at a FABRICATED offset
+    (`para_idx * 50`, `page_num * 100`) that has no relationship to where the link
+    actually occurs. That span was byte-exact re-openable, so the grounding gate
+    passed — but it cited the WRONG text, undermining the verbatim-anchor guarantee
+    (grounding integrity).
+
+    This helper searches canonical (case-insensitively) for the first candidate anchor
+    string — e.g. the link target's filename stem or the display text — and returns its
+    real offset. When no candidate is found in canonical there IS no in-text position
+    for the link (it lives in relationship XML / a PDF annotation, not the flowed text),
+    so we return 0 (document start) — a truthful "somewhere in this document" anchor —
+    rather than minting a plausible-looking but fabricated offset. Callers that need to
+    signal the reduced certainty do so via scoping_confidence at detection time.
+    """
+    if not canonical:
+        return 0
+    haystack = canonical.lower()
+    for cand in candidates:
+        if not cand:
+            continue
+        needle = cand.strip().lower()
+        # Try the filename stem too (targets are often "path/spec_v2.pdf").
+        for probe in (needle, needle.split("/")[-1].split("\\")[-1].rsplit(".", 1)[0]):
+            probe = probe.strip()
+            if probe and len(probe) >= 3:
+                idx = haystack.find(probe)
+                if idx >= 0:
+                    return idx
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # Helper: extract limit value from src span text (Step A of Ruling 6)
 # ---------------------------------------------------------------------------
@@ -325,18 +359,15 @@ def extract_references(
             target = hl.get("target", "")
             if not target:
                 continue
-            # Determine dst: if target is a doc_id in the corpus, use it; else "unresolved"
-            # CR-01: the real DOCX parser (parse/docx.py::_extract_hyperlinks) always sets
-            # paragraph_index=None, so `.get("paragraph_index", 0)` returns None (the KEY is
-            # present with value None; the .get default only applies when the key is ABSENT).
-            # `None * 50` then raised TypeError and aborted the entire reference leg on any
-            # real DOCX carrying a hyperlink. Coerce a missing/None index to 0.
-            para_idx = hl.get("paragraph_index") or 0
-            # Find a span in the doc that best represents this hyperlink anchor
-            # Use the first reasonable position in canonical text
             if not canonical:
                 continue
-            anchor_offset = min(para_idx * 50, max(0, len(canonical) - 80))
+            # WR-01: anchor at a REAL occurrence of the link target in canonical text,
+            # not a fabricated `para_idx * 50` offset. If the target string does not
+            # appear in the flowed text (it lives in the DOCX relationship XML), fall
+            # back to offset 0 — a truthful document-start anchor, never a plausible
+            # fake. (CR-01 is now moot here since paragraph_index is no longer used to
+            # compute the offset, but the parser still emits it as None.)
+            anchor_offset = _real_anchor_offset(canonical, target, hl.get("display", ""))
             src_span = _span_at_offset(doc_id, canonical, anchor_offset, normalizer_version)
             src_id = f"{doc_id}:{src_span.start}"
             # dst: check if target looks like a known doc_id or filename
@@ -364,10 +395,15 @@ def extract_references(
                 log.warning("edge_cap_reached", doc_id=doc_id, edge_type="pdf_link")
                 break
             uri = lnk.get("uri", "") or lnk.get("name", "")
-            page_num = lnk.get("page", 0)
             if not uri:
                 continue
-            anchor_offset = min(page_num * 100, max(0, len(canonical) - 80))
+            if not canonical:
+                continue
+            # WR-01: anchor at a REAL occurrence of the link URI in canonical, not a
+            # fabricated `page_num * 100` offset. PDF link annotations carry no canonical
+            # text offset; if the URI text is not present in the flowed text, fall back
+            # to offset 0 rather than a fake per-page offset.
+            anchor_offset = _real_anchor_offset(canonical, uri)
             src_span = _span_at_offset(doc_id, canonical, anchor_offset, normalizer_version)
             src_id = f"{doc_id}:{src_span.start}"
             dst_doc = _resolve_target_doc(uri, doc_ids, manifest)
