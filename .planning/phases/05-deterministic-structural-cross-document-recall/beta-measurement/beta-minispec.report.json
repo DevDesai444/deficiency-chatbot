@@ -1,0 +1,59 @@
+{
+  "job_id": "",
+  "faults": [
+    {
+      "title": "Entire required section absent (3.2.S.7): ICH Q1A(R2) -- 2.1.3 Selection of Batches",
+      "detail": "",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "corroborated",
+      "evidence_class": "checklist",
+      "confidence": 0.7,
+      "verdict": "gap",
+      "rule_span_id": {
+        "doc_id": "ich-Q1A-R2",
+        "start": 11444,
+        "end": 11766,
+        "hash": "b2ca41bf6f057f97"
+      },
+      "submission_span_id": null,
+      "absence_anchor": {
+        "profile": [
+          "drug_substance"
+        ],
+        "family": "3.2.S.7",
+        "requirement_id": "Q1A-BATCH-SELECTION",
+        "threshold": 0.04,
+        "sub_threshold_hits": [],
+        "manifest_span_ids": [],
+        "claim_span_id": null
+      },
+      "structural_anchor": null,
+      "reference_anchor": null,
+      "precedent_anchor": null,
+      "leg_tag": null,
+      "dedup_key": null,
+      "confidence_tier": null,
+      "evidence": "",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_absence_finding",
+      "guidance_refs": [
+        "ICH Q1A(R2) -- 2.1.3 Selection of Batches",
+        "Q1A-BATCH-SELECTION"
+      ],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    }
+  ],
+  "faults_found": true,
+  "domains_checked": [],
+  "parse_failures": [],
+  "analysis_seconds": 0.0,
+  "stop_reason": "",
+  "budget_exhausted": false
+}

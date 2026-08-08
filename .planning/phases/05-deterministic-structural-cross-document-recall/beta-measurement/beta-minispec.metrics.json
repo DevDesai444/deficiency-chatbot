@@ -1,0 +1,52 @@
+{
+  "end_to_end": {
+    "precision": 0.0,
+    "recall": 0.0,
+    "tp": 0,
+    "fp": 1,
+    "fn": 4
+  },
+  "end_to_end_by_family": {
+    "absence_of_evidence": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 1,
+      "fn": 1
+    },
+    "derivation_plausibility": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 1,
+      "fn": 0
+    },
+    "cross_reference_integrity": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 1,
+      "fn": 3
+    },
+    "regulatory_framing": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 1,
+      "fn": 0
+    }
+  },
+  "recall_by_family": {
+    "absence_of_evidence": 0.0,
+    "derivation_plausibility": 0.0,
+    "cross_reference_integrity": 0.0,
+    "regulatory_framing": 0.0
+  },
+  "retrieval_recall_at_k": 0.0,
+  "parse_fidelity": {
+    "parsed_ok": true,
+    "parse_failures": 0
+  },
+  "anchor_rate": "n/a_no_source",
+  "verifier": "n/a_phase0"
+}

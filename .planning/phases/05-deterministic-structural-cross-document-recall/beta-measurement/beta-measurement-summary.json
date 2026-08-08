@@ -1,0 +1,115 @@
+{
+  "faiss_present": false,
+  "absence_threshold": 0.04,
+  "docs": {
+    "mvr1381": {
+      "captured_report": ".planning/phases/05-deterministic-structural-cross-document-recall/beta-measurement/beta-mvr1381.report.json",
+      "total_candidates_emitted": 109,
+      "candidates_by_leg": {
+        "absence": 8,
+        "structural": 0,
+        "reference": 101,
+        "precedent": 0
+      },
+      "reference_anomaly_counts": {
+        "UNRESOLVED_REF": 97,
+        "VALUE_CONTRADICTION": 4
+      },
+      "precedent_skipped": true,
+      "matched_gt_ids": [],
+      "fp_count": 109,
+      "fn_gt_ids": [
+        "A-01",
+        "A-02",
+        "A-03",
+        "A-04",
+        "A-05",
+        "A-06",
+        "A-07",
+        "A-08",
+        "A-09",
+        "A-10",
+        "A-11",
+        "A-12",
+        "B-01",
+        "B-02",
+        "B-03",
+        "B-04",
+        "B-05",
+        "B-06",
+        "B-07",
+        "B-08",
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06",
+        "C-07",
+        "D-01"
+      ],
+      "gt_ids_for_doc": [
+        "A-01",
+        "A-02",
+        "A-03",
+        "A-04",
+        "A-05",
+        "A-06",
+        "A-07",
+        "A-08",
+        "A-09",
+        "A-10",
+        "A-11",
+        "A-12",
+        "B-01",
+        "B-02",
+        "B-03",
+        "B-04",
+        "B-05",
+        "B-06",
+        "B-07",
+        "B-08",
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06",
+        "C-07",
+        "D-01"
+      ],
+      "B-08_matched": false,
+      "C-01_matched": false,
+      "C-02_matched": false
+    },
+    "minispec": {
+      "captured_report": ".planning/phases/05-deterministic-structural-cross-document-recall/beta-measurement/beta-minispec.report.json",
+      "total_candidates_emitted": 1,
+      "candidates_by_leg": {
+        "absence": 1,
+        "structural": 0,
+        "reference": 0,
+        "precedent": 0
+      },
+      "reference_anomaly_counts": {},
+      "precedent_skipped": true,
+      "matched_gt_ids": [],
+      "fp_count": 1,
+      "fn_gt_ids": [
+        "MS-01",
+        "MS-02",
+        "MS-03",
+        "MS-04"
+      ],
+      "gt_ids_for_doc": [
+        "MS-01",
+        "MS-02",
+        "MS-03",
+        "MS-04"
+      ],
+      "B-08_matched": false,
+      "C-01_matched": false,
+      "C-02_matched": false
+    }
+  }
+}
