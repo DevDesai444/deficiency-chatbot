@@ -214,10 +214,32 @@ def _find_value_column(
     return max(col_numeric_count, key=col_numeric_count.__getitem__)
 
 
+# A VALUE cell is a bare number optionally followed by a unit token — NOT a label
+# that merely contains a digit ("Sample 1", "Unit 3"). D-GRD3: general regex, no
+# corpus constant. Recognized trailing units mirror the reference leg's unit set.
+_VALUE_CELL_RE = re.compile(
+    r'^\s*[<>≤≥]?\s*\d+(?:\.\d+)?\s*'
+    r'(?:%\s*(?:w/w)?|mg/mL|mg/g|mg/kg|mg|mL|ppm|ppb|g/L|µg|ug|kg|g|L)?\s*$',
+    re.IGNORECASE,
+)
+
+
+def _is_value_cell(text: str) -> bool:
+    """True when the cell is a numeric value (optionally unit-bearing), not a label.
+
+    WR-05 fix: a column of labels like "Sample 1", "Unit 1", "Batch 3" contains digits
+    but is NOT a value column. Using `re.search(r'[\\d.]+')` (mere digit presence) mis-
+    classified such label columns as numeric, which then (a) polluted the value-column
+    set and (b) caused the label column to be skipped as "another numeric column",
+    dropping the aggregate label entirely. Require the WHOLE cell to be a number+unit.
+    """
+    return bool(_VALUE_CELL_RE.match(text or ""))
+
+
 def _find_value_columns(
     cell_texts: dict[tuple[int, int], str],
 ) -> list[int]:
-    """WR-05: return ALL candidate value columns (majority-numeric), not just one.
+    """WR-05: return ALL candidate value columns (majority pure-numeric), not just one.
 
     Real regulatory tables routinely carry several numeric columns (e.g.
     "Result | Limit | % of Limit", or one column per stability timepoint). The old
@@ -225,19 +247,19 @@ def _find_value_columns(
     aggregate stated in a different numeric column was never checked (recall loss), and
     basis cells summed across a column that mixes results and limits produced a nonsense
     recompute (false positive). This returns every column whose data cells are MAJORITY
-    numeric so the caller can pair the aggregate label with the claim IN EACH numeric
-    column and recompute per column. Columns are returned in ascending index order for
-    deterministic output.
+    pure-numeric (a number optionally followed by a unit — see _is_value_cell), so a
+    label column that merely contains digits ("Sample 1") is NOT counted. Columns are
+    returned in ascending index order for deterministic output.
     """
     col_total: dict[int, int] = defaultdict(int)
-    col_numeric: dict[int, int] = defaultdict(int)
+    col_value: dict[int, int] = defaultdict(int)
     for (r, c), text in cell_texts.items():
         col_total[c] += 1
-        if re.search(r'[\d.]+', text):
-            col_numeric[c] += 1
+        if _is_value_cell(text):
+            col_value[c] += 1
     candidates = [
         c for c in sorted(col_total)
-        if col_numeric[c] > 0 and col_numeric[c] * 2 >= col_total[c]  # majority-numeric
+        if col_value[c] > 0 and col_value[c] * 2 >= col_total[c]  # majority pure-numeric
     ]
     return candidates
 
