@@ -60,6 +60,7 @@ BASELINE_PATH = Path(__file__).parent / "baseline" / "recall_by_family.json"
 RETRIEVAL_BASELINE_PATH = Path(__file__).parent / "baseline" / "retrieval_recall.json"
 COVERAGE_BASELINE_PATH = Path(__file__).parent / "baseline" / "coverage_baseline.json"
 ABSENCE_BASELINE_PATH = Path(__file__).parent / "baseline" / "absence_threshold.json"
+BETA_RECALL_BASELINE_PATH = Path(__file__).parent / "baseline" / "beta_recall_baseline.json"
 
 
 def _join_source_text(parsed_doc: dict) -> str:
@@ -985,6 +986,93 @@ def cmd_deterministic_recall_gate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_beta_recall_gate(args: argparse.Namespace) -> int:
+    """`beta-recall-gate`: 5R additive β-recall ratchet (LLM-free, Databricks-free).
+
+    Re-runs the deterministic legs (absence + structural + reference; precedent structured-skips
+    when data/rulebook.faiss is absent) over every NON-HELD-OUT eval doc (each ingested in
+    isolation so the held-out witness is excluded), scores each captured report via the frozen
+    match path, and enforces the recorded ratchet in `beta_recall_baseline.json`:
+      (i)  matched_set never shrinks — every baseline matched GT id must still be matched.
+      (ii) aggregate recall (matched / total non-held-out GT) never falls below the floor.
+
+    Offline-SAFE (WR-03), mirroring absence-gate: when the local corpus is absent (data/
+    gitignored in CI), every non-held-out doc is skipped and the gate prints
+    `BETA-RECALL-GATE SKIPPED (no local corpus)` and exits 0 — a tripwire on the gate code
+    path, not a measurement, in vanilla CI. Frozen score/match machinery is untouched.
+    """
+    import shutil
+    import tempfile
+
+    from evals.match import score
+    from ingest.corpus import ingest_corpus
+    from rulebook.absence import enumerate_absences
+    from rulebook.requirement_index import build_requirement_edges, load_requirement_index
+    from rulebook.structural import detect_structural_inconsistencies
+    from rulebook.references import extract_references, detect_reference_anomalies
+    from rulebook.precedent_search import detect_precedent_candidates
+    from tools.ledger import RetrievalLedger
+
+    baseline = json.loads(Path(args.baseline).read_text())
+    baseline_matched: set[str] = set(baseline.get("matched_set", []))
+    baseline_aggregate: float = float(baseline.get("aggregate_recall", 0.0))
+    abs_threshold = json.loads(ABSENCE_BASELINE_PATH.read_text())["threshold"]
+    faiss_present = Path("data/rulebook.faiss").exists()
+
+    load_requirement_index.cache_clear()
+    build_requirement_edges()
+
+    eval_set = load_eval_set()
+    total_gt = sum(1 for gt in eval_set.deficiencies
+                   if gt.doc_id in {d.doc_id for d in eval_set.documents if not d.held_out})
+    measured_matched: set[str] = set()
+    measured_docs = 0
+
+    for doc in eval_set.documents:
+        if doc.held_out:
+            continue
+        src = Path(doc.path)
+        if not src.exists():
+            continue
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                shutil.copy(src, Path(td) / src.name)
+                corpus = ingest_corpus(Path(td))
+                corpus = _relabel_corpus_doc_id(corpus, doc)
+                ledger = RetrievalLedger()
+                faults = []
+                faults += enumerate_absences(corpus, corpus.manifest, ledger, threshold=abs_threshold)
+                faults += detect_structural_inconsistencies(corpus, corpus.manifest, ledger)
+                edb = str(Path(td) / "edges.db")
+                extract_references(corpus, corpus.manifest, db_path=edb)
+                faults += detect_reference_anomalies(corpus, corpus.manifest, ledger, db_path=edb)
+                if faiss_present:
+                    faults += detect_precedent_candidates(corpus, corpus.manifest, ledger)
+        except Exception as exc:  # noqa: BLE001 -- a missing/unreadable corpus file must never crash the gate
+            print(f"beta-recall-gate: could not process {doc.doc_id}: {exc}")
+            continue
+        measured_docs += 1
+        result = score([f.model_dump() for f in faults], eval_set.deficiencies, doc.doc_id)
+        measured_matched |= result.matched_gt_ids
+
+    if measured_docs == 0:
+        print("BETA-RECALL-GATE SKIPPED (no local corpus)")
+        return 0
+
+    aggregate = len(measured_matched) / total_gt if total_gt else 0.0
+    lost = sorted(baseline_matched - measured_matched)
+    print(f"beta-recall-gate: matched={sorted(measured_matched)} aggregate={aggregate:.4f} "
+          f"(floor {baseline_aggregate:.4f}); baseline_matched={sorted(baseline_matched)}")
+    if lost:
+        print(f"FAIL: beta-recall-gate — lost baseline matched ids: {lost}")
+        return 1
+    if aggregate + 1e-9 < baseline_aggregate:
+        print(f"FAIL: beta-recall-gate — aggregate {aggregate:.4f} below floor {baseline_aggregate:.4f}")
+        return 1
+    print("PASS: beta-recall-gate")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m evals.run", description="DefPredict eval harness CI-style CLI."
@@ -1081,6 +1169,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="RECALL-02/03/04 combined recall report on synthetic fixture. Hard-fails on structural "
              "or reference 0 findings; reports precedent without hard-fail (FAISS dependency).",
     ).set_defaults(func=cmd_deterministic_recall_gate)
+
+    beta_recall_p = subparsers.add_parser(
+        "beta-recall-gate",
+        help="5R additive ratchet: re-run deterministic legs over the local eval corpus, score via "
+             "the frozen path, hard-fail if any baseline matched id is lost or aggregate falls below "
+             "the floor; structured-skip when no local corpus.",
+    )
+    beta_recall_p.add_argument("--baseline", default=str(BETA_RECALL_BASELINE_PATH))
+    beta_recall_p.set_defaults(func=cmd_beta_recall_gate)
 
     return parser
 

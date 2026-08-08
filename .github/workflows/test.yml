@@ -54,6 +54,19 @@ jobs:
           # measures the real non-held-out aggregate and ratchets against the committed baseline.
           uv run python -m evals.run absence-gate
 
+      - name: Enforce beta-recall-gate (5R additive live-engine recall ratchet)
+        env:
+          PYTHONPATH: src
+        run: |
+          # beta-recall-gate is offline-SAFE (WR-03), same idiom as absence-gate: data/ is gitignored
+          # in CI, so every non-held-out doc fails to ingest -> the gate emits
+          # `BETA-RECALL-GATE SKIPPED (no local corpus)` and exits 0 (always-on tripwire that the
+          # gate code path builds/imports/runs clean). Where a corpus is provisioned (self-hosted/
+          # scheduled with data/ present) the SAME command re-runs the deterministic legs, scores via
+          # the frozen path, and hard-fails if any baseline matched id is lost or aggregate drops
+          # below the committed 5R floor (0.1875) — protecting the live-engine recall gains forever.
+          uv run python -m evals.run beta-recall-gate
+
   pytest-slow:
     runs-on: ubuntu-latest
     steps:

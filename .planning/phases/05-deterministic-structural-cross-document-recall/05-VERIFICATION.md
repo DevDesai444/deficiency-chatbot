@@ -185,3 +185,11 @@ All 5 Success Criteria are MET. All 4 requirements (RECALL-02/03/04/05) are SATI
 _Verified: 2026-08-07T21:30:00Z_
 _Verifier: Claude (gsd-verifier) — goal-backward, code-evidence basis_
 _Re-verification: Yes — after gap closure (commit 918f614)_
+
+---
+
+## Addendum — SC5 real-corpus clause (added 2026-08-08, owned by Phase 5R)
+
+The original PASS above verified Phase 5 on the **synthetic fixture** by construction. On the **real eval corpus**, SC5's grounded-recall clause was **NOT met at phase close**: the live deterministic engine scored **0.000** because (a) emitted findings carried empty `evidence` and the frozen matcher credits evidence, and (b) the scoring relabel/cache bridge suppressed the structural leg via `wrong_store`. These were **delivery** failures, not detection failures (the legs do fire on real data).
+
+**Phase 5R remediated and re-measured this:** evidence populated (R1), relabel/cache bridge fixed (R2), re-measured on the real corpus via the frozen path (R3) → **aggregate recall 0.1875 (6/32)**, mvr1381 0.179 (incl. **C-01**), minispec 0.250 (MS-01) — above the 0.107 golden and 0.071 agent baselines; C-01 matched for the first time. An additive `beta-recall-gate` (R5) now ratchets this floor in CI. Residual named gaps handed to Phase 7: **B-08, C-02, MS-02** (see `beta-measurement/RESULTS-5R.md`). Golden `found_set` unchanged (no swap — it would shrink protection; B-08 remains unmatched by the live engine).

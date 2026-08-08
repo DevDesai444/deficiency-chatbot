@@ -1,0 +1,6 @@
+{
+  "generated_from": "live-deterministic-legs:mvr1381+minispec (5R, frozen evals.run score path)",
+  "matched_set": ["A-09", "A-11", "B-01", "C-01", "C-06", "MS-01"],
+  "aggregate_recall": 0.1875,
+  "note": "5R additive β-recall ratchet. Protects the FIRST measured live-engine recall on the real corpus. matched_set never shrinks; aggregate_recall never falls below this floor. Structured-skip (exit 0) when the local eval corpus is absent (CI without data/), mirroring absence-gate (WR-03). Not a golden swap: the curated golden's found_set is unchanged; this gate protects live-engine gains, which are a distinct, additive surface."
+}
