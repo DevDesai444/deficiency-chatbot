@@ -48,6 +48,140 @@
       "out_of_distribution": false,
       "challenge_note": "",
       "cited_section_indices": []
+    },
+    {
+      "title": "Labeled-aggregate SUM mismatch: stated '0.14' != recomputed '0.42'",
+      "detail": "Table 'docx-t3': aggregate cell at row 4 states '0.14' but recompute of 3 basis values gives '0.42' (relation: SUM).",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "verified",
+      "evidence_class": "code_verified",
+      "confidence": 0.9,
+      "verdict": "violation",
+      "rule_span_id": null,
+      "submission_span_id": {
+        "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+        "start": 413,
+        "end": 417,
+        "hash": "970acaf1f3333b37"
+      },
+      "absence_anchor": null,
+      "structural_anchor": {
+        "claim_span_id": {
+          "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+          "start": 413,
+          "end": 417,
+          "hash": "970acaf1f3333b37"
+        },
+        "basis_span_ids": [
+          {
+            "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+            "start": 344,
+            "end": 348,
+            "hash": "5c291e283a62959f"
+          },
+          {
+            "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+            "start": 365,
+            "end": 369,
+            "hash": "feeb4cc13d88e2b6"
+          },
+          {
+            "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+            "start": 386,
+            "end": 390,
+            "hash": "40e99e7e08eaff61"
+          }
+        ],
+        "relation": "SUM",
+        "expected_value": "0.42",
+        "actual_value": "0.14",
+        "comparison_store": "CORPUS",
+        "scoping_confidence": "full"
+      },
+      "reference_anchor": null,
+      "precedent_anchor": null,
+      "leg_tag": "STRUCTURAL",
+      "dedup_key": "36364a2f79cb1bf00d92a0deeca29a9c:413:null",
+      "confidence_tier": "full",
+      "evidence": "0.14 | basis: 0.08 ; 0.15 ; 0.19",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_structural_finding",
+      "guidance_refs": [],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
+    },
+    {
+      "title": "Labeled-aggregate MAX mismatch: stated '0.15' != recomputed '0.19'",
+      "detail": "Table 'docx-t3': aggregate cell at row 5 states '0.15' but recompute of 3 basis values gives '0.19' (relation: MAX).",
+      "category": "general_cmc",
+      "severity": "medium",
+      "tier": "verified",
+      "evidence_class": "code_verified",
+      "confidence": 0.9,
+      "verdict": "violation",
+      "rule_span_id": null,
+      "submission_span_id": {
+        "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+        "start": 431,
+        "end": 435,
+        "hash": "feeb4cc13d88e2b6"
+      },
+      "absence_anchor": null,
+      "structural_anchor": {
+        "claim_span_id": {
+          "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+          "start": 431,
+          "end": 435,
+          "hash": "feeb4cc13d88e2b6"
+        },
+        "basis_span_ids": [
+          {
+            "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+            "start": 344,
+            "end": 348,
+            "hash": "5c291e283a62959f"
+          },
+          {
+            "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+            "start": 365,
+            "end": 369,
+            "hash": "feeb4cc13d88e2b6"
+          },
+          {
+            "doc_id": "36364a2f79cb1bf00d92a0deeca29a9c",
+            "start": 386,
+            "end": 390,
+            "hash": "40e99e7e08eaff61"
+          }
+        ],
+        "relation": "MAX",
+        "expected_value": "0.19",
+        "actual_value": "0.15",
+        "comparison_store": "CORPUS",
+        "scoping_confidence": "full"
+      },
+      "reference_anchor": null,
+      "precedent_anchor": null,
+      "leg_tag": "STRUCTURAL",
+      "dedup_key": "36364a2f79cb1bf00d92a0deeca29a9c:431:null",
+      "confidence_tier": "full",
+      "evidence": "0.15 | basis: 0.08 ; 0.15 ; 0.19",
+      "section": "",
+      "page": 0,
+      "table_ref": "",
+      "source": "tool:emit_structural_finding",
+      "guidance_refs": [],
+      "precedents": [],
+      "novel": false,
+      "out_of_distribution": false,
+      "challenge_note": "",
+      "cited_section_indices": []
     }
   ],
   "faults_found": true,

@@ -4,10 +4,10 @@
   "docs": {
     "mvr1381": {
       "captured_report": ".planning/phases/05-deterministic-structural-cross-document-recall/beta-measurement/beta-mvr1381.report.json",
-      "total_candidates_emitted": 109,
+      "total_candidates_emitted": 112,
       "candidates_by_leg": {
         "absence": 8,
-        "structural": 0,
+        "structural": 3,
         "reference": 101,
         "precedent": 0
       },
@@ -16,8 +16,14 @@
         "VALUE_CONTRADICTION": 4
       },
       "precedent_skipped": true,
-      "matched_gt_ids": [],
-      "fp_count": 109,
+      "matched_gt_ids": [
+        "A-09",
+        "A-11",
+        "B-01",
+        "C-01",
+        "C-06"
+      ],
+      "fp_count": 100,
       "fn_gt_ids": [
         "A-01",
         "A-02",
@@ -27,11 +33,8 @@
         "A-06",
         "A-07",
         "A-08",
-        "A-09",
         "A-10",
-        "A-11",
         "A-12",
-        "B-01",
         "B-02",
         "B-03",
         "B-04",
@@ -39,12 +42,10 @@
         "B-06",
         "B-07",
         "B-08",
-        "C-01",
         "C-02",
         "C-03",
         "C-04",
         "C-05",
-        "C-06",
         "C-07",
         "D-01"
       ],
@@ -79,24 +80,25 @@
         "D-01"
       ],
       "B-08_matched": false,
-      "C-01_matched": false,
+      "C-01_matched": true,
       "C-02_matched": false
     },
     "minispec": {
       "captured_report": ".planning/phases/05-deterministic-structural-cross-document-recall/beta-measurement/beta-minispec.report.json",
-      "total_candidates_emitted": 1,
+      "total_candidates_emitted": 3,
       "candidates_by_leg": {
         "absence": 1,
-        "structural": 0,
+        "structural": 2,
         "reference": 0,
         "precedent": 0
       },
       "reference_anomaly_counts": {},
       "precedent_skipped": true,
-      "matched_gt_ids": [],
-      "fp_count": 1,
+      "matched_gt_ids": [
+        "MS-01"
+      ],
+      "fp_count": 2,
       "fn_gt_ids": [
-        "MS-01",
         "MS-02",
         "MS-03",
         "MS-04"
