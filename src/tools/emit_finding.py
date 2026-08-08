@@ -198,6 +198,7 @@ def emit_absence_finding(
                             hint="re-fetch the current rule text via read_guideline and cite its freshly-issued span-ID")
 
     # --- 2. Optional narrative-claim CORPUS span (D-ABS4): re-open byte-exact, SAME path -----
+    absence_evidence = ""  # R1 (5R): surface the top grounded span text for the matcher
     claim_span_id = absence_anchor.claim_span_id
     if claim_span_id is not None:
         if not ledger.was_issued(claim_span_id):
@@ -215,7 +216,7 @@ def emit_absence_finding(
                                   offset_map=[OffsetRun.model_validate(r) for r in corpus_cache["offset_map"]],
                                   normalizer_version=corpus_cache["normalizer_version"], serializer_version=corpus_cache["serializer_version"])
         try:
-            open_span(claim_span_id, claim_nt, claim_span_id.doc_id)
+            absence_evidence, _ = open_span(claim_span_id, claim_nt, claim_span_id.doc_id)  # R1 (5R)
         except HashMismatch:
             return ToolRejected(tool="emit_absence_finding", reason_code="not_byte_exact",
                                 half="submission",
@@ -229,12 +230,28 @@ def emit_absence_finding(
                             reason="absence anchor missing enumerate inputs required to re-run the negative",
                             hint="populate CoverageAbsenceAnchor.family and .requirement_id so the verifier can RE-RUN the search")
 
+    # R1 (5R): if no narrative-claim span, surface the top sub-threshold retrieval-hit span text.
+    if not absence_evidence and absence_anchor.sub_threshold_hits:
+        top_hit = absence_anchor.sub_threshold_hits[0].span_id
+        hit_cache = corpus.cached_entry(top_hit.doc_id)
+        if hit_cache is not None:
+            hit_nt = NormalizedText(
+                canonical=hit_cache["canonical"], raw_serialized=hit_cache["raw_serialized"],
+                offset_map=[OffsetRun.model_validate(r) for r in hit_cache["offset_map"]],
+                normalizer_version=hit_cache["normalizer_version"],
+                serializer_version=hit_cache["serializer_version"],
+            )
+            try:
+                absence_evidence, _ = open_span(top_hit, hit_nt, top_hit.doc_id)
+            except HashMismatch:
+                pass
+
     # --- 4. Construct the absence-typed Fault (GAP; no submission_span_id) -------------------
     return Fault(
         title=title or "Absent required element", detail=detail,
         tier=Tier.CORROBORATED, evidence_class=EvidenceClass.CHECKLIST, confidence=0.7,
         verdict=ComplianceVerdict.GAP, rule_span_id=rule_span_id, submission_span_id=None,
-        absence_anchor=absence_anchor, source="tool:emit_absence_finding",
+        absence_anchor=absence_anchor, evidence=absence_evidence, source="tool:emit_absence_finding",
         guidance_refs=[rule_citation or rule_span_id.doc_id] + ([requirement_id] if requirement_id else []),
     )
 
@@ -341,9 +358,12 @@ def emit_structural_finding(
     claim_result = issue_cached_span(ledger, claim_span_id, claim_nt)
     if isinstance(claim_result, ToolRejected):
         return claim_result
+    # R1 (5R): surface the already-opened, byte-exact claim-cell text as evidence (span-text only).
+    claim_raw, _ = open_span(claim_span_id, claim_nt, claim_span_id.doc_id)
 
     # --- 3. BASIS spans: issue via cache (D-ABS2 over-emit: accumulate failures, don't drop) --
     issued_basis: list[SpanID] = []
+    basis_raws: list[str] = []
     seen_keys: set[tuple[str, int, int]] = set()
     for basis_span in structural_anchor.basis_span_ids:
         key = (basis_span.doc_id, basis_span.start, basis_span.end)
@@ -362,6 +382,11 @@ def emit_structural_finding(
         basis_result = issue_cached_span(ledger, basis_span, basis_nt)
         if not isinstance(basis_result, ToolRejected):
             issued_basis.append(basis_span)
+            try:  # R1 (5R): surface basis-cell text (already validated byte-exact)
+                basis_raw, _ = open_span(basis_span, basis_nt, basis_span.doc_id)
+                basis_raws.append(basis_raw)
+            except HashMismatch:
+                pass
 
     # Require at least 1 independent basis span (Pitfall 2: merged cells collapsing to same span)
     if len(issued_basis) < 1:
@@ -373,6 +398,7 @@ def emit_structural_finding(
 
     # --- 4. Construct the structural Fault (VIOLATION; Ruling 2: VERIFIED + CODE_VERIFIED) ----
     dedup_key = f"{claim_span_id.doc_id}:{claim_span_id.start}:null"
+    evidence = claim_raw + (" | basis: " + " ; ".join(basis_raws) if basis_raws else "")
     return Fault(
         title=title or "Structural inconsistency detected",
         detail=detail,
@@ -386,6 +412,7 @@ def emit_structural_finding(
         verdict=ComplianceVerdict.VIOLATION,
         dedup_key=dedup_key,
         confidence_tier=structural_anchor.scoping_confidence,
+        evidence=evidence,
         source="tool:emit_structural_finding",
     )
 
@@ -433,6 +460,24 @@ def emit_reference_finding(
 
     # --- 2. Construct the reference Fault (VIOLATION; Ruling 2: VERIFIED + CODE_VERIFIED) -----
     dedup_key = f"{src_span_id.doc_id}:{src_span_id.start}:null"
+    # R1 (5R): surface src span text (byte-exact) + dst span text when the reference resolved.
+    src_raw, _ = open_span(src_span_id, src_nt, src_span_id.doc_id)
+    evidence = src_raw
+    dst_span_id = reference_anchor.dst_span_id
+    if dst_span_id is not None:
+        dst_cache = corpus.cached_entry(dst_span_id.doc_id)
+        if dst_cache is not None:
+            dst_nt = NormalizedText(
+                canonical=dst_cache["canonical"], raw_serialized=dst_cache["raw_serialized"],
+                offset_map=[OffsetRun.model_validate(r) for r in dst_cache["offset_map"]],
+                normalizer_version=dst_cache["normalizer_version"],
+                serializer_version=dst_cache["serializer_version"],
+            )
+            try:
+                dst_raw, _ = open_span(dst_span_id, dst_nt, dst_span_id.doc_id)
+                evidence = f"{src_raw} -> {dst_raw}"
+            except HashMismatch:
+                pass
     return Fault(
         title=title or f"Reference anomaly: {reference_anchor.anomaly}",
         detail=detail,
@@ -446,6 +491,7 @@ def emit_reference_finding(
         verdict=ComplianceVerdict.VIOLATION,
         dedup_key=dedup_key,
         confidence_tier=reference_anchor.scoping_confidence,
+        evidence=evidence,
         source="tool:emit_reference_finding",
     )
 
