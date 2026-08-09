@@ -204,7 +204,7 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Wave-0 test scaffolds + D-14 baseline pin (MODEL-01, MODEL-02, RELIABILITY-01/02/03)
+- [x] 06-01-PLAN.md — Wave-0 test scaffolds + D-14 baseline pin (MODEL-01, MODEL-02, RELIABILITY-01/02/03)
 - [ ] 06-02-PLAN.md — D-19/D-20 GPU/quant confirmation gate [BLOCKING] (MODEL-01, MODEL-02)
 - [ ] 06-03-PLAN.md — VERDICT schema + reliability.py module + config/serving additions (MODEL-01, RELIABILITY-01/02/03)
 - [ ] 06-04-PLAN.md — client.py allow-list guard + extra_body passthrough + registry field-level hints (MODEL-01, RELIABILITY-01/02)

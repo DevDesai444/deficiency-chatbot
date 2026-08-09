@@ -4,8 +4,8 @@ milestone: v2.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 context gathered
-last_updated: "2026-08-09T01:59:34.211Z"
-last_activity: 2026-08-09 -- Phase 06 planning complete
+last_updated: "2026-08-09T02:58:28.516Z"
+last_activity: 2026-08-09 -- Phase 06 execution started
 progress:
   total_phases: 9
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-05)
 
 **Core value:** Given any directory of submission documents, reliably find the real FDA/ICH compliance deficiencies — all faults and only faults that exist — each cited to the exact passage that proves it.
-**Current focus:** Phase 05 — deterministic-structural-cross-document-recall
+**Current focus:** Phase 06 — on-prem-verifier-model-weak-model-reliability
 
 ## Current Position
 
-Phase: 05 — COMPLETE
-Plan: 1 of 7
-Status: Ready to execute
-Last activity: 2026-08-09 -- Phase 06 planning complete
+Phase: 06 (on-prem-verifier-model-weak-model-reliability) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 06
+Last activity: 2026-08-09 -- Phase 06 execution started
 
 ## Performance Metrics
 
