@@ -172,6 +172,14 @@ def parse_structured(
             return None, f"json_repair failed: {exc}"
 
     # L4: Pydantic validation — surface errors verbatim for caller re-prompt
+    # D-15: Function-local import to prevent circular import:
+    #   reliability.py imports tool_schema_for_databricks from structured.py;
+    #   a module-level import of strict_coerce here would close the circle.
+    from llm.reliability import strict_coerce  # noqa: PLC0415 — intentional function-local
+    # Apply strict lossless coercion before pydantic validate.
+    # Recovers Qwen-style failures: quoted numbers → numbers (annotation-aware),
+    # bool-strings → bool, single-key wrapper unwrap. Enums are NEVER coerced (D-11).
+    obj = strict_coerce(obj, model_cls)
     try:
         return model_cls.model_validate(obj), None
     except ValidationError as exc:
