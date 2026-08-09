@@ -66,10 +66,52 @@ thinking-mode escalation *trigger*, the interpretive-tail pass.
     post-repair** (bar sits ABOVE Phase 3's 95% because verdict-parsing is an
     easier task than Phase 3's open tool-calling); **thinking-mode ON and OFF
     each separately** above the bar; **plus one tool-call round-trip probe**.
-  - **(b) Discrimination** — the probe set contains known-good and
-    known-planted-bad candidates and Nemotron must **separate them**;
-    pre-register the split (e.g. **≥80% correct on knowns**).
+  - **(b) Discrimination** — scored over a **defensible labeled subset** only:
+    the **6 matched-GT candidates** (known-good, KEEP-expected) PLUS a
+    **hand-verified known-planted-bad subset** (confirmed-false FPs, explicitly
+    designated and cited). The unverified "unmatched-but-not-confirmed-false"
+    middle (97 UNRESOLVED_REF + other unmatched tail) is **excluded from the
+    scored denominator** — these candidates are logged as telemetry but do NOT
+    count as ground-truth DOWNGRADE-expected, because "unmatched ≠ false" (Phase
+    5 missed 23 real GT deficiencies; some unmatched candidates may be genuine).
+    The designated known-planted-bad subset must be explicitly identified and
+    cited in the plan before execution. Discrimination is scored as **two
+    separate, independent hard assertions** (not pooled):
+      - **KEEP-recall floor:** `keep_correct / 6 ≥ 0.80` (i.e. ≥ 5 of the 6
+        matched-GT must be verdicted KEEP). This is the recall-critical assertion
+        — the verifier MUST retain real deficiencies.
+      - **DOWNGRADE-rate floor:** `downgrade_correct / |known-planted-bad| ≥ 0.80`
+        (precision — must drop confirmed-false FPs on the verified-bad subset).
+      Both floors must pass independently; clearing one does not excuse the other.
+    - **Constant-verdict tripwire** (two-sided): fires and sets score=0.0 if
+      `keep_ratio ≥ 0.95` (blanket-KEEP) **OR** `downgrade_ratio ≥ 0.90`
+      (blanket-DOWNGRADE, which would score ~0.94 on the 6:109 full split and
+      pass a pooled bar while getting 0/6 real deficiencies right — the exact
+      failure mode caught by cross-AI review 2026-08-09). Both directions tested.
+    - **Absolute FP-KEEP ceiling** (pre-registered): ≤ K candidates from the
+      known-planted-bad subset may be verdicted KEEP (K = ceil(0.20 ·
+      |known-planted-bad|), minimum 1); pre-register K in the plan before
+      execution.
+    - **All-DOWNGRADE stub test** (required): a test using a stub verifier that
+      always returns DOWNGRADE MUST FAIL the discrimination suite — proving the
+      tripwire catches the recall-destroying case, not just the blanket-KEEP case.
   - "Probes pass" becomes falsifiable — or Phase 6 repeats the SC5 mistake.
+
+  > **D-06b Amendment (2026-08-09) — cross-AI review finding:**
+  > The original D-06b wording ("≥80% correct on knowns") was implemented as
+  > pooled `correct/total` over the full 115-candidate set (6 KEEP-expected vs
+  > ~109 DOWNGRADE-expected). Under this 95/5 class imbalance, a near-constant-
+  > DOWNGRADE verifier scores ~0.94 and clears the ≥0.80 bar while getting 0/6
+  > real deficiencies right — certifying a recall-destroying verifier. The
+  > `keep_expected_total`/`downgrade_expected_total` counters were computed but
+  > never used in scoring. Additionally, "everything not matched-GT" was labeled
+  > DOWNGRADE-expected, but "unmatched ≠ false" (Phase 5 missed 23 real GT
+  > deficiencies; 97 UNRESOLVED_REF may be genuine). This amendment tightens D-06b
+  > to: per-class KEEP-recall ≥ 0.80 AND DOWNGRADE-rate ≥ 0.80 on a defensible
+  > labeled subset (known-good ∪ known-planted-bad only); two-sided tripwire
+  > (downgrade_ratio ≥ 0.90 as well as keep_ratio ≥ 0.95); scored denominator
+  > excludes the unverified middle. No other D-06 element weakened.
+
 - **D-07: Define a minimal `VERDICT` arg-model in Phase 6** (`verdict:
   KEEP|DOWNGRADE`, `confidence`, `rationale`, `grounding_span`) living in
   `schemas/`. It is the probe's assertion target AND the concrete schema this
@@ -119,6 +161,15 @@ thinking-mode escalation *trigger*, the interpretive-tail pass.
   written as **numbers in the plan** before code changes. Harness = replay the
   same probe suite through `llm/reliability.py` and **diff the rates**. Without
   the pinned number "measurably reduced" is vibes; with it, arithmetic.
+  **Note (D-13/D-14 honesty):** `coerce_and_validate` in Phase 6 surfaces
+  `ParseFailed` on first validation failure rather than issuing a real LLM
+  re-prompt (the `retries_remaining` path returns `ParseFailed(layer="reliability-L3")`
+  with the reprompt message embedded — the CALLER, i.e. Phase 7 orchestrator,
+  issues the actual corrective re-prompt turn). The D-14 baseline diff reflects
+  what strict_coerce recovers WITHOUT a live re-prompt; the D-13 "corrective
+  retry" is the structured reprompt message delivery, not an in-module LLM call.
+  Plan 06 acceptance criteria label D-14 accordingly as a coercion-recovery
+  smoke test (not a full retry-loop gate).
 
 ### Layer siting
 - **D-15: One shared reliability module** (e.g. `src/llm/reliability.py`)
@@ -138,6 +189,14 @@ thinking-mode escalation *trigger*, the interpretive-tail pass.
   external model. This is a security allow-list, NOT the forbidden kind of
   hardcoding (which is per-corpus check conditions). Satisfies MODEL-01 SC1
   minimally — no ceremony beyond the guard.
+  **Single source of truth:** `ON_PREM_ALLOW_LIST` is defined ONCE in `config.py`
+  (derived from `DETECTOR_MODELS` keys + fine-tune ids) and imported by
+  `client.py`. There is no hand-copied frozenset literal in `client.py`. A test
+  asserts `ON_PREM_ALLOW_LIST >= set(DETECTOR_MODELS)` so the two cannot drift.
+  **Deny-first substring check:** any model-id containing `claude`, `gpt`, or
+  `gemini` (case-insensitive) is rejected loudly even if it is not in the exact
+  allow-list — so new on-prem model-ids with unknown names are not auto-blocked
+  while external families still fail loudly.
 
 ### Phase-7 decorrelation scaffold
 - **D-17: Role + lineage metadata now; enforcement in Phase 7.** Add a
@@ -168,6 +227,13 @@ thinking-mode escalation *trigger*, the interpretive-tail pass.
   starts until the quant/GPU pair is confirmed vLLM-compatible.** This is the
   "will vLLM even run" gate; hitting it mid-build instead of up front is how a
   phase loses a week.
+
+### Phase-7 handoff note
+- **VERDICT `grounding_span` byte-exact re-resolution** against the corpus is a
+  **Phase-7 gate** — the field is required in the VERDICT schema (D-07) and
+  enforced present in Phase 6, but byte-exact re-resolution (as in `emit_finding`'s
+  dual byte-exact gate) is not implemented or asserted in Phase 6. Phase 7
+  enforces it in code before any finding is surfaced.
 
 ### Claude's Discretion
 - **D-12 (failure boundary)** and **D-13 (retry-cap value)** were "you decide" —
