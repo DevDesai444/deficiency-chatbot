@@ -137,6 +137,11 @@ def register_model() -> str:
     vLLM with the llama_nemotron_json tool-call parser available.
     """
     mlflow.set_registry_uri("databricks-uc")
+    # A spark_python_task has NO default MLflow experiment (unlike a notebook),
+    # so start_run() raises RESOURCE_DOES_NOT_EXIST unless one is set explicitly.
+    mlflow.set_experiment(
+        os.environ.get("MLFLOW_EXPERIMENT_PATH", "/Users/dev.desai@amneal.com/defpredict-nemotron")
+    )
     with mlflow.start_run(run_name="register-nemotron"):
         mlflow.pyfunc.log_model(
             name="defpredict_nemotron",
