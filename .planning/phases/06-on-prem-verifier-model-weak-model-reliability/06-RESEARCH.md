@@ -814,22 +814,22 @@ This is a greenfield deployment (Nemotron is not currently deployed per D-01). H
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **What is the exact GPU hardware on GPU_XLARGE_8?**
    - What we know: `GPU_XLARGE_8` is the confirmed workload_type on both `defpredict-suggestor` and `defpredict-evaluator` (live CLI probe 2026-08-08). Databricks documents `GPU_XLARGE` as 1×H100-80GB; the `_8` suffix strongly implies 8 units.
-   - What's unclear: The exact GPU model (H100 SXM5 vs PCIe? NVLink vs PCIe fabric?). Whether Blackwell (B200) has been provisioned for this workspace.
-   - Recommendation: **Day 0 task — run `databricks clusters list-node-types --profile amneal-dev | python3 -m json.tool` and grep for GPU identifiers.** This resolves D-19 and unblocks D-20.
+   - What was unclear: The exact GPU model (H100 SXM5 vs PCIe? NVLink vs PCIe fabric?). Whether Blackwell (B200) has been provisioned for this workspace.
+   - **RESOLVED:** Plan 02 carries a [BLOCKING] D-20 gate (Task 1 + checkpoint:human-verify) that runs `databricks clusters list-node-types --profile amneal-dev` on Day 0 of Wave 1 and records the confirmed GPU class + quant in ADR-nemotron-verifier-model.md before any serving build begins. No serving code starts until this gate is committed and approved.
 
 2. **vLLM version on the GPU serving container?**
    - What we know: The workspace used `GPU_XLARGE_8` for transformers-based models (fine-tuned Llama 8B). The vLLM version available on the serving container is determined by the Databricks ML runtime version.
-   - What's unclear: Whether the available runtime supports vLLM ≥0.11 with the `llama_nemotron_json` parser natively, or whether a custom requirements.txt is needed in the MLflow artifact.
-   - Recommendation: Include `extra_pip_requirements=["vllm>=0.11"]` in the `mlflow.pyfunc.log_model` call to ensure the correct version is available.
+   - What was unclear: Whether the available runtime supports vLLM ≥0.11 with the `llama_nemotron_json` parser natively, or whether a custom requirements.txt is needed in the MLflow artifact.
+   - **RESOLVED:** Plan 05 `notebooks/deploy_nemotron.py` pins `extra_pip_requirements=["vllm>=0.11"]` in the `mlflow.pyfunc.log_model` call, ensuring the correct vLLM version is installed on the serving container regardless of the default ML runtime. Acceptance criteria grep-verify this line is present.
 
 3. **Model weights download mechanism?**
    - What we know: HuggingFace hub (`nvidia/Llama-3_3-Nemotron-Super-49B-v1_5`) is the source. The workspace has `/Volumes/defpredict/main/artifacts/` for artifact storage.
-   - What's unclear: Whether HuggingFace is reachable from the Databricks workspace network, or whether a VPN/proxy is needed. Also: whether the NVIDIA Open Model License + Llama 3.3 Community License have been reviewed/accepted for the organization.
-   - Recommendation: Pre-check network reachability and license acceptance before Wave 1 build starts. This is a potential blocker that is not a code task.
+   - What was unclear: Whether HuggingFace is reachable from the Databricks workspace network, or whether a VPN/proxy is needed. Also: whether the NVIDIA Open Model License + Llama 3.3 Community License have been reviewed/accepted for the organization.
+   - **RESOLVED:** Plan 05 user_setup frontmatter declares license acceptance (HuggingFace nvidia/Llama-3_3-Nemotron-Super-49B-v1_5 → License agreement) as a manual precondition. Plan 05 Task 1 includes a fallback path: if HuggingFace hub is unreachable, check `dbfs ls /FileStore/models/nemotron-49b` for a pre-staged DBFS copy and copy to the Volume. Network reachability is verified on the same task before proceeding.
 
 ---
 
