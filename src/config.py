@@ -141,7 +141,15 @@ MODEL_LINEAGE: dict[str, str] = {
 #
 # Adding a new on-prem model: add to DETECTOR_MODELS (display name) AND
 # ensure it appears in ON_PREM_ALLOW_LIST (via DETECTOR_MODELS or explicit below).
-ON_PREM_ALLOW_LIST: frozenset[str] = frozenset(DETECTOR_MODELS.keys())
+#
+# Embeddings model (D-16 ADDENDUM): "databricks-bge-large-en" is the Databricks-hosted
+# BGE embedding endpoint used by vector_search._embed_databricks(). It carries raw
+# submission text in the embedding call, so it is in scope for the on-prem boundary
+# (21 CFR Part 11). Added explicitly here because it is not a chat-completion model
+# and therefore does not appear in DETECTOR_MODELS.
+ON_PREM_ALLOW_LIST: frozenset[str] = frozenset(DETECTOR_MODELS.keys()) | frozenset({
+    "databricks-bge-large-en",  # D-16-ADDENDUM: Databricks BGE embeddings endpoint
+})
 # (DETECTOR_MODELS already contains Llama, Qwen, Nemotron, fine-tunes added above)
 
 

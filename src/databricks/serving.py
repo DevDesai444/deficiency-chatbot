@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from openai import OpenAI
 
-from config import get_settings
+from llm.client import get_client  # D-16 ADDENDUM: route through the guarded singleton
 
 _DB_MODELS = {
     "llama-8b": "databricks-meta-llama-3-1-8b-instruct",
@@ -18,16 +18,14 @@ _DB_MODELS = {
 
 
 def get_llm_client() -> OpenAI:
-    s = get_settings()
-    if s.is_databricks:
-        return OpenAI(
-            base_url=f"{s.databricks_host}/serving-endpoints",
-            api_key=s.databricks_token,
-        )
-    return OpenAI(
-        base_url=s.llm_base_url,
-        api_key="not-needed",
-    )
+    """Return the on-prem guarded OpenAI-compatible client singleton.
+
+    D-16 ADDENDUM: Routes through llm.client.get_client() so the deny-first
+    substring check and ON_PREM_ALLOW_LIST guard always run before any HTTP call.
+    Raw client construction previously here has been removed — client.py is the
+    single site for all OpenAI client instantiation in src/.
+    """
+    return get_client()
 
 
 def resolve_model(model: str) -> str:

@@ -82,8 +82,13 @@ class ChatTurn:
 def get_client(model: str | None = None) -> OpenAI:
     """Return the OpenAI-compatible client singleton.
 
-    D-16: If a model ID is provided, enforce the on-prem allow-list guard
-    BEFORE returning or constructing the singleton. Two layers:
+    D-16: Enforce the on-prem allow-list guard BEFORE returning or constructing the
+    singleton. When model=None the CONCRETE DEFAULT is resolved first
+    (get_settings().resolved_llm_model), then the check runs on that resolved id.
+    This means every path — explicit model arg or no-arg default resolution —
+    flows through the guard. No HTTP call is reachable with an unchecked model id.
+
+    Two layers applied to the resolved concrete id:
 
     Layer 1 — Deny-first substring check (FIX 4):
       Rejects any model-id containing known external family names ('claude', 'gpt',
@@ -100,25 +105,36 @@ def get_client(model: str | None = None) -> OpenAI:
     Regulated pharma submission data must never reach an external LLM API
     (21 CFR Part 11 confidentiality). This guard fails loud before any HTTP call.
     """
+    # D-16 ADDENDUM: Resolve concrete model id before the guard.
+    # When model is None, resolve the configured default so the check ALWAYS runs
+    # on a concrete id — not on None (which previously skipped all guards).
+    s = get_settings()
+    if model is None:
+        model = s.resolved_llm_model
+
     # D-16: Layer 1 — deny-first substring check for known external families (FIX 4).
     # Applied BEFORE the allow-list check so that external model names with unusual
     # prefixes (e.g. "databricks-claude-opus-4-8") fail loudly regardless of
     # whether they appear in ON_PREM_ALLOW_LIST.
-    if model is not None:
-        model_lower = model.lower()
-        matched = [s for s in _EXTERNAL_FAMILY_SUBSTRINGS if s in model_lower]
-        if matched:
-            raise ValueError(
-                f"Model {model!r} contains a known external family name {matched}. "
-                f"Regulated pharma submission data must never leave on-prem infrastructure "
-                f"(21 CFR Part 11 confidentiality). "
-                f"If this is a legitimate on-prem model, add it to config.DETECTOR_MODELS first "
-                f"and ensure it does not match external family substrings."
-            )
-    # D-16: Layer 2 — exact allow-list check.
-    # Catches any model-id not in the confirmed on-prem set (config drift defense).
+    # Runs in ALL environments (local + Databricks).
+    model_lower = model.lower()
+    matched = [s_ for s_ in _EXTERNAL_FAMILY_SUBSTRINGS if s_ in model_lower]
+    if matched:
+        raise ValueError(
+            f"Model {model!r} contains a known external family name {matched}. "
+            f"Regulated pharma submission data must never leave on-prem infrastructure "
+            f"(21 CFR Part 11 confidentiality). "
+            f"If this is a legitimate on-prem model, add it to config.DETECTOR_MODELS first "
+            f"and ensure it does not match external family substrings."
+        )
+    # D-16: Layer 2 — exact allow-list check (Databricks only).
+    # ON_PREM_ALLOW_LIST enumerates confirmed Databricks-hosted on-prem endpoints.
+    # In local dev (Ollama), the serving base_url is localhost — any model name is
+    # on-prem by construction; the list would contain Ollama model names that are
+    # environment-specific and not meaningful to enumerate here. The deny-first substring
+    # check (Layer 1) guards both environments against external family names.
     # ON_PREM_ALLOW_LIST is imported from config.py — single source of truth (FIX 4).
-    if model is not None and model not in ON_PREM_ALLOW_LIST:
+    if s.is_databricks and model not in ON_PREM_ALLOW_LIST:
         raise ValueError(
             f"Model {model!r} is not in the on-prem allow-list. "
             f"Forbidden external models include databricks-claude-*, databricks-gpt-*, "
@@ -128,7 +144,6 @@ def get_client(model: str | None = None) -> OpenAI:
         )
     global _client
     if _client is None:
-        s = get_settings()
         if s.is_databricks:
             _client = OpenAI(
                 base_url=f"{s.databricks_host}/serving-endpoints",
@@ -171,10 +186,14 @@ def chat_completion_full(
 ) -> ChatResult:
     """Full-response variant — returns text + finish_reason so callers can detect truncation."""
     s = get_settings()
-    client = get_client()
+    resolved_model = model or s.resolved_llm_model
+    # D-16 ADDENDUM: pass the RESOLVED model into get_client so the guard checks
+    # the actual model that will be used in the API call — not None (which previously
+    # resolved the default internally but after the guard ran on the unresolved None).
+    client = get_client(resolved_model)
 
     kwargs: dict = {
-        "model": model or s.resolved_llm_model,
+        "model": resolved_model,
         "messages": messages,
         "temperature": temperature if temperature is not None else s.llm_temperature,
         "max_tokens": max_tokens,
@@ -246,8 +265,10 @@ def chat_completion_tools(
     If explicit extra_body is provided by the caller, it takes precedence over auto-inject.
     """
     s = get_settings()
-    client = get_client()
     resolved_model = model or s.resolved_llm_model
+    # D-16 ADDENDUM: pass the RESOLVED model into get_client so the guard checks
+    # the actual model that will be used — not None (which previously skipped the guard).
+    client = get_client(resolved_model)
 
     # D-08: Auto-detect guided decode support and inject if supported.
     # Function-local imports to prevent circular import:
