@@ -607,7 +607,7 @@ def main() -> None:
     # === Default: deploy -> probe -> teardown (try/finally — un-bypassable) ===
     # DEV TEARDOWN POLICY: the finally block ensures teardown runs whether probes
     # PASS or FAIL. This is the mandatory path for development sessions.
-    version = register_model()
+    version = args.use_version or register_model()
     deploy(entity_version=version)
     if not args.no_wait:
         wait_for_ready(timeout_minutes=args.timeout_minutes)
