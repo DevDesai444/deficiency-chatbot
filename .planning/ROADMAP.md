@@ -206,7 +206,7 @@ Plans:
 Plans:
 - [x] 06-01-PLAN.md — Wave-0 test scaffolds + D-14 baseline pin (MODEL-01, MODEL-02, RELIABILITY-01/02/03)
 - [x] 06-02-PLAN.md — D-19/D-20 GPU/quant confirmation gate [BLOCKING] (MODEL-01, MODEL-02)
-- [ ] 06-03-PLAN.md — VERDICT schema + reliability.py module + config/serving additions (MODEL-01, RELIABILITY-01/02/03)
+- [x] 06-03-PLAN.md — VERDICT schema + reliability.py module + config/serving additions (MODEL-01, RELIABILITY-01/02/03)
 - [ ] 06-04-PLAN.md — client.py allow-list guard + extra_body passthrough + registry field-level hints (MODEL-01, RELIABILITY-01/02)
 - [ ] 06-05-PLAN.md — Nemotron deployment notebook + MODEL-02 pre-wiring probes (MODEL-01, MODEL-02)
 - [ ] 06-06-PLAN.md — D-06 probe suite gate + D-14 baseline diff + phase completion (MODEL-01/02, RELIABILITY-01/02/03)
