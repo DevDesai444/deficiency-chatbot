@@ -4,11 +4,23 @@ import time
 from dataclasses import dataclass
 
 import structlog
+from pydantic import BaseModel
 from openai import APIConnectionError, APITimeoutError, BadRequestError, OpenAI, RateLimitError
 
-from config import get_settings
+from config import ON_PREM_ALLOW_LIST, get_settings  # D-16: single source of truth (FIX 4)
+# D-08: supports_guided_json + build_guided_extra_body are imported FUNCTION-LOCALLY in
+# chat_completion_tools to prevent the circular import:
+#   client.py → reliability.py → structured.py → client.py (chat_completion_full)
+# Module-level import of reliability here would close that circle. Function-local import
+# defers the resolution until after all modules are initialized.
 
 log = structlog.get_logger()
+
+# D-16: Deny-first substring check (FIX 4).
+# Catches known external model families by name pattern even if they don't appear
+# in ON_PREM_ALLOW_LIST as an exact ID. New on-prem models are NOT blocked by this
+# check — only known external families (claude, gpt, gemini).
+_EXTERNAL_FAMILY_SUBSTRINGS = ("claude", "gpt", "gemini")
 
 _client: OpenAI | None = None
 
@@ -67,7 +79,53 @@ class ChatTurn:
     usage_present: bool = False
 
 
-def get_client() -> OpenAI:
+def get_client(model: str | None = None) -> OpenAI:
+    """Return the OpenAI-compatible client singleton.
+
+    D-16: If a model ID is provided, enforce the on-prem allow-list guard
+    BEFORE returning or constructing the singleton. Two layers:
+
+    Layer 1 — Deny-first substring check (FIX 4):
+      Rejects any model-id containing known external family names ('claude', 'gpt',
+      'gemini') case-insensitively. Catches variants like 'claude-3-opus-custom' or
+      'databricks-claude-opus-4-8' that may not be in the exact allow-list. The real
+      endpoint 'databricks-claude-opus-4-8' is confirmed live in this workspace today
+      and is an exact example of the one-string-away misconfiguration surface this
+      guard defends against.
+
+    Layer 2 — Exact allow-list check:
+      Rejects any model-id not in ON_PREM_ALLOW_LIST (config.py is the single source
+      of truth; no duplicate set literal in client.py — FIX 4).
+
+    Regulated pharma submission data must never reach an external LLM API
+    (21 CFR Part 11 confidentiality). This guard fails loud before any HTTP call.
+    """
+    # D-16: Layer 1 — deny-first substring check for known external families (FIX 4).
+    # Applied BEFORE the allow-list check so that external model names with unusual
+    # prefixes (e.g. "databricks-claude-opus-4-8") fail loudly regardless of
+    # whether they appear in ON_PREM_ALLOW_LIST.
+    if model is not None:
+        model_lower = model.lower()
+        matched = [s for s in _EXTERNAL_FAMILY_SUBSTRINGS if s in model_lower]
+        if matched:
+            raise ValueError(
+                f"Model {model!r} contains a known external family name {matched}. "
+                f"Regulated pharma submission data must never leave on-prem infrastructure "
+                f"(21 CFR Part 11 confidentiality). "
+                f"If this is a legitimate on-prem model, add it to config.DETECTOR_MODELS first "
+                f"and ensure it does not match external family substrings."
+            )
+    # D-16: Layer 2 — exact allow-list check.
+    # Catches any model-id not in the confirmed on-prem set (config drift defense).
+    # ON_PREM_ALLOW_LIST is imported from config.py — single source of truth (FIX 4).
+    if model is not None and model not in ON_PREM_ALLOW_LIST:
+        raise ValueError(
+            f"Model {model!r} is not in the on-prem allow-list. "
+            f"Forbidden external models include databricks-claude-*, databricks-gpt-*, "
+            f"databricks-gemini-* — regulated pharma submission data must never leave "
+            f"on-prem infrastructure (21 CFR Part 11 confidentiality). "
+            f"Allowed: {sorted(ON_PREM_ALLOW_LIST)}"
+        )
     global _client
     if _client is None:
         s = get_settings()
@@ -168,19 +226,49 @@ def chat_completion_tools(
     temperature: float = 0.0,
     max_tokens: int = 4096,
     tool_choice: str = "auto",
+    extra_body: dict | None = None,                          # D-08: explicit override (caller wins)
+    guided_model_cls: type[BaseModel] | None = None,         # D-08/Pitfall-7: source model for sanitized schema
 ) -> ChatTurn:
-    """AGENT-01: a tool-calling turn using the same resilience layer as chat_completion_full."""
+    """AGENT-01: a tool-calling turn using the same resilience layer as chat_completion_full.
+
+    D-08: Guided decode auto-inject. When guided_model_cls is provided and
+    supports_guided_json() confirms the model supports it, extra_body is auto-injected
+    from build_guided_extra_body(guided_model_cls). This single wiring point covers
+    ALL tool-call turns (all 7 review tools + VERDICT) without requiring every caller
+    to pass extra_body explicitly.
+
+    PITFALL 7: the guided schema MUST route through tool_schema_for_databricks()
+    (via build_guided_extra_body) — NEVER the raw tool parameters dict. Raw schemas
+    can contain $ref/anyOf/pattern that vLLM backends reject. build_guided_extra_body
+    calls tool_schema_for_databricks internally and is the single mandatory sanitized
+    builder. Any raw-schema helper bypassing this is explicitly forbidden (Pitfall 7).
+
+    If explicit extra_body is provided by the caller, it takes precedence over auto-inject.
+    """
     s = get_settings()
     client = get_client()
+    resolved_model = model or s.resolved_llm_model
+
+    # D-08: Auto-detect guided decode support and inject if supported.
+    # Function-local imports to prevent circular import:
+    #   client.py → reliability.py → structured.py → client.py
+    # Explicit extra_body from the caller always takes precedence over auto-inject.
+    # guided_model_cls must route through build_guided_extra_body (Pitfall 7 guard).
+    if extra_body is None and guided_model_cls is not None:
+        from llm.reliability import build_guided_extra_body, supports_guided_json  # noqa: PLC0415
+        if supports_guided_json(client, resolved_model):
+            extra_body = build_guided_extra_body(guided_model_cls)
 
     kwargs: dict = {
-        "model": model or s.resolved_llm_model,
+        "model": resolved_model,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "tools": tools,
         "tool_choice": tool_choice,
     }
+    if extra_body is not None:
+        kwargs["extra_body"] = extra_body  # D-08: server-side guided JSON decoding
 
     for attempt in range(_MAX_RETRIES):
         try:
