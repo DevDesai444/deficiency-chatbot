@@ -48,3 +48,48 @@ confirms/refutes, and handles reasoning-heavy finding classes.
 - One additional model to serve on Databricks; used only in the verify/reasoning role.
 - Does **not** reopen γ (fully self-hosted, on-prem, privacy-preserving).
 - Recall remains deterministic and general (no metric-chasing / overfitting).
+
+---
+
+## D-19/D-20 Amendment — Quant/GPU decision (Phase 6, 06-02 gate)
+
+**Date:** 2026-08-09
+**GATE STATUS: PASSED** (D-19/D-20 hard gate — hardware confirmed before any serving build)
+**Deciders:** senior reviewer (Row-1 ruling) + orchestrator (enumeration)
+**Quant selected: FP8**
+**Serving tier:** `GPU_XLARGE_8` (Hopper / H100)
+**tensor-parallel-size: 8** (matches the 8-GPU tier and the research recommendation; tunable down without changing the quant lock — FP8-on-Hopper holds for any plausible GPU count)
+**Excluded:** NVFP4 (requires Blackwell — **absent** from this workspace); BF16/AWQ-INT4 held in reserve as the mechanical fallback (see Fallback Rider).
+
+### 1. Serving-tier facts (verbatim — chip family is the binding fact)
+
+| Fact | Value | Source |
+|---|---|---|
+| GPU serving tier in use | **`GPU_XLARGE_8`** (proven on `defpredict-suggestor` + `-evaluator`, both READY, `workload_size=Small`) | serving-endpoints API (live, re-verified independently by reviewer) |
+| `GPU_XLARGE` → chip | **1× H100 (80GB)**, us-west-2, enrollment-gated | Databricks AWS docs (custom-LLM serving) |
+| `GPU_XLARGE_8` in public docs? | **No** — account-negotiated tier; `_8` count is **INFERRED** (⇒ 8× the XLARGE/H100 unit) and **immaterial to the quant choice** — chip *family* (Hopper/H100) is the binding fact; FP8 fits any plausible GPU count | docs + inference |
+| Compute region inventory | 8× H100 (`p5.48xlarge`) **and** 8× A100 (`p4d`) exist; **no Blackwell** | `databricks clusters list-node-types` (live) |
+| Chip field in serving API? | **Absent — the serving API abstracts the chip** (no gpu/instance/hardware field anywhere in the endpoint config) | serving-endpoints API (verified) |
+| Scale-to-zero | **Not supported** on the H100 (`GPU_XLARGE`) tier ("H100 capacity too constrained for cold-start"); proven endpoints run **always-on** (`scale_to_zero=None`) | docs + live config |
+
+Convergent evidence the tier is Hopper/H100 (HIGH confidence): (a) `GPU_XLARGE` is definitionally the H100 tier per docs; (b) the region physically has 8× H100 (`p5.48xlarge`); (c) the proven `GPU_XLARGE_8` endpoints run always-on, matching the documented H100 no-scale-to-zero constraint; (d) no Blackwell → NVFP4 impossible. FP8 is the correct Hopper-native quant.
+
+### 2. Entitlement evidence
+The H100 (`GPU_XLARGE`) tier is enrollment-gated per docs — **but entitlement is already proven**: `defpredict-suggestor` and `defpredict-evaluator` run on `GPU_XLARGE_8` **today**. The only open operational question is **capacity for ONE MORE endpoint** of this tier. **06-05's first action verifies available capacity** before the Nemotron build proceeds.
+
+### 3. Cost + ops constraints (Phase-8 shadow data)
+- **No scale-to-zero on the H100 tier → always-on hourly burn** (consistent with D-04, which already accepts standing GPU cost). No idle-savings lever exists on this tier.
+- **Hourly cost ($/DBU):** NOT exposed by the CLI/serving API or the docs read; the H100 tier is enrollment-gated (negotiated pricing). **REQUIRED FOLLOW-UP:** obtain the `GPU_XLARGE_8` DBU/hour rate from the Databricks **account/pricing console or account team** and record it here before any extended run. (Not fabricated — pending authoritative source.)
+- **DEV TEARDOWN POLICY (mandatory):** the Nemotron endpoint is **stopped/deleted between active development sessions** and **recreated from the 06-05 notebook** — **no idle H100-hours**. Recreation MUST be **fully scripted** (the 06-05 notebook IS the recovery path), so teardown costs nothing but a redeploy wait. 06-05 must make the deploy path idempotent + re-runnable to honor this.
+
+### 4. Fallback Rider (no new gate needed — mechanical row-selection)
+If 06-05's deployment hits **capacity denial** or reveals **non-Hopper hardware**, fall through the pre-ranked table **mechanically** (the decision is already made; only the row selection changes):
+- **Row 2 — A100-only:** BF16 (49B ≈ ~98GB weights; fits an 8×A100-80GB tier) if an A100 tier is available and its hourly cost is defensible (record cost here).
+- **Row 3 — A100-only + BF16 unaffordable/unavailable:** AWQ-INT4 on the smallest fitting tier.
+- **Invariant:** the **D-06 probe suite gates verifier QUALITY regardless of quant** — a quantization that degrades discrimination below the per-class floors **fails Phase 6 on its own gates**. The quant choice therefore cannot silently cost verdict quality.
+
+### 5. Context note — D-16 guard protects a *present* temptation
+The workspace exposes **pay-per-token `databricks-claude-opus-4-8`, `databricks-gpt-5-*`, and `databricks-gemini-3-5-flash` endpoints TODAY** (confirmed READY in the live endpoint list). The D-16 deny-first allow-list guard protects against a **real, present** one-string-away misconfiguration surface — not a hypothetical one.
+
+### Supersedes in the original ADR
+- The line "single H100/H200, **NVFP4 + GGUF** quants" (Footprint) and action item 2's "NVFP4-or-GGUF" are **superseded** by this amendment: **FP8 on 8× H100**, NVFP4 excluded (no Blackwell), GGUF not vLLM-native.
