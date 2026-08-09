@@ -62,8 +62,9 @@ asyncio_mode = "auto"
 # contract on every run.
 markers = [
     "slow: real-embedding held-out-corpus test; opt in with `-m slow` (deselected by default).",
+    "integration: live-endpoint test requiring Databricks/Nemotron; deselected by default.",
 ]
-addopts = "-m 'not slow'"
+addopts = "-m 'not slow and not integration'"
 
 [tool.ruff]
 line-length = 100
