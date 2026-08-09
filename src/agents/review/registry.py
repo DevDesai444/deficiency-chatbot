@@ -23,6 +23,7 @@ from agents.review.budget import BudgetLedger
 from agents.review.spanref import parse_span_ref
 from ingest.corpus import CorpusIndex
 from ingest.manifest import CoverageManifest
+from llm.reliability import format_field_level_reprompt_from_json
 from llm.structured import build_tool_schema, parse_structured
 from rulebook.store import DEFAULT_RULEBOOK_CACHE_DIR
 from schemas.faults import ComplianceVerdict
@@ -227,11 +228,17 @@ class ToolRegistry:
         direct_ok = _direct_validate(raw_text, spec.model)
         parsed, error = parse_structured(raw_text, spec.model)
         if parsed is None:
+            # RELIABILITY-02 / D-15: field-level reprompt from reliability.py.
+            # format_field_level_reprompt_from_json accepts the JSON error string
+            # that parse_structured returns (exc.json(indent=None)) and produces
+            # per-field guidance naming the failing field and its expected type.
+            # Falls back to generic hint if error parsing fails.
+            field_hint = format_field_level_reprompt_from_json(error, spec.model)
             rejected = ToolRejected(
                 tool=name,
                 reason_code="post_repair_malformed",
                 reason=error or "tool arguments could not be parsed or validated",
-                hint="send a JSON object matching this tool's schema exactly",
+                hint=field_hint,
             )
             return self._rejected(name, {}, rejected, "post")
 
