@@ -12,19 +12,50 @@ FIX 4: ON_PREM_ALLOW_LIST is the single source of truth; it must be a superset o
 """
 from __future__ import annotations
 
+import inspect
 import pytest
 from unittest.mock import patch, MagicMock
 
+from llm.client import get_client
+
 
 # ---------------------------------------------------------------------------
-# Import guard — get_client and ON_PREM_ALLOW_LIST may not exist until Plan 02.
-# pytest.importorskip skips the entire file gracefully at collection time.
+# Capability-keyed skip guard (reviewer directive, 2026-08-09).
+#
+# `llm.client` already imports before the D-16 guard exists, so keying the skip
+# on module importability (the old pytest.importorskip) let these shells RUN and
+# hard-FAIL — normalizing a red suite and hiding real regressions. Instead, key
+# the skip on the ACTUAL capability: the guard is "implemented" only once
+#   (1) get_client accepts a `model=` parameter, AND
+#   (2) ON_PREM_ALLOW_LIST is defined (non-None).
+# Until then (Plan 06-04 / Wave 3) the whole module SKIPS, keeping wave
+# boundaries green.
+#
+# RIDER — Plan 06-04 done-criteria: the wave that implements the guard MUST make
+# these shells GREEN (this skipif evaluates False once the capability lands). If
+# any of these remain skipped after 06-04, 06-04 is NOT done.
 # ---------------------------------------------------------------------------
-llm_client_mod = pytest.importorskip(
-    "llm.client",
-    reason="llm.client.get_client + ON_PREM_ALLOW_LIST not yet implemented — Plan 02",
+def _guard_implemented() -> bool:
+    try:
+        sig = inspect.signature(get_client)
+    except (TypeError, ValueError):
+        return False
+    if "model" not in sig.parameters:
+        return False
+    try:
+        from llm.client import ON_PREM_ALLOW_LIST
+    except Exception:
+        return False
+    return ON_PREM_ALLOW_LIST is not None
+
+
+pytestmark = pytest.mark.skipif(
+    not _guard_implemented(),
+    reason=(
+        "D-16 on-prem guard not yet implemented — get_client(model=) + "
+        "ON_PREM_ALLOW_LIST land in Plan 06-04 / Wave 3; shells go green there."
+    ),
 )
-get_client = llm_client_mod.get_client
 
 
 # ---------------------------------------------------------------------------
