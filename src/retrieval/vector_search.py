@@ -17,20 +17,27 @@ def _get_local_model():
     return _model
 
 
-def _embed_databricks(texts: list[str]) -> np.ndarray:
-    from openai import OpenAI
+_DATABRICKS_EMBEDDING_MODEL = "databricks-bge-large-en"
 
-    s = get_settings()
-    client = OpenAI(
-        base_url=f"{s.databricks_host}/serving-endpoints",
-        api_key=s.databricks_token,
-    )
+
+def _embed_databricks(texts: list[str]) -> np.ndarray:
+    """Embed texts via the Databricks BGE embeddings endpoint.
+
+    D-16 ADDENDUM: Routes through llm.client.get_client() with the explicit
+    embeddings model id so the on-prem guard runs on this path too. Embeddings
+    carry raw submission text and are in scope for the 21 CFR Part 11 boundary.
+    Construction params (base_url, api_key, timeout) are identical to what
+    client.py uses — this is routing-only, embedding values are unchanged.
+    """
+    from llm.client import get_client  # D-16 ADDENDUM: guarded singleton
+
+    client = get_client(_DATABRICKS_EMBEDDING_MODEL)
     batch_size = 16
     all_embeddings = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
         resp = client.embeddings.create(
-            model="databricks-bge-large-en",
+            model=_DATABRICKS_EMBEDDING_MODEL,
             input=batch,
         )
         all_embeddings.extend([d.embedding for d in resp.data])
