@@ -210,6 +210,81 @@ def test_field_level_error_format():
 
 
 # ---------------------------------------------------------------------------
+# D-08: guided decode auto-inject proof — chat_completion_tools wiring
+# ---------------------------------------------------------------------------
+
+def test_guided_tools_injects_extra_body():
+    """D-08 wiring proof (FIX 6 / plan 06-04 acceptance criteria).
+
+    When chat_completion_tools is called with guided_model_cls=VERDICT and the
+    reliability probe reports that the model supports guided JSON, extra_body must
+    be injected into the underlying OpenAI call. This test proves the wiring
+    at the real call site without making a live network request.
+    """
+    try:
+        from llm.client import chat_completion_tools
+    except ImportError:
+        pytest.skip("llm.client not importable")
+
+    VERDICT = _require_verdict()
+    reliability = _require_reliability()
+
+    from unittest.mock import MagicMock, patch
+    import types
+
+    # Stub the OpenAI client so no real HTTP call goes out
+    fake_message = MagicMock()
+    fake_message.tool_calls = []
+    fake_message.content = ""
+    fake_choice = MagicMock()
+    fake_choice.message = fake_message
+    fake_choice.finish_reason = "stop"
+    fake_response = MagicMock()
+    fake_response.choices = [fake_choice]
+    fake_response.usage = None
+
+    captured_kwargs: list[dict] = []
+
+    def fake_create(**kwargs):
+        captured_kwargs.append(kwargs)
+        return fake_response
+
+    fake_openai = MagicMock()
+    fake_openai.chat.completions.create.side_effect = fake_create
+
+    # Force guided_cache to say the model supports guided JSON (avoid live probe)
+    model_name = "nemotron-super-49b-v1_5"
+    reliability._guided_cache[model_name] = True
+
+    with patch("llm.client.get_client", return_value=fake_openai), \
+         patch("llm.client.get_settings") as mock_settings:
+        mock_settings.return_value.resolved_llm_model = model_name
+        mock_settings.return_value.is_databricks = True
+
+        dummy_tool = {
+            "type": "function",
+            "function": {"name": "verdict", "description": "emit verdict", "parameters": {}},
+        }
+        chat_completion_tools(
+            messages=[{"role": "user", "content": "evaluate"}],
+            tools=[dummy_tool],
+            guided_model_cls=VERDICT,
+        )
+
+    assert len(captured_kwargs) == 1, "Expected exactly one API call"
+    call_kwargs = captured_kwargs[0]
+    assert "extra_body" in call_kwargs, (
+        "D-08: extra_body must be injected when guided_model_cls is provided and "
+        "the model supports guided JSON decoding. "
+        f"Actual kwargs keys: {list(call_kwargs.keys())}"
+    )
+    assert "structured_outputs" in call_kwargs["extra_body"], (
+        f"extra_body must contain 'structured_outputs' key. "
+        f"Actual extra_body: {call_kwargs['extra_body']}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # D-12: coerce_and_validate — typed ParseFailed on exhausted retry (no fabrication)
 # ---------------------------------------------------------------------------
 

@@ -22,7 +22,6 @@ import pytest
 # These use xfail so they appear in the report but don't block collection.
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=False, reason="verifier_model + MODEL_LINEAGE not yet in config.py — Plan 02")
 def test_verifier_model_role_resolves_nemotron():
     """Settings.verifier_model must return 'nemotron-super-49b-v1_5' on Databricks."""
     from config import Settings
@@ -30,21 +29,18 @@ def test_verifier_model_role_resolves_nemotron():
     assert settings.verifier_model == "nemotron-super-49b-v1_5"
 
 
-@pytest.mark.xfail(strict=False, reason="MODEL_LINEAGE not yet in config.py — Plan 02")
 def test_lineage_nemotron_is_nemotron_on_llama():
     """MODEL_LINEAGE['nemotron-super-49b-v1_5'] must be 'nemotron-on-llama'."""
     from config import MODEL_LINEAGE
     assert MODEL_LINEAGE["nemotron-super-49b-v1_5"] == "nemotron-on-llama"
 
 
-@pytest.mark.xfail(strict=False, reason="MODEL_LINEAGE not yet in config.py — Plan 02")
 def test_lineage_llama_is_llama():
     """MODEL_LINEAGE['databricks-meta-llama-3-3-70b-instruct'] must be 'llama'."""
     from config import MODEL_LINEAGE
     assert MODEL_LINEAGE["databricks-meta-llama-3-3-70b-instruct"] == "llama"
 
 
-@pytest.mark.xfail(strict=False, reason="verifier_max_repair_calls not yet in config.py — Plan 02")
 def test_verifier_max_repair_calls_default_is_1():
     """Settings.verifier_max_repair_calls must default to 1
     (mirrors structured_output_max_repair_calls; single re-prompt budget)."""
@@ -56,7 +52,6 @@ def test_verifier_max_repair_calls_default_is_1():
 # Tests that CAN run now (against current config.py)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=False, reason="nemotron-super-49b-v1_5 not yet in DETECTOR_MODELS — Plan 02")
 def test_nemotron_in_detector_models():
     """nemotron-super-49b-v1_5 must appear in DETECTOR_MODELS once the verifier is wired."""
     from config import DETECTOR_MODELS

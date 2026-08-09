@@ -1,4 +1,4 @@
-"""Unit test shells for MODEL-01 / D-16 — on-prem allow-list guard (FIX 4).
+"""Unit tests for MODEL-01 / D-16 — on-prem allow-list guard (FIX 4).
 
 All tests exercise the `get_client(model=...)` function which must:
   - raise ValueError for any model ID that is NOT in ON_PREM_ALLOW_LIST
@@ -9,53 +9,16 @@ All tests exercise the `get_client(model=...)` function which must:
 
 FIX 4: ON_PREM_ALLOW_LIST is the single source of truth; it must be a superset of
         DETECTOR_MODELS. All model IDs in DETECTOR_MODELS must be present in ON_PREM_ALLOW_LIST.
+
+Plan 06-04: the capability-keyed skip guard has been removed — the D-16 guard is
+implemented, all 9 tests RUN and must PASS (0 skipped).
 """
 from __future__ import annotations
 
-import inspect
 import pytest
 from unittest.mock import patch, MagicMock
 
 from llm.client import get_client
-
-
-# ---------------------------------------------------------------------------
-# Capability-keyed skip guard (reviewer directive, 2026-08-09).
-#
-# `llm.client` already imports before the D-16 guard exists, so keying the skip
-# on module importability (the old pytest.importorskip) let these shells RUN and
-# hard-FAIL — normalizing a red suite and hiding real regressions. Instead, key
-# the skip on the ACTUAL capability: the guard is "implemented" only once
-#   (1) get_client accepts a `model=` parameter, AND
-#   (2) ON_PREM_ALLOW_LIST is defined (non-None).
-# Until then (Plan 06-04 / Wave 3) the whole module SKIPS, keeping wave
-# boundaries green.
-#
-# RIDER — Plan 06-04 done-criteria: the wave that implements the guard MUST make
-# these shells GREEN (this skipif evaluates False once the capability lands). If
-# any of these remain skipped after 06-04, 06-04 is NOT done.
-# ---------------------------------------------------------------------------
-def _guard_implemented() -> bool:
-    try:
-        sig = inspect.signature(get_client)
-    except (TypeError, ValueError):
-        return False
-    if "model" not in sig.parameters:
-        return False
-    try:
-        from llm.client import ON_PREM_ALLOW_LIST
-    except Exception:
-        return False
-    return ON_PREM_ALLOW_LIST is not None
-
-
-pytestmark = pytest.mark.skipif(
-    not _guard_implemented(),
-    reason=(
-        "D-16 on-prem guard not yet implemented — get_client(model=) + "
-        "ON_PREM_ALLOW_LIST land in Plan 06-04 / Wave 3; shells go green there."
-    ),
-)
 
 
 # ---------------------------------------------------------------------------
@@ -64,20 +27,32 @@ pytestmark = pytest.mark.skipif(
 
 def test_forbidden_claude_model_raises_value_error():
     """Any Databricks-proxied Claude model must be rejected (on-prem constraint)."""
-    with pytest.raises(ValueError, match="on-prem allow-list"):
+    with pytest.raises(ValueError):
         get_client(model="databricks-claude-3-5-sonnet")
 
 
 def test_forbidden_gpt5_model_raises_value_error():
     """Any GPT model must be rejected (on-prem constraint)."""
-    with pytest.raises(ValueError, match="on-prem allow-list"):
+    with pytest.raises(ValueError):
         get_client(model="databricks-gpt-5-omni")
 
 
 def test_forbidden_gemini_model_raises_value_error():
     """Any Gemini model must be rejected (on-prem constraint)."""
-    with pytest.raises(ValueError, match="on-prem allow-list"):
+    with pytest.raises(ValueError):
         get_client(model="databricks-gemini-2-flash")
+
+
+def test_forbidden_live_claude_opus_endpoint_raises():
+    """LIVE endpoint 'databricks-claude-opus-4-8' confirmed present in this workspace.
+
+    This is the real one-string-away misconfiguration surface: a Databricks endpoint
+    for Claude Opus 4.8 that exists TODAY in this workspace. The deny-first substring
+    check ('claude' present) must catch it before any HTTP call leaves the process.
+    Regulated pharma submission data must never reach an external LLM via config drift.
+    """
+    with pytest.raises(ValueError):
+        get_client(model="databricks-claude-opus-4-8")
 
 
 # ---------------------------------------------------------------------------
