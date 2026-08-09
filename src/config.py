@@ -83,13 +83,15 @@ class Settings(BaseSettings):
     def verifier_model(self) -> str:
         """D-17: Verifier/reasoning role → Nemotron-Super-49B (self-managed vLLM).
 
-        Resolves to the served-model-name that matches --served-model-name in the
-        vLLM launch command and is the cache key for _guided_cache in reliability.py.
+        Returns the Databricks ENDPOINT NAME "defpredict-nemotron" — the routable id
+        that must be passed as model= in OpenAI client calls through Databricks serving.
+        (The vLLM internal --served-model-name "nemotron-super-49b-v1_5" is different;
+        it is only used as the vLLM entrypoint arg, not for client routing.)
         Falls back to detector_model in local dev (non-Databricks) where Nemotron
         is not served.
         """
         if self.is_databricks:
-            return "nemotron-super-49b-v1_5"
+            return "defpredict-nemotron"
         return self.detector_model  # local dev fallback
 
     @property
@@ -113,7 +115,13 @@ DETECTOR_MODELS: dict[str, str] = {
     "databricks-meta-llama-3-1-8b-instruct": "Llama 3.1 8B",
     "databricks-qwen35-122b-a10b": "Qwen3.5 122B · A10B (MoE)",
     "databricks-qwen3-next-80b-a3b-instruct": "Qwen3-Next 80B · A3B (MoE)",
-    "nemotron-super-49b-v1_5": "Nemotron Super 49B v1.5 (verifier)",
+    # Routable endpoint name — must be used as model= in OpenAI client calls.
+    # The vLLM --served-model-name ("nemotron-super-49b-v1_5") is an internal
+    # vLLM identifier only; Databricks routing requires the endpoint name.
+    "defpredict-nemotron": "Nemotron Super 49B v1.5 (verifier endpoint)",
+    # Keep the vLLM served-model-name entry so it stays in the allow-list for
+    # any direct vLLM API access or legacy references.
+    "nemotron-super-49b-v1_5": "Nemotron Super 49B v1.5 (vLLM served-model-name)",
     "defpredict-suggestor": "DefPredict Suggestor (fine-tuned)",
     "defpredict-evaluator": "DefPredict Evaluator (fine-tuned)",
 }
@@ -127,6 +135,9 @@ MODEL_LINEAGE: dict[str, str] = {
     "databricks-meta-llama-3-1-8b-instruct": "llama",
     "databricks-qwen35-122b-a10b": "qwen",
     "databricks-qwen3-next-80b-a3b-instruct": "qwen",
+    # Routable endpoint name — the id the verifier is addressed by in API calls.
+    "defpredict-nemotron": "nemotron-on-llama",
+    # vLLM served-model-name entry kept for direct vLLM access / legacy references.
     "nemotron-super-49b-v1_5": "nemotron-on-llama",
     "defpredict-suggestor": "llama",
     "defpredict-evaluator": "llama",

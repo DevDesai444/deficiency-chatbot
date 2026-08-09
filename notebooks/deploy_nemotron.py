@@ -66,15 +66,16 @@ _FALLBACK_ROW3_DTYPE = "awq"  # INT4 via AWQ — requires --quantization awq
 
 VLLM_CMD = (
     "python3 -m vllm.entrypoints.openai.api_server "
-    f"--model {NEMOTRON_VOLUME_DIR} "
+    "--model model_dir "
     f"--served-model-name {SERVED_MODEL_NAME} "
     "--trust-remote-code "
     f"--tensor-parallel-size {TENSOR_PARALLEL_SIZE} "
     "--max-model-len 65536 "
     "--gpu-memory-utilization 0.95 "
     "--enable-auto-tool-choice "
-    # llama_nemotron_toolcall_parser_no_streaming.py ships with the model weights
-    f"--tool-parser-plugin {NEMOTRON_VOLUME_DIR}/llama_nemotron_toolcall_parser_no_streaming.py "
+    # llama_nemotron_toolcall_parser_no_streaming.py ships with the model weights;
+    # path is relative to the MLflow artifacts folder (the artifact key "model_dir").
+    "--tool-parser-plugin model_dir/llama_nemotron_toolcall_parser_no_streaming.py "
     "--tool-call-parser llama_nemotron_json "
     "--host 0.0.0.0 "
     "--port 8080 "
@@ -86,14 +87,14 @@ VLLM_CMD = (
 
 VLLM_CMD_BF16 = (
     "python3 -m vllm.entrypoints.openai.api_server "
-    f"--model {NEMOTRON_VOLUME_DIR} "
+    "--model model_dir "
     f"--served-model-name {SERVED_MODEL_NAME} "
     "--trust-remote-code "
     f"--tensor-parallel-size {TENSOR_PARALLEL_SIZE} "
     "--max-model-len 65536 "
     "--gpu-memory-utilization 0.95 "
     "--enable-auto-tool-choice "
-    f"--tool-parser-plugin {NEMOTRON_VOLUME_DIR}/llama_nemotron_toolcall_parser_no_streaming.py "
+    "--tool-parser-plugin model_dir/llama_nemotron_toolcall_parser_no_streaming.py "
     "--tool-call-parser llama_nemotron_json "
     "--host 0.0.0.0 "
     "--port 8080 "
@@ -122,6 +123,11 @@ class NemotronServingModel(mlflow.pyfunc.PythonModel):
 
 def register_model() -> str:
     """Register Nemotron as an MLflow pyfunc in Unity Catalog.
+
+    IMPORTANT: This uploads 92.9 GiB from the Volume into the MLflow artifact store.
+    Expect 30-90 minutes. Requires databricks-sdk >= 0.102.0 (avoids 5-min upload timeout).
+    Run from a Databricks notebook (internal network) for fastest upload speed.
+    Run once; the registered version is reused on subsequent deploys without re-upload.
 
     Returns the registered model version string (typically "1").
     Idempotent: re-running creates a new model version in Unity Catalog,
@@ -223,9 +229,17 @@ def deploy(entity_version: str = "1", _row: int = 1) -> None:
 
 
 def _is_capacity_denial(response_text: str) -> bool:
-    """Detect a capacity denial in the API response body."""
+    """Detect a capacity denial or workload_type tier-rejection in the API response body.
+
+    Risk 4 (06-05-DEPLOY-RESEARCH.md): GPU_XLARGE_8 is an account-negotiated tier.
+    A workspace without enrollment returns 'workload_type not supported' or 'not supported'
+    — these are treated as capacity/tier denials and fall through the Fallback Rider rows.
+    """
     lowered = response_text.lower()
-    return any(token in lowered for token in ("capacity", "no capacity", "quota", "insufficient"))
+    return any(token in lowered for token in (
+        "capacity", "no capacity", "quota", "insufficient",
+        "not supported", "workload_type",
+    ))
 
 
 def _is_hardware_mismatch(response_text: str) -> bool:
@@ -275,7 +289,7 @@ def _maybe_fallback(
         )
 
 
-def wait_for_ready(timeout_minutes: int = 30) -> None:
+def wait_for_ready(timeout_minutes: int = 60) -> None:
     """Poll until the endpoint reaches READY state.
 
     Idempotent: safe to call if already READY (returns immediately).
@@ -399,7 +413,7 @@ def probe() -> ProbeResult:
         turn = chat_completion_tools(
             messages=[{"role": "system", "content": _THINKING_OFF_SYS}] + _PROBE_MSG,
             tools=[_VERDICT_TOOL],
-            model=SERVED_MODEL_NAME,
+            model=ENDPOINT_NAME,
             temperature=0.0,
             max_tokens=256,
             guided_model_cls=VERDICT,
@@ -419,14 +433,14 @@ def probe() -> ProbeResult:
         turn_on = chat_completion_tools(
             messages=[{"role": "system", "content": _THINKING_ON_SYS}] + _PROBE_MSG,
             tools=[_VERDICT_TOOL],
-            model=SERVED_MODEL_NAME,
+            model=ENDPOINT_NAME,
             temperature=0.6,
             max_tokens=2048,
         )
         turn_off = chat_completion_tools(
             messages=[{"role": "system", "content": _THINKING_OFF_SYS}] + _PROBE_MSG,
             tools=[_VERDICT_TOOL],
-            model=SERVED_MODEL_NAME,
+            model=ENDPOINT_NAME,
             temperature=0.0,
             max_tokens=256,
         )
@@ -447,7 +461,7 @@ def probe() -> ProbeResult:
         turn = chat_completion_tools(
             messages=[{"role": "system", "content": _THINKING_OFF_SYS}] + _PROBE_MSG,
             tools=[_VERDICT_TOOL],
-            model=SERVED_MODEL_NAME,
+            model=ENDPOINT_NAME,
             temperature=0.0,
             max_tokens=256,
             guided_model_cls=VERDICT,

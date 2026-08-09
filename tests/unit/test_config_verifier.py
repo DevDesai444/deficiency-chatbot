@@ -1,16 +1,15 @@
-"""Unit test shells for D-17 — verifier_model role + MODEL_LINEAGE tags.
+"""Unit tests for D-17 — verifier_model role + MODEL_LINEAGE tags.
 
 Tests in this file cover:
-  - Settings.verifier_model resolves to the Nemotron model on Databricks
-  - MODEL_LINEAGE dict maps model IDs to lineage tag strings
+  - Settings.verifier_model resolves to the endpoint name "defpredict-nemotron" on Databricks
+  - MODEL_LINEAGE maps both the routable endpoint name and vLLM served-model-name to lineage
   - verifier_max_repair_calls defaults to 1 (mirrors structured_output_max_repair_calls)
-  - nemotron-super-49b-v1_5 is in DETECTOR_MODELS
+  - "defpredict-nemotron" (routable endpoint id) is in DETECTOR_MODELS
   - ON_PREM_ALLOW_LIST is importable from config and is a frozenset (FIX 4)
 
-The verifier_model property and MODEL_LINEAGE dict do not exist in config.py yet
-(Plan 02). The importorskip guard on config-plus skips this file gracefully.
-However, DETECTOR_MODELS and ON_PREM_ALLOW_LIST tests import from config directly
-(which does exist) — those tests can run against the current config.
+06-05-DEPLOY-FIX: verifier_model now returns the Databricks ENDPOINT NAME
+"defpredict-nemotron" (not the vLLM served-model-name "nemotron-super-49b-v1_5").
+The OpenAI model= parameter must be the endpoint name when routing through Databricks.
 """
 from __future__ import annotations
 
@@ -18,19 +17,35 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
-# Tests that depend on future additions to config.py (Plan 02)
-# These use xfail so they appear in the report but don't block collection.
+# Core verifier_model / lineage tests
 # ---------------------------------------------------------------------------
 
-def test_verifier_model_role_resolves_nemotron():
-    """Settings.verifier_model must return 'nemotron-super-49b-v1_5' on Databricks."""
+def test_verifier_model_role_resolves_endpoint_name():
+    """Settings.verifier_model must return 'defpredict-nemotron' (endpoint name) on Databricks.
+
+    06-05-DEPLOY-FIX: the OpenAI model= must be the Databricks ENDPOINT NAME, not the
+    vLLM --served-model-name. The endpoint name is "defpredict-nemotron".
+    """
     from config import Settings
     settings = Settings(environment="databricks", databricks_host="x", databricks_token="x")
-    assert settings.verifier_model == "nemotron-super-49b-v1_5"
+    assert settings.verifier_model == "defpredict-nemotron"
 
 
-def test_lineage_nemotron_is_nemotron_on_llama():
-    """MODEL_LINEAGE['nemotron-super-49b-v1_5'] must be 'nemotron-on-llama'."""
+def test_lineage_endpoint_name_is_nemotron_on_llama():
+    """MODEL_LINEAGE['defpredict-nemotron'] must be 'nemotron-on-llama'.
+
+    The verifier is addressed by its endpoint name in API calls; the lineage entry
+    must be keyed on the same routable id so Phase 7 decorrelation logic resolves it.
+    """
+    from config import MODEL_LINEAGE
+    assert MODEL_LINEAGE["defpredict-nemotron"] == "nemotron-on-llama"
+
+
+def test_lineage_served_model_name_is_nemotron_on_llama():
+    """MODEL_LINEAGE['nemotron-super-49b-v1_5'] must be 'nemotron-on-llama'.
+
+    The vLLM served-model-name entry is kept for direct vLLM access / legacy references.
+    """
     from config import MODEL_LINEAGE
     assert MODEL_LINEAGE["nemotron-super-49b-v1_5"] == "nemotron-on-llama"
 
@@ -49,13 +64,18 @@ def test_verifier_max_repair_calls_default_is_1():
 
 
 # ---------------------------------------------------------------------------
-# Tests that CAN run now (against current config.py)
+# DETECTOR_MODELS membership — routable endpoint id must be present
 # ---------------------------------------------------------------------------
 
-def test_nemotron_in_detector_models():
-    """nemotron-super-49b-v1_5 must appear in DETECTOR_MODELS once the verifier is wired."""
+def test_endpoint_name_in_detector_models():
+    """'defpredict-nemotron' (routable endpoint id) must appear in DETECTOR_MODELS.
+
+    06-05-DEPLOY-FIX: the routable id is in DETECTOR_MODELS so ON_PREM_ALLOW_LIST
+    (derived from DETECTOR_MODELS keys) covers it and the D-16 guard does not
+    reject the verifier's own endpoint.
+    """
     from config import DETECTOR_MODELS
-    assert "nemotron-super-49b-v1_5" in DETECTOR_MODELS
+    assert "defpredict-nemotron" in DETECTOR_MODELS
 
 
 def test_on_prem_allow_list_imported_from_config():
@@ -64,11 +84,23 @@ def test_on_prem_allow_list_imported_from_config():
     This is the single-source-of-truth invariant: the allow-list that guards get_client
     must be defined in config.py, not scattered across the codebase.
     """
-    # If ON_PREM_ALLOW_LIST doesn't exist yet, mark as expected failure
     try:
         from config import ON_PREM_ALLOW_LIST
     except ImportError:
         pytest.xfail("ON_PREM_ALLOW_LIST not yet in config.py — Plan 02")
     assert isinstance(ON_PREM_ALLOW_LIST, frozenset), (
         f"ON_PREM_ALLOW_LIST must be a frozenset, got: {type(ON_PREM_ALLOW_LIST)}"
+    )
+
+
+def test_endpoint_name_in_allow_list():
+    """'defpredict-nemotron' must be in ON_PREM_ALLOW_LIST.
+
+    06-05-DEPLOY-FIX: the D-16 guard checks the model= string against ON_PREM_ALLOW_LIST.
+    The verifier uses model='defpredict-nemotron' in probe calls — it must be allowed.
+    """
+    from config import ON_PREM_ALLOW_LIST
+    assert "defpredict-nemotron" in ON_PREM_ALLOW_LIST, (
+        "'defpredict-nemotron' must be in ON_PREM_ALLOW_LIST so the D-16 guard "
+        "does not reject the verifier's own endpoint."
     )
