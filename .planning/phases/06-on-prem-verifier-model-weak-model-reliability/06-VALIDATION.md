@@ -2,8 +2,8 @@
 phase: 6
 slug: on-prem-verifier-model-weak-model-reliability
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-08-08
 ---
 
@@ -59,13 +59,13 @@ created: 2026-08-08
 
 ## Wave 0 Requirements
 
-- [ ] `tests/unit/test_reliability.py` — RELIABILITY-01/02/03, D-09, D-11, D-12
-- [ ] `tests/unit/test_on_prem_guard.py` — MODEL-01 / D-16
-- [ ] `tests/unit/test_verdict_schema.py` — D-07 VERDICT model + schema derivation
-- [ ] `tests/integration/test_nemotron_probe.py` — MODEL-02 (live endpoint; `@pytest.mark.integration`)
-- [ ] `tests/evals/test_verifier_probe.py` — D-06a/D-06b/D-18 (live Nemotron; DeepEval harness)
-- [ ] `tests/evals/test_reliability_baseline.py` — D-14 pinned-baseline diff harness
-- [ ] `tests/unit/test_config.py` additions — D-17 `verifier_model` + lineage tags
+- [x] `tests/unit/test_reliability.py` — RELIABILITY-01/02/03, D-09, D-11, D-12
+- [x] `tests/unit/test_on_prem_guard.py` — MODEL-01 / D-16
+- [x] `tests/unit/test_verdict_schema.py` — D-07 VERDICT model + schema derivation
+- [x] `tests/integration/test_nemotron_probe.py` — MODEL-02 (live endpoint; `@pytest.mark.integration`)
+- [x] `tests/evals/test_verifier_probe.py` — D-06a/D-06b/D-18 (live Nemotron; DeepEval harness)
+- [x] `tests/evals/test_reliability_baseline.py` — D-14 pinned-baseline diff harness
+- [x] `tests/unit/test_config_verifier.py` — D-17 `verifier_model` + lineage tags
 
 ---
 
@@ -88,4 +88,4 @@ created: 2026-08-08
 - [ ] Feedback latency < 30s (unit); live evals on-demand
 - [ ] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-08-08
