@@ -144,7 +144,7 @@ def register_model() -> str:
     )
     with mlflow.start_run(run_name="register-nemotron"):
         mlflow.pyfunc.log_model(
-            name="defpredict_nemotron",
+            artifact_path="defpredict_nemotron",
             python_model=NemotronServingModel(),
             artifacts={"model_dir": NEMOTRON_VOLUME_DIR},
             metadata={
