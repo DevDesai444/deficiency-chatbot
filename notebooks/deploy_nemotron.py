@@ -572,6 +572,13 @@ def main() -> None:
         default=30,
         help="Timeout in minutes for wait_for_ready (default: 30).",
     )
+    parser.add_argument(
+        "--use-version",
+        default=None,
+        help="Deploy an already-registered UC model version (e.g. '1') WITHOUT "
+        "re-running register_model() (avoids re-uploading the 93 GB). Applies to "
+        "--deploy-only and the default deploy->probe->teardown flow.",
+    )
     args = parser.parse_args()
 
     # === Teardown-only mode ===
@@ -589,7 +596,7 @@ def main() -> None:
 
     # === Deploy-only mode (no probe, no teardown) ===
     if args.deploy_only:
-        version = register_model()
+        version = args.use_version or register_model()
         deploy(entity_version=version)
         if not args.no_wait:
             wait_for_ready(timeout_minutes=args.timeout_minutes)
