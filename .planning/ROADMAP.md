@@ -201,7 +201,15 @@ Plans:
   2. **Nemotron pre-wiring probes pass on real verification traces**: vLLM tool-call works, `detailed thinking on/off` is validated, and the tool-parser flags + quantization are confirmed for the target GPU — the model reliably returns a machine-parsable `VERDICT` on a real claim + source + rule input.
   3. **Tool-call arguments are constrained by server-side guided decoding** (vLLM `guided_json` / Ollama `format`) wherever the endpoint supports it, and a malformed-arg emits **field-level actionable feedback** (which field, expected type) bounded by a retry cap — measurably reducing the weak-model tool-arg failure rate versus the Phase 3 baseline.
   4. **Targeted semantic arg coercion** handles the observed weak-model failure modes (quoted numbers/booleans, single-key-wrapper unwrap) **without loosening the advertised schemas** — a test proves the advertised schema is unchanged while the coercion recovers previously-rejected valid intents.
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Wave-0 test scaffolds + D-14 baseline pin (MODEL-01, MODEL-02, RELIABILITY-01/02/03)
+- [ ] 06-02-PLAN.md — D-19/D-20 GPU/quant confirmation gate [BLOCKING] (MODEL-01, MODEL-02)
+- [ ] 06-03-PLAN.md — VERDICT schema + reliability.py module + config/serving additions (MODEL-01, RELIABILITY-01/02/03)
+- [ ] 06-04-PLAN.md — client.py allow-list guard + extra_body passthrough + registry field-level hints (MODEL-01, RELIABILITY-01/02)
+- [ ] 06-05-PLAN.md — Nemotron deployment notebook + MODEL-02 pre-wiring probes (MODEL-01, MODEL-02)
+- [ ] 06-06-PLAN.md — D-06 probe suite gate + D-14 baseline diff + phase completion (MODEL-01/02, RELIABILITY-01/02/03)
 
 ### Phase 7: Multi-Agent Verification + Interpretive Tail (β)
 **Goal**: Repurpose the agent as the β **verifier** — the role the NO-GO proved it can do that recall it cannot. Each deterministic candidate is judged by an isolated, write-disabled verifier sub-agent that re-opens the cited source + rule and returns a machine-parsed `VERDICT: KEEP | DOWNGRADE` (**never DROP**; unsure resolves to KEEP — the downgrade-never-drop recall invariant, enforced in code). An orchestrator fans out verifiers keyed on `docId:sectionId:ruleId`, consolidates and dedups, and reports coverage. The verifier model is cross-family / decorrelated from the candidate source so correlated errors cannot be rubber-stamped. Finally, an agentic **interpretive-tail** pass surfaces grounded deficiencies no deterministic rule can express — the narrow, precision-gated place the loop still earns its keep. Subsumes GROUND-02, AGENT-02, DETECT-05.
