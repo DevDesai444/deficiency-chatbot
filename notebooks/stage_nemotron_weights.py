@@ -174,4 +174,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Only sys.exit on FAILURE. A bare sys.exit(0) raises SystemExit(0) which a
+    # Databricks spark_python_task's IPython runner reports as a task FAILURE even
+    # though the work succeeded (observed 2026-08-09: 97 files / 92.9 GiB staged +
+    # manifest verified, yet the run was marked INTERNAL_ERROR on SystemExit: 0).
+    _rc = main()
+    if _rc:
+        sys.exit(_rc)
