@@ -142,11 +142,22 @@ def register_model() -> str:
     mlflow.set_experiment(
         os.environ.get("MLFLOW_EXPERIMENT_PATH", "/Users/dev.desai@amneal.com/defpredict-nemotron")
     )
+    # Unity Catalog requires a model signature (input/output schema) or version
+    # registration fails, even though the pyfunc predict is never called (the vLLM
+    # entrypoint serves). A minimal chat signature satisfies the requirement.
+    from mlflow.models.signature import ModelSignature
+    from mlflow.types.schema import ColSpec, Schema
+
+    _sig = ModelSignature(
+        inputs=Schema([ColSpec("string", "prompt")]),
+        outputs=Schema([ColSpec("string", "response")]),
+    )
     with mlflow.start_run(run_name="register-nemotron"):
         mlflow.pyfunc.log_model(
             artifact_path="defpredict_nemotron",
             python_model=NemotronServingModel(),
             artifacts={"model_dir": NEMOTRON_VOLUME_DIR},
+            signature=_sig,
             metadata={
                 "task": "llm/v1/chat",
                 "entrypoint": VLLM_CMD,
