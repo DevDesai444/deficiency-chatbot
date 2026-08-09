@@ -13,6 +13,7 @@ _DB_MODELS = {
     "llama-70b": "databricks-meta-llama-3-3-70b-instruct",
     "suggestor": "defpredict-suggestor",
     "evaluator": "defpredict-evaluator",
+    "nemotron": "nemotron-super-49b-v1_5",  # D-03/D-17: self-managed vLLM verifier endpoint
 }
 
 
