@@ -18,6 +18,7 @@ Run with:
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -26,6 +27,12 @@ import pytest
 import structlog
 
 log = structlog.get_logger()
+
+# Ensure src/ is importable for match.py and schema.py (needed at module load for
+# _load_keep_gts and within load_probe_samples).
+_SRC_PATH = str(Path(__file__).parent.parent.parent / "src")
+if _SRC_PATH not in sys.path:
+    sys.path.insert(0, _SRC_PATH)
 
 # NOTE: Only the live-endpoint test (test_verifier_conformance_and_discrimination)
 # is marked @pytest.mark.integration. The invariant tests (test_matched_gt_ids_loaded_from_json,
@@ -68,6 +75,35 @@ def _load_matched_gt_ids() -> frozenset[str]:
 
 
 MATCHED_GT_IDS: frozenset[str] = _load_matched_gt_ids()
+
+
+def _load_keep_gts():
+    """Load GroundTruthDeficiency objects whose gt.id is in MATCHED_GT_IDS.
+
+    Returns a dict mapping doc_id -> list[GroundTruthDeficiency] restricted to
+    the MATCHED_GT_IDS subset and the two beta-measurement doc_ids.
+
+    Used by load_probe_samples() to derive KEEP labels deterministically via
+    src/evals/match.matches — the exact same matcher Phase 5 used.
+
+    Returns None if the eval-set loader is unavailable (import error); callers
+    must handle None gracefully and skip KEEP labeling.
+    """
+    try:
+        from evals.schema import load_eval_set  # type: ignore[import]
+    except ImportError:
+        return None
+
+    try:
+        eval_set = load_eval_set()
+    except Exception:
+        return None
+
+    keep_gts: dict[str, list] = {"mvr1381": [], "minispec": []}
+    for gt in eval_set.deficiencies:
+        if gt.doc_id in keep_gts and gt.id in MATCHED_GT_IDS:
+            keep_gts[gt.doc_id].append(gt)
+    return keep_gts
 
 
 def _fault_id(fault: dict, idx: int, report_prefix: str) -> str:
@@ -160,27 +196,61 @@ class ProbeSample:
 def load_probe_samples() -> list[ProbeSample]:
     """Load the real beta candidates from committed report JSONs.
 
-    KEEP-expected:      finding_ids in MATCHED_GT_IDS (6 total; from JSON, not hardcoded)
-    DOWNGRADE-expected: finding_ids in KNOWN_PLANTED_BAD (hand-verified confirmed-false)
+    KEEP-expected:      faults that match() at least one GT whose gt.id ∈ MATCHED_GT_IDS
+                        (re-derived via src/evals/match.matches — same matcher Phase 5 used)
+    DOWNGRADE-expected: faults whose dedup_key ∈ KNOWN_PLANTED_BAD (hand-verified confirmed-false)
     UNSCORED:           all others (unverified middle; logged but excluded from scoring)
+
+    FIX (2026-08-10): The prior implementation compared fault dedup_key hashes against
+    MATCHED_GT_IDS strings ("A-09", "C-01", …), which never matched — keeping keep_scored=0
+    and making the KEEP-recall floor unmeasurable (0/0 → 0.0). The fix re-derives KEEP labels
+    deterministically using the Phase-5 matcher (match.matches), which checks whether the
+    fault's evidence contains the GT's evidence_anchor tokens.
 
     The split is scored over the DEFENSIBLE LABELED SUBSET only (D-06b amended 2026-08-09).
     "Unmatched != false" — Phase 5 missed 23 real GT deficiencies (fn_gt_ids);
     some unmatched candidates (UNRESOLVED_REF) may be genuine cross-references.
+
+    Self-check (invariant): the set of gt.ids actually recovered by matches() across both
+    docs MUST equal MATCHED_GT_IDS (all 6). If not, raises AssertionError with the diff —
+    proving the re-derivation reproduces Phase-5 exactly.
     """
-    # FIX 2: Invariant — MATCHED_GT_IDS must have exactly 6 items (per beta-summary)
-    keep_expected = MATCHED_GT_IDS
-    assert len(keep_expected) == 6, (
-        f"Expected 6 KEEP-expected items from matched_gt_ids, got {len(keep_expected)}. "
+    # Invariant — MATCHED_GT_IDS must have exactly 6 items (per beta-summary)
+    assert len(MATCHED_GT_IDS) == 6, (
+        f"Expected 6 KEEP-expected items from matched_gt_ids, got {len(MATCHED_GT_IDS)}. "
         f"Check that beta-measurement-summary.json has not been modified. "
-        f"Current set: {sorted(keep_expected)}"
+        f"Current set: {sorted(MATCHED_GT_IDS)}"
     )
 
+    # Load GT objects for the MATCHED_GT_IDS subset (needed for KEEP labeling via matches())
+    keep_gts = _load_keep_gts()
+
+    # Load matcher (may be None if src/ unavailable)
+    _matches_fn = None
+    if keep_gts is not None:
+        try:
+            from evals.match import matches as _matches_fn  # type: ignore[import]
+        except ImportError:
+            pass
+
+    def _is_keep(fault: dict, doc_id: str) -> bool:
+        """Return True iff fault matches at least one GT whose gt.id ∈ MATCHED_GT_IDS."""
+        if _matches_fn is None or keep_gts is None:
+            return False
+        for gt in keep_gts.get(doc_id, []):
+            if _matches_fn(fault, gt):
+                return True
+        return False
+
     samples: list[ProbeSample] = []
+    # Track which MATCHED_GT_IDS are actually recovered by matches() — for self-check.
+    recovered_gt_ids: set[str] = set()
 
     # Load from mvr1381 report
     if BETA_MVR_REPORT_PATH.exists():
         report = json.loads(BETA_MVR_REPORT_PATH.read_text())
+        if keep_gts is not None and _matches_fn is not None:
+            from evals.match import matches as _m  # type: ignore[import]
         for idx, fault in enumerate(report.get("faults", [])):
             fid = _fault_id(fault, idx, "mvr1381")
             evidence = (
@@ -202,10 +272,42 @@ def load_probe_samples() -> list[ProbeSample]:
                 or "unknown"
             )
 
-            if fid in keep_expected:
+            is_keep = _is_keep(fault, "mvr1381")
+            is_downgrade = fid in KNOWN_PLANTED_BAD
+
+            # Conflict resolution: KNOWN_PLANTED_BAD (human-audited) takes precedence over
+            # match.matches() when both labels apply to the same fault.
+            #
+            # This conflict can arise when a fault's evidence string contains a GT anchor token
+            # as incidental context (e.g., "11477" appearing in the basis column of a MIN/MEAN
+            # fault alongside contaminating values), while the human audit determined the fault
+            # is a structural false positive (contaminated basis). The token matcher correctly
+            # identifies the token but cannot distinguish it from a genuine finding.
+            #
+            # KNOWN_PLANTED_BAD is the higher-authority labeling — the human reviewer examined
+            # the actual basis rows and confirmed the deficiency does not exist. DOWNGRADE wins.
+            if is_keep and is_downgrade:
+                log.warning(
+                    "keep_downgrade_conflict_resolved_as_downgrade",
+                    finding_id=fid,
+                    doc_id="mvr1381",
+                    reason=(
+                        "fault matches a MATCHED_GT_IDS anchor via match.matches() "
+                        "but is also in KNOWN_PLANTED_BAD (human-audited FP); "
+                        "KNOWN_PLANTED_BAD takes precedence"
+                    ),
+                )
+                is_keep = False  # DOWNGRADE wins
+
+            if is_keep:
+                # Record which GT IDs this fault contributed to (for self-check)
+                if keep_gts is not None and _matches_fn is not None:
+                    for gt in keep_gts.get("mvr1381", []):
+                        if _matches_fn(fault, gt):
+                            recovered_gt_ids.add(gt.id)
                 expected: Literal["KEEP", "DOWNGRADE", "UNSCORED"] = "KEEP"
                 scored = True
-            elif fid in KNOWN_PLANTED_BAD:
+            elif is_downgrade:
                 expected = "DOWNGRADE"
                 scored = True
             else:
@@ -248,10 +350,32 @@ def load_probe_samples() -> list[ProbeSample]:
                 or "unknown"
             )
 
-            if fid in keep_expected:
+            is_keep = _is_keep(fault, "minispec")
+            is_downgrade = fid in KNOWN_PLANTED_BAD
+
+            # Same conflict resolution as for mvr1381: KNOWN_PLANTED_BAD wins.
+            # (KNOWN_PLANTED_BAD dedup_keys are all from mvr1381, so this is a no-op in
+            # practice for minispec, but the guard is here for correctness.)
+            if is_keep and is_downgrade:
+                log.warning(
+                    "keep_downgrade_conflict_resolved_as_downgrade",
+                    finding_id=fid,
+                    doc_id="minispec",
+                    reason=(
+                        "fault matches a MATCHED_GT_IDS anchor via match.matches() "
+                        "but is also in KNOWN_PLANTED_BAD; KNOWN_PLANTED_BAD takes precedence"
+                    ),
+                )
+                is_keep = False
+
+            if is_keep:
+                if keep_gts is not None and _matches_fn is not None:
+                    for gt in keep_gts.get("minispec", []):
+                        if _matches_fn(fault, gt):
+                            recovered_gt_ids.add(gt.id)
                 expected = "KEEP"
                 scored = True
-            elif fid in KNOWN_PLANTED_BAD:
+            elif is_downgrade:
                 expected = "DOWNGRADE"
                 scored = True
             else:
@@ -268,6 +392,20 @@ def load_probe_samples() -> list[ProbeSample]:
                     scored=scored,
                 )
             )
+
+    # Self-check: the GT IDs recovered via matches() must exactly equal MATCHED_GT_IDS.
+    # This proves the re-derivation reproduces Phase-5 exactly (all 6 matched, no extras
+    # or gaps). If this fires, the committed reports no longer reproduce the Phase-5 result.
+    if keep_gts is not None and _matches_fn is not None:
+        assert recovered_gt_ids == set(MATCHED_GT_IDS), (
+            f"KEEP re-derivation self-check FAILED: recovered GT IDs do not match MATCHED_GT_IDS.\n"
+            f"  Expected:  {sorted(MATCHED_GT_IDS)}\n"
+            f"  Recovered: {sorted(recovered_gt_ids)}\n"
+            f"  Missing:   {sorted(MATCHED_GT_IDS - recovered_gt_ids)}\n"
+            f"  Extra:     {sorted(recovered_gt_ids - MATCHED_GT_IDS)}\n"
+            f"The committed beta-measurement reports must reproduce Phase-5's matched_gt_ids "
+            f"when scored via match.matches against the same eval set."
+        )
 
     return samples
 
@@ -652,6 +790,69 @@ def test_all_downgrade_stub_fails():
     assert not metric.is_successful(), (
         f"is_successful() returned True for a blanket-DOWNGRADE verifier. "
         f"Either the tripwire or the KEEP-recall floor must catch this."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Regression test: KEEP labeling is non-empty and reproduces MATCHED_GT_IDS
+# ---------------------------------------------------------------------------
+
+def test_keep_set_nonempty_and_reproduces_matched_gt():
+    """Regression: load_probe_samples() must produce a non-empty KEEP-labeled set.
+
+    This is a NON-integration unit test (no live endpoint required). It exercises
+    the KEEP-labeling boundary on the REAL committed beta-measurement reports.
+
+    The absence of this test let the boundary bug ship green:
+    - The old implementation compared dedup_key hashes against GT-id strings
+      ("A-09", "C-01", …) which never matched → keep_scored == 0 for every run
+      → the D-06b KEEP-recall floor computed 0/0 → 0.0 → gate could never pass
+      and was not actually gating recall at all.
+
+    If the eval-set loader or report files are unavailable in this environment,
+    the test is xfailed with a clear reason — it MUST NOT pass vacuously.
+    """
+    # Check prerequisites: report files and eval-set loader must be available
+    if not BETA_MVR_REPORT_PATH.exists() or not BETA_MINI_REPORT_PATH.exists():
+        pytest.xfail(
+            "Beta-measurement report files not found — KEEP labeling cannot be verified. "
+            f"Expected: {BETA_MVR_REPORT_PATH}, {BETA_MINI_REPORT_PATH}"
+        )
+
+    try:
+        from evals.schema import load_eval_set  # type: ignore[import]
+        from evals.match import matches  # type: ignore[import]
+    except ImportError as exc:
+        pytest.xfail(
+            f"src/evals imports unavailable — KEEP labeling cannot be verified: {exc}"
+        )
+
+    samples = load_probe_samples()
+    keep = [s for s in samples if s.expected_verdict == "KEEP"]
+
+    assert len(keep) > 0, (
+        "KEEP-labeled fault set is empty — boundary bug regressed. "
+        "load_probe_samples() must label faults via match.matches(fault, gt) where "
+        "gt.id ∈ MATCHED_GT_IDS. Comparing dedup_key hashes against GT-id strings "
+        "('A-09', 'C-01', …) always produces 0 matches."
+    )
+
+    # Every KEEP-labeled sample must be scored (scored=True)
+    assert all(s.scored for s in keep), (
+        f"Some KEEP-labeled samples have scored=False — this is a bug. "
+        f"KEEP samples: {[(s.finding_id, s.scored) for s in keep if not s.scored]}"
+    )
+
+    # DOWNGRADE side must still be intact
+    dg = [s for s in samples if s.expected_verdict == "DOWNGRADE"]
+    assert len(dg) == len(KNOWN_PLANTED_BAD), (
+        f"DOWNGRADE-labeled count mismatch: got {len(dg)}, expected {len(KNOWN_PLANTED_BAD)}. "
+        f"KNOWN_PLANTED_BAD must not have been changed by this fix."
+    )
+
+    # All DOWNGRADE-labeled samples must be scored
+    assert all(s.scored for s in dg), (
+        f"Some DOWNGRADE-labeled samples have scored=False."
     )
 
 
