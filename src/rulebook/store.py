@@ -186,16 +186,23 @@ def rebuild_local_index() -> None:
         _faiss_index, _faiss_doc_ids = None, []
         return
     texts = [(read_chunk_nt(c.doc_id).canonical if read_chunk_nt(c.doc_id) else "") for c in chunks]
-    # One encode() call PER chunk, not one bulk call over the whole list: rulebook chunks vary
-    # wildly in length (a whole-section span can run tens of thousands of chars, e.g. some eCFR
-    # sections). A single bulk `embed_texts(texts, batch_size=1)` call still segfaults in the CPU
-    # sentence-transformers backend -- encode() pre-processes/sorts the FULL input list before
-    # its internal batch loop runs, so the crash is tied to list SIZE, not batch padding.
-    # Embedding one chunk at a time (a fresh, single-item encode() call per chunk) is proven
-    # stable up to the largest observed chunk (~46k chars) and is the safe path here. This is a
-    # one-time build script (D-RB2) -- the throughput cost of no bulk-call optimization is an
-    # acceptable trade for reliability.
-    embeddings = np.stack([embed_texts([text], batch_size=1)[0] for text in texts])
+    # CPU BACKEND ONLY: one encode() call PER chunk, not one bulk call over the whole list.
+    # Rulebook chunks vary wildly in length (a whole-section span can run tens of thousands of
+    # chars, e.g. some eCFR sections). A single bulk `embed_texts(texts, batch_size=1)` call
+    # still segfaults in the CPU sentence-transformers backend -- encode() pre-processes/sorts
+    # the FULL input list before its internal batch loop runs, so the crash is tied to list
+    # SIZE, not batch padding. Embedding one chunk at a time (a fresh, single-item encode() call
+    # per chunk) is proven stable up to the largest observed chunk (~46k chars).
+    #
+    # That workaround does NOT apply to the Databricks backend, where embed_texts is an HTTP
+    # call that already batches 16 server-side. Running the per-chunk loop there degenerates
+    # into one round trip per chunk -- 5,031 of them -- so branch on the backend.
+    from config import get_settings
+
+    if get_settings().is_databricks:
+        embeddings = np.asarray(embed_texts(texts), dtype=np.float32)
+    else:
+        embeddings = np.stack([embed_texts([text], batch_size=1)[0] for text in texts])
     dim = embeddings.shape[1]
     index = faiss.IndexFlatIP(dim)
     faiss.normalize_L2(embeddings)

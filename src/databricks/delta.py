@@ -69,6 +69,110 @@ def _escape(val: Any) -> str:
     return f"'{s}'"
 
 
+class _SqlLiteral:
+    """A value rendered WITHOUT quoting -- the one legitimate exception to _escape.
+
+    Needed because deficiency_kb.id / deficiency_embeddings.record_id are BIGINT: under Spark's
+    default ANSI store-assignment policy a quoted '501' is not implicitly cast to 501. The
+    constructor coerces through int(), so the ONLY thing that can ever reach a statement
+    unquoted is a genuine integer -- there is no path here for arbitrary text (T-JBZ-01).
+    """
+
+    __slots__ = ("value",)
+
+    def __init__(self, value: Any) -> None:
+        self.value = int(value)
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return f"_SqlLiteral({self.value})"
+
+
+def _render(val: Any) -> str:
+    """Every value goes through _escape -- except a pre-validated integer _SqlLiteral."""
+    return str(val) if isinstance(val, _SqlLiteral) else _escape(val)
+
+
+# ---------------------------------------------------------------------------
+# Byte-budgeted batched write primitives (shared by both Delta writers)
+# ---------------------------------------------------------------------------
+
+_MAX_STMT_CHARS = 500_000   # Statement Execution API payload headroom; batches flush on BYTE
+                            # budget, not row count, because canonical texts range from ~500
+                            # chars (a precedent deficiency) to ~46k (an eCFR section) and
+                            # embeddings are ~20KB of JSON each.
+
+
+def _flush_batches(
+    rendered: list[str], prefix_len: int, sep_len: int, max_stmt_chars: int,
+) -> list[list[str]]:
+    """Split already-rendered value fragments into the FEWEST batches that each stay under the
+    budget. A single fragment that alone exceeds the budget still gets its own batch -- an
+    oversized eCFR canonical text must remain writable, never silently dropped."""
+    batches: list[list[str]] = []
+    current: list[str] = []
+    current_len = prefix_len
+    for frag in rendered:
+        addition = len(frag) + (sep_len if current else 0)
+        if current and current_len + addition > max_stmt_chars:
+            batches.append(current)
+            current, current_len = [], prefix_len
+            addition = len(frag)
+        current.append(frag)
+        current_len += addition
+    if current:
+        batches.append(current)
+    return batches
+
+
+def _batched_insert(
+    table: str,
+    columns: list[str],
+    value_tuples: list[tuple],
+    max_stmt_chars: int = _MAX_STMT_CHARS,
+    stats: dict | None = None,
+) -> int:
+    """Multi-row INSERT, flushed whenever the rendered statement would exceed the budget.
+
+    Every value goes through _escape -- no exceptions, no f-string shortcuts -- except an
+    explicitly int-coerced _SqlLiteral (see above). Returns rows written; when `stats` is
+    supplied, accumulates the number of statements issued under key "statements"."""
+    if not value_tuples:
+        return 0
+    prefix = f"INSERT INTO {table} ({', '.join(columns)}) VALUES "
+    rendered = ["(" + ", ".join(_render(v) for v in row) + ")" for row in value_tuples]
+    batches = _flush_batches(rendered, len(prefix), len(", "), max_stmt_chars)
+    for batch in batches:
+        _run_sql(prefix + ", ".join(batch))
+    if stats is not None:
+        stats["statements"] = stats.get("statements", 0) + len(batches)
+    return len(value_tuples)
+
+
+def _delete_by_keys(
+    table: str,
+    key_col: str,
+    keys: list[str],
+    max_stmt_chars: int = _MAX_STMT_CHARS,
+    stats: dict | None = None,
+) -> int:
+    """DELETE ... WHERE key_col IN (...), same byte-budgeted batching. Paired with
+    _batched_insert this gives upsert-by-key idempotency without a MERGE statement (which this
+    codebase does not use anywhere in databricks/*.py -- stay consistent)."""
+    if not keys:
+        return 0
+    prefix = f"DELETE FROM {table} WHERE {key_col} IN ("
+    rendered = [_render(k) for k in keys]
+    batches = _flush_batches(rendered, len(prefix) + 1, len(", "), max_stmt_chars)
+    for batch in batches:
+        _run_sql(prefix + ", ".join(batch) + ")")
+    if stats is not None:
+        stats["statements"] = stats.get("statements", 0) + len(batches)
+    return len(keys)
+
+
 def _fetch_chunk(link: str) -> dict:
     """Fetch one result chunk by its internal link (Databricks SQL Statement API)."""
     with _sql_client() as client:

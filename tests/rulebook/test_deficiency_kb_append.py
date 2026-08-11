@@ -182,15 +182,29 @@ def _fake_result(columns: list[str], data: list[list]) -> dict:
 
 @pytest.fixture
 def dbx(monkeypatch):
+    """A STATEFUL fake warehouse: COUNT(*) reflects the rows the fake has actually 'inserted',
+    so the before/after report in the return value is exercised for real."""
     statements: list[str] = []
+    state = {"deficiency_kb": 500, "deficiency_embeddings": 500, "max_id": 500}
+
+    def _tuple_count(stmt: str) -> int:
+        return stmt.split("VALUES ", 1)[1].count("), (") + 1
 
     def fake_run_sql(stmt: str):
         statements.append(stmt)
         upper = stmt.upper()
-        if "COUNT(*)" in upper and "DEFICIENCY_KB" in upper:
-            return _fake_result(["n", "max_id"], [["500", "500"]])
+        if upper.startswith("INSERT INTO CAT.SCH.DEFICIENCY_KB"):
+            n = _tuple_count(stmt)
+            state["deficiency_kb"] += n
+            state["max_id"] += n
+            return {}
+        if upper.startswith("INSERT INTO CAT.SCH.DEFICIENCY_EMBEDDINGS"):
+            state["deficiency_embeddings"] += _tuple_count(stmt)
+            return {}
         if "COUNT(*)" in upper and "DEFICIENCY_EMBEDDINGS" in upper:
-            return _fake_result(["n"], [["500"]])
+            return _fake_result(["n"], [[str(state["deficiency_embeddings"])]])
+        if "COUNT(*)" in upper and "DEFICIENCY_KB" in upper:
+            return _fake_result(["n", "max_id"], [[str(state["deficiency_kb"]), str(state["max_id"])]])
         if "RESPONSE_DATE" in upper and "SELECT" in upper:
             return _fake_result(["response_date"], [[None]])
         return {}
@@ -245,6 +259,7 @@ def test_append_embeddings_uses_build_index_text_and_matching_record_ids(dbx, mo
     # describe different vectors for the same record
     assert seen == [["Widget | Stability | Drug Product | text one"]]
     assert report["appended"] == 1
+    assert report["after"] == 501
     inserts = [s for s in dbx if s.startswith("INSERT INTO cat.sch.deficiency_embeddings")]
     assert len(inserts) == 1
     assert "501" in inserts[0]

@@ -9,8 +9,19 @@ import json
 
 import numpy as np
 
-from databricks.delta import _escape, _rows_from_result, _run_sql, _table
+from databricks.delta import (
+    _batched_insert,
+    _delete_by_keys,
+    _escape,
+    _rows_from_result,
+    _run_sql,
+    _table,
+)
 from rulebook.store import RuleChunk, all_chunks, read_chunk_nt
+
+# Embeddings are ~1024-dim JSON (~20KB each), so their batches flush far sooner than the
+# canonical-text batches do; a shared 500k-char budget lands them around 25 rows/statement.
+_EMB_MAX_STMT_CHARS = 500_000
 
 
 def _ensure_rulebook_tables() -> None:
@@ -24,33 +35,79 @@ def _ensure_rulebook_tables() -> None:
     _run_sql(f"CREATE TABLE IF NOT EXISTS {emb_table} (doc_id STRING, embedding STRING)")
 
 
-def push_chunks_to_delta() -> int:
-    """Idempotent (upsert-by-doc_id via delete+insert, matching this codebase's existing
-    Databricks write style -- no MERGE INTO used elsewhere in databricks/*.py, stay consistent)."""
+def push_chunks_to_delta(
+    sources: tuple[str, ...] | None = None,
+    only_missing: bool = False,
+) -> dict:
+    """Push local rulebook chunks + their embeddings to Delta.
+
+    Idempotent (upsert-by-doc_id via batched delete+insert, matching this codebase's existing
+    Databricks write style -- databricks/*.py never uses a MERGE statement, stay consistent).
+
+    This used to issue FOUR SERIAL statements per chunk. At 5,031 chunks that is ~20,000 serial
+    Statement Execution API round trips -- many hours. It is now O(batches).
+
+    `sources` filters by chunk.source. This is LOAD-BEARING, not a convenience: the local store
+    holds ich=5 while Databricks holds ich=4 (pre-existing drift, explicitly out of scope).
+    Without the filter, `only_missing` would helpfully push that stray ich chunk and land
+    rulebook_embeddings at 5,032 instead of the intended 5,031.
+
+    `only_missing` skips doc_ids already present remotely -- which also skips RE-EMBEDDING them.
+
+    Returns {"candidates", "skipped_existing", "pushed", "statements"}.
+    """
     from retrieval.vector_search import embed_texts
 
     _ensure_rulebook_tables()
     chunks_table, emb_table = _table("rulebook_chunks"), _table("rulebook_embeddings")
+
     chunks = all_chunks()
+    if sources is not None:
+        chunks = [c for c in chunks if c.source in sources]
+    report = {"candidates": len(chunks), "skipped_existing": 0, "pushed": 0, "statements": 0}
     if not chunks:
-        return 0
+        return report
+
+    if only_missing:
+        existing = {
+            r["doc_id"] for r in _rows_from_result(_run_sql(f"SELECT doc_id FROM {chunks_table}"))
+        }
+        report["statements"] += 1
+        kept = [c for c in chunks if c.doc_id not in existing]
+        report["skipped_existing"] = len(chunks) - len(kept)
+        chunks = kept
+        if not chunks:
+            return report
 
     texts = [(read_chunk_nt(c.doc_id).canonical if read_chunk_nt(c.doc_id) else "") for c in chunks]
-    embeddings = embed_texts(texts)
+    embeddings = embed_texts(texts)   # ONE bulk call; the Databricks backend batches 16 internally
+    doc_ids = [c.doc_id for c in chunks]
 
-    for chunk, text, emb in zip(chunks, texts, embeddings, strict=True):
-        _run_sql(f"DELETE FROM {chunks_table} WHERE doc_id = {_escape(chunk.doc_id)}")
-        _run_sql(
-            f"INSERT INTO {chunks_table} (doc_id, citation, source, version, license, url, span_json, normalizer_version, serializer_version, canonical_text) "
-            f"VALUES ({_escape(chunk.doc_id)}, {_escape(chunk.citation)}, {_escape(chunk.source)}, {_escape(chunk.version)}, "
-            f"{_escape(chunk.license)}, {_escape(chunk.url)}, {_escape(chunk.span.model_dump_json())}, "
-            f"{_escape(chunk.normalizer_version)}, {_escape(chunk.serializer_version)}, {_escape(text)})"
-        )
-        _run_sql(f"DELETE FROM {emb_table} WHERE doc_id = {_escape(chunk.doc_id)}")
-        _run_sql(
-            f"INSERT INTO {emb_table} (doc_id, embedding) VALUES ({_escape(chunk.doc_id)}, {_escape(json.dumps(emb.tolist()))})"
-        )
-    return len(chunks)
+    stats: dict = {}
+    _delete_by_keys(chunks_table, "doc_id", doc_ids, stats=stats)
+    _batched_insert(
+        chunks_table,
+        ["doc_id", "citation", "source", "version", "license", "url", "span_json",
+         "normalizer_version", "serializer_version", "canonical_text"],
+        [
+            (c.doc_id, c.citation, c.source, c.version, c.license, c.url,
+             c.span.model_dump_json(), c.normalizer_version, c.serializer_version, text)
+            for c, text in zip(chunks, texts, strict=True)
+        ],
+        stats=stats,
+    )
+    _delete_by_keys(emb_table, "doc_id", doc_ids, stats=stats)
+    _batched_insert(
+        emb_table,
+        ["doc_id", "embedding"],
+        [(c.doc_id, json.dumps(emb.tolist())) for c, emb in zip(chunks, embeddings, strict=True)],
+        max_stmt_chars=_EMB_MAX_STMT_CHARS,
+        stats=stats,
+    )
+
+    report["pushed"] = len(chunks)
+    report["statements"] += stats.get("statements", 0)
+    return report
 
 
 # NOTE (plan-checker Warning 1 / D-RB6 traceability): search_rulebook_databricks has ZERO
