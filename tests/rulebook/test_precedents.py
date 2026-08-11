@@ -161,8 +161,9 @@ def test_solid_oral_dedupes_to_4426_chunks(solid_oral_chunks):
 
 def test_solid_oral_forward_fill_count(solid_oral_chunks):
     rows = _all_provenance_rows("ANDA-Solid-Oral-Deficiency-RoadMap.xlsm")
+    assert len(rows) == 5096
     inferred_count = sum(1 for row in rows if row["anda_inferred"] == 1)
-    assert inferred_count == FF_SOLID
+    assert inferred_count == 50
 
 
 def test_solid_oral_cohort_year_and_category_are_populated(solid_oral_chunks):
@@ -172,12 +173,12 @@ def test_solid_oral_cohort_year_and_category_are_populated(solid_oral_chunks):
     rows = _all_provenance_rows("ANDA-Solid-Oral-Deficiency-RoadMap.xlsm")
     assert rows, "no Solid Oral provenance rows found"
 
-    cohort_populated = sum(1 for r in rows if (r["cohort_year"] or "").strip())
-    category_populated = sum(1 for r in rows if (r["category"] or "").strip())
+    cohort_populated = sum(1 for r in rows if str(r["cohort_year"] or "").strip())
+    category_populated = sum(1 for r in rows if str(r["category"] or "").strip())
     assert cohort_populated > 0
     assert category_populated > 0
-    assert cohort_populated == COHORT_SOLID
-    assert category_populated == CATEGORY_SOLID
+    assert cohort_populated == 4636
+    assert category_populated == 4921
 
 
 def test_provenance_rows_carry_source_file(chunks, solid_oral_chunks):
@@ -189,12 +190,41 @@ def test_provenance_rows_carry_source_file(chunks, solid_oral_chunks):
     }
 
 
-def test_solid_oral_chunks_carry_their_own_source_filename(solid_oral_chunks):
-    """BLOCKER 2: the chunk's doc_dict filename must be derived from xlsm_path, not hardcoded
-    to the TDDS name."""
-    nt = read_chunk_nt(solid_oral_chunks[0].doc_id)
-    assert nt is not None
-    assert "ANDA-Solid-Oral-Deficiency-RoadMap.xlsm" in nt.raw_serialized
+def test_ingest_derives_chunk_filename_from_its_own_workbook(tmp_path, monkeypatch):
+    """BLOCKER 2: every chunk's doc_dict filename must be derived from xlsm_path. It used to be
+    hardcoded to the TDDS name, so a second workbook's chunks would all claim to come from the
+    first one."""
+    import openpyxl
+
+    from rulebook import precedents
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = precedents._SHEET_NAME
+    ws.append(["title row"])
+    ws.append(list(_SOLID_ORAL_HEADER))
+    ws.append(["206392", "Widget", "Tablet", "Drug Product", "Specification/CoA",
+               "GD-I - CY-4", "IR", "a synthetic deficiency", "2014-09-29"])
+    path = tmp_path / "Some-Other-Workbook.xlsx"
+    wb.save(path)
+
+    seen_doc_dicts: list[dict] = []
+    seen_source_files: list[str] = []
+
+    def _fake_persist(doc_dict, doc_id, citation, store):
+        seen_doc_dicts.append(doc_dict)
+        return doc_id
+
+    monkeypatch.setattr(precedents, "_persist_chunk", _fake_persist)
+    monkeypatch.setattr(
+        precedents, "_write_provenance",
+        lambda doc_id, group_rows, source_file, db_path=None: seen_source_files.append(source_file),
+    )
+
+    precedents.ingest_precedents(path, store=object())
+
+    assert [d["filename"] for d in seen_doc_dicts] == ["Some-Other-Workbook.xlsx"]
+    assert seen_source_files == ["Some-Other-Workbook.xlsx"]
 
 
 # --- multi-workbook vendoring (BLOCKER 3) ---------------------------------------------------

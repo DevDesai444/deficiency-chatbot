@@ -263,26 +263,54 @@ def build_fda(
     return rows
 
 
-def vendor_precedent(src: str = "Sample Data/ANDA-TDDS-Deficiency Roadmap.xlsm",
-                     dest: str = "rulebook/precedents/ANDA-TDDS-Deficiency-Roadmap.xlsm") -> dict:
+# (src, dest, citation) per precedent workbook -- same list-of-tuples convention as
+# ICH_GUIDELINES above. Adding a THIRD workbook is one tuple plus the vendored file; there is no
+# per-file literal left anywhere in the ingestion path (header text is normalized, and each
+# chunk's filename is derived from its own xlsm_path). The TDDS citation string is preserved
+# VERBATIM so the existing manifest.yaml row does not churn.
+PRECEDENT_WORKBOOKS = [
+    ("Sample Data/ANDA-TDDS-Deficiency Roadmap.xlsm",
+     "rulebook/precedents/ANDA-TDDS-Deficiency-Roadmap.xlsm",
+     "ANDA-TDDS Deficiency Roadmap (precedent spreadsheet)"),
+    ("Sample Data/ANDA-Solid-Oral-Deficiency-RoadMap.xlsm",
+     "rulebook/precedents/ANDA-Solid-Oral-Deficiency-RoadMap.xlsm",
+     "ANDA Solid Oral Deficiency RoadMap (precedent spreadsheet)"),
+]
+
+
+def vendor_precedent(src: str = PRECEDENT_WORKBOOKS[0][0],
+                     dest: str = PRECEDENT_WORKBOOKS[0][1],
+                     citation: str | None = None) -> dict:
     """D-PREC: VENDOR ONLY (copy + hash + manifest row). Do NOT parse, ingest, or dedupe here --
     the schema-vs-deficiency_kb audit and dedupe policy are the senior reviewer's recorded
     manual step (02-CONTEXT.md D-PREC), not executable work for this phase."""
     src_path, dest_path = Path(src), Path(dest)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
-    data = src_path.read_bytes()
-    dest_path.write_bytes(data)
-    row = {"source": "precedent", "citation": "ANDA-TDDS Deficiency Roadmap (precedent spreadsheet)",
+    if not src_path.exists() and dest_path.exists():
+        # OFFLINE-FIRST (D-RB6), matching every other build_* in this file: `Sample Data/` is
+        # gitignored, so a clean checkout must still be able to refresh the manifest from the
+        # already-vendored bytes rather than crashing on a missing source.
+        data = dest_path.read_bytes()
+    else:
+        data = src_path.read_bytes()
+        dest_path.write_bytes(data)
+    citation = citation or f"{Path(dest).stem} (precedent spreadsheet)"
+    row = {"source": "precedent", "citation": citation,
           "version": "vendored as-is", "license": "internal", "url": "",
           "sha256": _sha256(data), "path": dest, "note": "D-PREC: schema audit + dedupe policy vs defpredict.main.deficiency_kb is a senior-reviewer manual step, NOT performed here."}
-    rows = [r for r in _load_manifest_rows() if r.get("source") != "precedent"]
+    # Replace ONLY this workbook's own row. The previous blanket `source != "precedent"` filter
+    # DROPPED every sibling workbook's row the moment a second one was vendored.
+    rows = [r for r in _load_manifest_rows()
+            if not (r.get("source") == "precedent" and r.get("path") == dest)]
     rows.append(row)
     _save_manifest_rows(rows)
     return row
 
 
 def main() -> int:
-    build_ecfr(); build_ich(); build_fda(); vendor_precedent()
+    build_ecfr(); build_ich(); build_fda()
+    for src, dest, citation in PRECEDENT_WORKBOOKS:
+        vendor_precedent(src, dest, citation)
     rebuild_local_index()
     print(f"rulebook build complete: {len(_load_manifest_rows())} manifest rows")
     return 0
