@@ -25,10 +25,14 @@ See: .planning/PROJECT.md (updated 2026-08-05)
 
 ## Current Position
 
-Phase: 06 (on-prem-verifier-model-weak-model-reliability) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 06
-Last activity: 2026-08-10 -- Phase 06 execution started
+Phase: 06 (on-prem-verifier-model-weak-model-reliability) — 06-06 gate BLOCKED (infra, not code)
+Plan: 06-06 of 6 — code complete + committed + locally verified; live gate CANNOT run
+Status: BLOCKED on Databricks entitlement — see .planning/phases/06-.../06-06-GATE-BLOCKED-STATUS.md
+Last activity: 2026-08-11 -- 06-06 gate code done; Nemotron unservable on aip-amn-dev (custom-entrypoint serving disabled workspace-wide); Path B (GPU-cluster vLLM) explored to 6th wall (FIPS solved, CUDA next) then stopped; committed to Track 1 (entitlement escalation)
+
+## Blockers
+
+- **06-06 live gate — BLOCKED (Databricks platform).** aip-amn-dev has Custom Model Serving with custom `entrypoint` (self-managed vLLM) DISABLED workspace-wide; no H100 custom-serving tiers; PT can't serve Nemotron's DeciLM arch. Gate code is done + committed; BF16 model v2 registered/READY. **Unblock = Databricks support ticket** (drafted: `.planning/phases/06-.../session/databricks-custom-serving-request.md`). Resume plan in `06-06-GATE-BLOCKED-STATUS.md`. Reviewer (user) files the ticket.
 
 ## Performance Metrics
 
