@@ -180,12 +180,24 @@ def _fake_result(columns: list[str], data: list[list]) -> dict:
     }
 
 
+# The fake warehouse's mutable state, module-level so a test can swap the reported DDL after
+# the `dbx` fixture has already been constructed.
+dbx_state: dict = {}
+
+
 @pytest.fixture
 def dbx(monkeypatch):
     """A STATEFUL fake warehouse: COUNT(*) reflects the rows the fake has actually 'inserted',
     so the before/after report in the return value is exercised for real."""
     statements: list[str] = []
-    state = {"deficiency_kb": 500, "deficiency_embeddings": 500, "max_id": 500}
+    # module-level so a test can swap the DDL AFTER the fixture has been built
+    dbx_state.clear()
+    dbx_state.update({
+        "deficiency_kb": 500, "deficiency_embeddings": 500, "max_id": 500,
+        # a PLAIN bigint id by default; the identity-guard test swaps this in
+        "ddl": "CREATE TABLE cat.sch.deficiency_kb (\n  id BIGINT,\n  anda_number STRING)",
+    })
+    state = dbx_state
 
     def _tuple_count(stmt: str) -> int:
         return stmt.split("VALUES ", 1)[1].count("), (") + 1
@@ -207,6 +219,8 @@ def dbx(monkeypatch):
             return _fake_result(["n", "max_id"], [[str(state["deficiency_kb"]), str(state["max_id"])]])
         if "RESPONSE_DATE" in upper and "SELECT" in upper:
             return _fake_result(["response_date"], [[None]])
+        if upper.startswith("SHOW CREATE TABLE"):
+            return _fake_result(["createtab_stmt"], [[state["ddl"]]])
         return {}
 
     monkeypatch.setattr(delta_mod, "_run_sql", fake_run_sql)
@@ -214,6 +228,37 @@ def dbx(monkeypatch):
     monkeypatch.setattr(delta_mod, "_table", lambda name: f"cat.sch.{name}")
     monkeypatch.setattr(kb, "_table", lambda name: f"cat.sch.{name}")
     return statements
+
+
+def test_append_databricks_refuses_an_identity_id_column_before_writing_anything(dbx):
+    """The real defpredict.main.deficiency_kb declares
+    `id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1)`, so Delta rejects the
+    explicit ids this writer must assign. Without this pre-flight the FIRST batch fails with
+    DELTA_IDENTITY_COLUMNS_EXPLICIT_INSERT_NOT_SUPPORTED -- and on a different batch boundary
+    some rows could already have landed in a shared table. Identity values are never reused, so
+    a speculative attempt permanently burns the id range it fails to claim.
+    """
+    dbx_state["ddl"] = (
+        "CREATE TABLE cat.sch.deficiency_kb (\n"
+        "  id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),\n"
+        "  anda_number STRING COLLATE UTF8_BINARY)"
+    )
+
+    with pytest.raises(RuntimeError) as exc:
+        kb.append_databricks([{c: "x" for c in _KB_COLUMNS}], expect_before=500)
+
+    assert "IDENTITY" in str(exc.value)
+    assert not [s for s in dbx if s.startswith("INSERT INTO")], "wrote rows despite the guard"
+
+
+def test_identity_columns_parses_the_generated_always_marker(dbx):
+    dbx_state["ddl"] = (
+        "CREATE TABLE cat.sch.deficiency_kb (\n"
+        "  id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),\n"
+        "  record_id BIGINT,\n"
+        "  anda_number STRING)"
+    )
+    assert kb._identity_columns("cat.sch.deficiency_kb") == {"id"}
 
 
 def test_append_databricks_assigns_ids_from_max_plus_one_in_list_order(dbx):

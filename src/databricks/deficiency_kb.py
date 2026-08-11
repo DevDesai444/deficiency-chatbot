@@ -132,6 +132,21 @@ def remote_counts() -> dict:
     return {"deficiency_kb": count, "max_id": max_id, "deficiency_embeddings": _emb_count()}
 
 
+def _identity_columns(table: str) -> set[str]:
+    """Columns declared GENERATED ALWAYS AS IDENTITY. Delta rejects ANY explicit value for such
+    a column (DELTA_IDENTITY_COLUMNS_EXPLICIT_INSERT_NOT_SUPPORTED), so a writer cannot choose
+    their values -- the warehouse does, and Delta guarantees only that the generated values are
+    unique and increasing, NOT that they are contiguous or that they follow VALUES order."""
+    rows = _rows_from_result(_run_sql(f"SHOW CREATE TABLE {table}"))
+    ddl = "\n".join(str(next(iter(r.values()), "")) for r in rows)
+    cols: set[str] = set()
+    for line in ddl.splitlines():
+        stripped = line.strip().rstrip(",")
+        if "GENERATED ALWAYS AS IDENTITY" in stripped.upper():
+            cols.add(stripped.split()[0].strip("`"))
+    return cols
+
+
 def append_databricks(rows: list[dict], expect_before: int) -> dict:
     """APPEND rows to defpredict.<schema>.deficiency_kb with ids assigned from MAX(id) + 1 in
     LIST ORDER, so id N lines up with local rowid N."""
@@ -141,6 +156,26 @@ def append_databricks(rows: list[dict], expect_before: int) -> dict:
         raise RuntimeError(
             f"refusing to append: {kb} holds {before} rows but --expect-before said "
             f"{expect_before}. Someone else may have changed shared state."
+        )
+
+    # PRE-FLIGHT, before a single row is written. Refusing here is the whole point: without it
+    # the first batch fails mid-append with DELTA_IDENTITY_COLUMNS_EXPLICIT_INSERT_NOT_SUPPORTED
+    # and later batches may already have landed.
+    #
+    # This is not a limitation we can route around silently. Letting the warehouse generate the
+    # ids would satisfy neither half of the contract: Delta guarantees identity values are
+    # unique and increasing but NOT contiguous, and it does not guarantee they follow VALUES
+    # order -- so neither "ids 501..5596" nor "remote id N describes the same record as local
+    # rowid N" would hold. And identity values are never reused, so a speculative attempt burns
+    # the 501..5596 range permanently. There is exactly one shot; it is a decision, not a retry.
+    identity = _identity_columns(kb)
+    if identity & set(_DBX_COLUMNS):
+        raise RuntimeError(
+            f"refusing to append: {kb} declares {sorted(identity)} as GENERATED ALWAYS AS "
+            f"IDENTITY, so Delta rejects the explicit id values this writer must assign to keep "
+            f"remote id N aligned with local rowid N. Identity values are never reused, so a "
+            f"speculative append permanently burns the id range it fails to claim. Resolve the "
+            f"id strategy before re-running."
         )
 
     # response_date has no local counterpart. MIRROR whatever the existing rows use (NULL vs '')
