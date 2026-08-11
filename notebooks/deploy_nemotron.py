@@ -57,6 +57,10 @@ SERVED_MODEL_NAME = "nemotron-super-49b-v1_5"
 TENSOR_PARALLEL_SIZE = 8   # 8xH100 (GPU_XLARGE_8 Hopper)
 DTYPE_FLAG = "fp8"         # FP8 — Hopper-native quant; locks D-19/D-20 gate
 
+# --max-model-len is env-driven so the A10G/BF16 path can lower KV-cache pressure
+# without changing the FP8/H100 default (65536). Applies to BOTH vLLM commands.
+MAX_MODEL_LEN = os.environ.get("NEMOTRON_MAX_MODEL_LEN", "65536")
+
 # ===== Fallback Rider rows (ADR §4 — no new gate, mechanical row-selection only) =====
 # Row 1 (default): FP8 on GPU_XLARGE_8 / H100 / TP-8  <- this file uses Row 1
 # Row 2 (capacity denial / non-Hopper): BF16, same TP-8
@@ -70,7 +74,7 @@ VLLM_CMD = (
     f"--served-model-name {SERVED_MODEL_NAME} "
     "--trust-remote-code "
     f"--tensor-parallel-size {TENSOR_PARALLEL_SIZE} "
-    "--max-model-len 65536 "
+    f"--max-model-len {MAX_MODEL_LEN} "
     "--gpu-memory-utilization 0.95 "
     "--enable-auto-tool-choice "
     # llama_nemotron_toolcall_parser_no_streaming.py ships with the model weights;
@@ -91,7 +95,7 @@ VLLM_CMD_BF16 = (
     f"--served-model-name {SERVED_MODEL_NAME} "
     "--trust-remote-code "
     f"--tensor-parallel-size {TENSOR_PARALLEL_SIZE} "
-    "--max-model-len 65536 "
+    f"--max-model-len {MAX_MODEL_LEN} "
     "--gpu-memory-utilization 0.95 "
     "--enable-auto-tool-choice "
     "--tool-parser-plugin model_dir/llama_nemotron_toolcall_parser_no_streaming.py "
@@ -152,6 +156,20 @@ def register_model() -> str:
         inputs=Schema([ColSpec("string", "prompt")]),
         outputs=Schema([ColSpec("string", "response")]),
     )
+
+    # Choose the baked entrypoint + metadata quant from NEMOTRON_DTYPE.
+    # "bfloat16" -> BF16 entrypoint (A10G/Ampere-safe, no FP8); else FP8 default
+    # (Hopper). The entrypoint is baked into MLflow metadata at registration time,
+    # so a BF16 version must be registered to serve on A10G.
+    _dtype = os.environ.get("NEMOTRON_DTYPE", "fp8").lower()
+    if _dtype == "bfloat16":
+        _entrypoint = VLLM_CMD_BF16
+        _quant = "bfloat16"
+    else:
+        _entrypoint = VLLM_CMD
+        _quant = DTYPE_FLAG
+    print(f"register_model: NEMOTRON_DTYPE={_dtype!r} -> quant={_quant!r}, max_model_len={MAX_MODEL_LEN}")
+
     with mlflow.start_run(run_name="register-nemotron"):
         mlflow.pyfunc.log_model(
             artifact_path="defpredict_nemotron",
@@ -160,17 +178,43 @@ def register_model() -> str:
             signature=_sig,
             metadata={
                 "task": "llm/v1/chat",
-                "entrypoint": VLLM_CMD,
+                "entrypoint": _entrypoint,
                 "served_model_name": SERVED_MODEL_NAME,
-                "quant": DTYPE_FLAG,
+                "quant": _quant,
                 "tensor_parallel_size": TENSOR_PARALLEL_SIZE,
+                "max_model_len": MAX_MODEL_LEN,
                 "adr_gate": "D-19/D-20 PASSED 2026-08-09",
             },
             registered_model_name=UC_MODEL_NAME,
             extra_pip_requirements=["vllm>=0.11"],
         )
     print(f"Registered: {UC_MODEL_NAME}")
-    return "1"
+
+    # Return the ACTUAL new version, not a hardcoded "1". Query UC for the highest
+    # version number of this registered model (the one just logged).
+    version = _latest_registered_version()
+    print(f"register_model: latest UC version = {version}")
+    return version
+
+
+def _latest_registered_version() -> str:
+    """Query Unity Catalog for the highest version number of UC_MODEL_NAME.
+
+    register_model() previously returned a hardcoded '1'; that is wrong once a
+    second version is registered. This queries the MLflow UC registry and returns
+    the max version as a string.
+    """
+    from mlflow.tracking import MlflowClient
+
+    client = MlflowClient(registry_uri="databricks-uc")
+    versions = client.search_model_versions(f"name = '{UC_MODEL_NAME}'")
+    if not versions:
+        raise RuntimeError(
+            f"No registered versions found for {UC_MODEL_NAME} after log_model — "
+            "registration may have failed."
+        )
+    latest = max(int(mv.version) for mv in versions)
+    return str(latest)
 
 
 def deploy(entity_version: str = "1", _row: int = 1) -> None:
@@ -203,7 +247,10 @@ def deploy(entity_version: str = "1", _row: int = 1) -> None:
                 {
                     "entity_name": UC_MODEL_NAME,
                     "entity_version": entity_version,
-                    "workload_type": "GPU_XLARGE_8",  # proven tier on aip-amn-dev (D-04)
+                    # Tier is env-driven; default keeps the proven FP8/H100 tier
+                    # (GPU_XLARGE_8). Set NEMOTRON_WORKLOAD_TYPE=GPU_MEDIUM_8 for
+                    # the 8xA10G BF16 path.
+                    "workload_type": os.environ.get("NEMOTRON_WORKLOAD_TYPE", "GPU_XLARGE_8"),
                     "workload_size": "Small",
                     "scale_to_zero_enabled": False,    # D-04: always-warm (H100 tier has no scale-to-zero)
                 }
