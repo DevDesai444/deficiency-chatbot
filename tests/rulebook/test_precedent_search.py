@@ -217,3 +217,32 @@ def test_detect_precedent_anchor_anda_excluded_is_list(monkeypatch, submission_a
     assert "anchor" in captured, "PrecedentAnchor construction path was not reached"
     assert isinstance(captured["anchor"].anda_excluded, list)
     assert captured["anchor"].anda_excluded == expected_excluded
+
+
+def test_detect_precedent_candidates_returns_an_iterable_list_of_faults(monkeypatch):
+    """The function fell off the end and returned None, so evals/run.py's
+    `faults += detect_precedent_candidates(...)` raised TypeError. Every other caller in this
+    file discarded the return value, which is precisely why it survived: green unit tests on
+    both sides of an untested composition boundary.
+
+    Pinned for BOTH shapes -- a run that emits nothing and a run that emits a Fault -- because
+    the empty case is the one the deterministic legs hit most often.
+    """
+    _patch_faiss_fn(monkeypatch, [("precedent-xyz", 0.9)])
+    _patch_provenance(monkeypatch, {"precedent-xyz": [{"anda_number": "999"}]})
+
+    monkeypatch.setattr(
+        "tools.emit_finding.emit_precedent_finding",
+        lambda **kw: None,   # emits nothing
+    )
+    empty = ps_module.detect_precedent_candidates(
+        corpus=None, manifest=_stub_manifest(_LONG_SECTION), ledger=None,
+    )
+    assert isinstance(empty, list)
+    assert list(empty) == []          # the exact operation evals/run.py performs
+
+    # and the no-matching-section path
+    none_matched = ps_module.detect_precedent_candidates(
+        corpus=None, manifest=_stub_manifest("too short"), ledger=None,
+    )
+    assert isinstance(none_matched, list)

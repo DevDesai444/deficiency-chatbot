@@ -278,3 +278,13 @@ def detect_precedent_candidates(
                 faults.append(result)
             elif isinstance(result, ToolRejected):
                 logger.debug("emit_precedent_finding rejected: %s", result.reason)
+
+    # This `return` was MISSING. The function is annotated -> list[Fault] but fell off the end
+    # and returned None, so `faults += detect_precedent_candidates(...)` raised
+    # "TypeError: 'NoneType' object is not iterable". It stayed invisible because
+    # evals/run.py's beta-recall-gate only calls this leg when data/rulebook.faiss exists on
+    # disk, and that file was absent -- so the RECALL-04 leg had never actually executed inside
+    # the gate. Worse, the gate's per-doc `except Exception: continue` then left measured_docs
+    # at 0, which it reports as "BETA-RECALL-GATE SKIPPED (no local corpus)" and exits 0: a
+    # crashing leg silently converted the ratchet into an unconditional PASS.
+    return faults
