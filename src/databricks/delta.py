@@ -37,7 +37,10 @@ def _sql_client() -> httpx.Client:
     )
 
 
-def _run_sql(statement: str) -> dict:
+_INLINE_LIMIT_MARKER = "Inline byte limit exceeded"
+
+
+def _post_statement(statement: str, disposition: str) -> dict:
     s = get_settings()
     with _sql_client() as client:
         resp = client.post(
@@ -46,12 +49,35 @@ def _run_sql(statement: str) -> dict:
                 "warehouse_id": s.databricks_warehouse_id,
                 "statement": statement,
                 "wait_timeout": "50s",
+                "disposition": disposition,
+                "format": "JSON_ARRAY",
             },
         )
-    data = resp.json()
+    return resp.json()
+
+
+def _run_sql(statement: str) -> dict:
+    """Execute a statement, transparently escalating to EXTERNAL_LINKS when the result is
+    too large to inline.
+
+    The API caps disposition=INLINE results at 25 MiB. A full embeddings scan blows past that
+    once the corpus grows: ~5.6k rows x ~20 KB of JSON per 1024-dim vector is ~110 MB. The
+    tables were ~10 MB when this code was written, so the ceiling was invisible until the KB
+    grew. Rather than make every caller choose a disposition, try INLINE (cheap, one round
+    trip, correct for the many small statements this codebase issues) and fall back to
+    EXTERNAL_LINKS only on the specific inline-limit error.
+    """
+    data = _post_statement(statement, "INLINE")
     state = data.get("status", {}).get("state", "")
     if state != "SUCCEEDED":
         err = data.get("status", {}).get("error", {}).get("message", "unknown error")
+        if _INLINE_LIMIT_MARKER in err:
+            log.info("databricks_sql_external_links_retry", statement=statement[:120])
+            data = _post_statement(statement, "EXTERNAL_LINKS")
+            state = data.get("status", {}).get("state", "")
+            if state == "SUCCEEDED":
+                return data
+            err = data.get("status", {}).get("error", {}).get("message", "unknown error")
         log.error("databricks_sql_failed", statement=statement[:200], error=err)
         raise RuntimeError(f"Databricks SQL error: {err}")
     return data
@@ -77,6 +103,18 @@ def _fetch_chunk(link: str) -> dict:
         return resp.json()
 
 
+def _fetch_external_link(url: str) -> list:
+    """Download one EXTERNAL_LINKS result chunk.
+
+    Deliberately a BARE client, not _sql_client(): these URLs are pre-signed, and sending an
+    Authorization header alongside the signature makes the storage backend reject the request.
+    """
+    with httpx.Client(timeout=120.0, follow_redirects=True) as client:
+        resp = client.get(url)
+        resp.raise_for_status()
+        return resp.json() or []
+
+
 def _rows_from_result(data: dict) -> list[dict]:
     """Flatten a Databricks SQL result into row dicts, following chunk pagination.
 
@@ -84,16 +122,55 @@ def _rows_from_result(data: dict) -> list[dict]:
     chunk's ``data_array`` plus a ``next_chunk_internal_link``. Reading ``data_array``
     alone silently truncates the result (e.g. 261 of 500 rows on the embeddings table),
     so we walk the chunk links to completion.
+
+    A result too large to inline at all comes back as ``external_links`` instead (see
+    ``_run_sql``'s EXTERNAL_LINKS escalation). Those are PRE-SIGNED URLs: they must be
+    fetched WITHOUT the Authorization header, because the storage backend rejects a request
+    carrying both a presigned signature and a bearer token. Each link yields the same
+    JSON_ARRAY shape as an inline chunk, and links are followed to completion the same way.
     """
     manifest = data.get("manifest", {})
     columns = [c["name"] for c in manifest.get("schema", {}).get("columns", [])]
     result = data.get("result", {}) or {}
-    rows = list(result.get("data_array", []) or [])
-    next_link = result.get("next_chunk_internal_link")
-    while next_link:
-        chunk = _fetch_chunk(next_link)
-        rows.extend(chunk.get("data_array", []) or [])
-        next_link = chunk.get("next_chunk_internal_link")
+
+    expected = manifest.get("total_row_count")
+
+    rows: list = []
+    if result.get("external_links"):
+        payload: dict | None = result
+        while payload:
+            links = payload.get("external_links") or []
+            if not links:
+                break
+            next_link = None
+            for link in links:
+                rows.extend(_fetch_external_link(link["external_link"]))
+                # The continuation pointer rides on the link object, not the envelope.
+                next_link = link.get("next_chunk_internal_link") or next_link
+            if not next_link:
+                break
+            chunk = _fetch_chunk(next_link)
+            # A continuation may return external_links at the TOP level or nested under
+            # "result" depending on the endpoint. Accept both -- assuming one shape is what
+            # truncated this to 1031/5596 rows on the first attempt.
+            payload = chunk.get("result") or chunk
+    else:
+        rows = list(result.get("data_array", []) or [])
+        next_link = result.get("next_chunk_internal_link")
+        while next_link:
+            chunk = _fetch_chunk(next_link)
+            rows.extend(chunk.get("data_array", []) or [])
+            next_link = chunk.get("next_chunk_internal_link")
+
+    # Fail loud on a short read. Truncation here is silent and downstream-invisible: a
+    # similarity search over 1/5 of the corpus returns confident, wrong neighbours rather
+    # than an error. This codebase has already been bitten twice by exactly that (261/500
+    # inline, then 1031/5596 external), so the invariant is asserted, not trusted.
+    if expected is not None and len(rows) != int(expected):
+        raise RuntimeError(
+            f"truncated result: read {len(rows)} rows but manifest declares {expected}. "
+            f"Refusing to return a partial result set."
+        )
     return [dict(zip(columns, row, strict=True)) for row in rows]
 
 
