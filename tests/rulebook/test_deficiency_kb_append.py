@@ -221,6 +221,11 @@ def dbx(monkeypatch):
             return _fake_result(["response_date"], [[None]])
         if upper.startswith("SHOW CREATE TABLE"):
             return _fake_result(["createtab_stmt"], [[state["ddl"]]])
+        if upper.startswith("SELECT ID,") and "WHERE ID >" in upper:
+            return _fake_result(
+                ["id", "product_name", "deficiency_type", "cmc_section", "deficiency_text"],
+                state.get("readback", []),
+            )
         return {}
 
     monkeypatch.setattr(delta_mod, "_run_sql", fake_run_sql)
@@ -230,18 +235,43 @@ def dbx(monkeypatch):
     return statements
 
 
-def test_append_databricks_refuses_an_identity_id_column_before_writing_anything(dbx):
+_IDENTITY_DDL = (
+    "CREATE TABLE cat.sch.deficiency_kb (\n"
+    "  id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),\n"
+    "  anda_number STRING COLLATE UTF8_BINARY)"
+)
+
+
+def test_append_databricks_omits_the_id_column_when_it_is_an_identity_column(dbx):
     """The real defpredict.main.deficiency_kb declares
-    `id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1)`, so Delta rejects the
-    explicit ids this writer must assign. Without this pre-flight the FIRST batch fails with
-    DELTA_IDENTITY_COLUMNS_EXPLICIT_INSERT_NOT_SUPPORTED -- and on a different batch boundary
-    some rows could already have landed in a shared table. Identity values are never reused, so
-    a speculative attempt permanently burns the id range it fails to claim.
+    `id BIGINT GENERATED ALWAYS AS IDENTITY`, and Delta rejects ANY explicit value for such a
+    column (DELTA_IDENTITY_COLUMNS_EXPLICIT_INSERT_NOT_SUPPORTED). The writer must therefore
+    omit `id` entirely and let the warehouse assign -- not try to supply one.
     """
+    dbx_state["ddl"] = _IDENTITY_DDL
+
+    rows = [{**{c: "" for c in _KB_COLUMNS}, "deficiency_text": f"d{i}"} for i in range(3)]
+    report = kb.append_databricks(rows, expect_before=500)
+
+    assert report["write_mode"] == "identity"
+    assert report["max_id_before"] == 500
+    assert report["after"] == 503
+
+    inserts = [s for s in dbx if s.startswith("INSERT INTO cat.sch.deficiency_kb")]
+    assert len(inserts) == 1
+    # the column list must NOT carry `id`
+    column_list = inserts[0].split("(", 1)[1].split(")", 1)[0]
+    assert "id" not in [c.strip() for c in column_list.split(",")]
+    assert "anda_number" in column_list
+
+
+def test_append_databricks_refuses_a_non_id_identity_column_before_writing_anything(dbx):
+    """A non-id identity column is unrecoverable: this writer supplies a value for every
+    non-id column, so the append would fail partway with earlier batches already committed."""
     dbx_state["ddl"] = (
         "CREATE TABLE cat.sch.deficiency_kb (\n"
-        "  id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),\n"
-        "  anda_number STRING COLLATE UTF8_BINARY)"
+        "  id BIGINT,\n"
+        "  anda_number BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1))"
     )
 
     with pytest.raises(RuntimeError) as exc:
@@ -293,19 +323,41 @@ def test_append_embeddings_uses_build_index_text_and_matching_record_ids(dbx, mo
 
     monkeypatch.setattr("retrieval.vector_search.embed_texts", fake_embed)
 
-    rows = [{
-        **{c: "" for c in _KB_COLUMNS},
-        "product_name": "Widget", "deficiency_type": "Stability",
+    # READ-BACK rows: each carries its own warehouse-assigned id alongside its text columns
+    kb_rows = [{
+        "id": "907", "product_name": "Widget", "deficiency_type": "Stability",
         "cmc_section": "Drug Product", "deficiency_text": "text one",
     }]
-    report = kb.append_embeddings_databricks(rows, ids=[501], expect_before=500)
+    report = kb.append_embeddings_databricks(kb_rows, expect_before=500)
 
     # notebooks/build_index.py's exact join -- the embedding text must match or the two indices
     # describe different vectors for the same record
     assert seen == [["Widget | Stability | Drug Product | text one"]]
     assert report["appended"] == 1
     assert report["after"] == 501
+    # record_id comes from the row's OWN id, not from input-list position
+    assert report["assigned_id_min"] == 907
     inserts = [s for s in dbx if s.startswith("INSERT INTO cat.sch.deficiency_embeddings")]
     assert len(inserts) == 1
-    assert "501" in inserts[0]
+    assert "907" in inserts[0]
     assert "[0.0, 0.0, 0.0, 0.0]" in inserts[0]
+
+
+def test_read_back_returns_the_new_rows_above_the_prior_max_id(dbx):
+    dbx_state["readback"] = [
+        ["903", "Widget", "Stability", "Drug Product", "text one"],
+        ["907", "Gadget", "Dissolution", "Drug Substance", "text two"],
+    ]
+    rows = kb.read_back_new_rows(500, expect_count=2)
+    assert [int(r["id"]) for r in rows] == [903, 907]
+    # non-contiguous ids are expected and must not be treated as an error
+    assert rows[0]["deficiency_text"] == "text one"
+
+
+def test_read_back_refuses_a_short_read(dbx):
+    """A truncated read-back would embed only some rows, leaving deficiency_kb rows with no
+    matching record_id -- exactly the orphan state the final verification query checks for."""
+    dbx_state["readback"] = [["501", "Widget", "Stability", "Drug Product", "text one"]]
+    with pytest.raises(RuntimeError) as exc:
+        kb.read_back_new_rows(500, expect_count=2)
+    assert "read-back returned 1 rows" in str(exc.value)

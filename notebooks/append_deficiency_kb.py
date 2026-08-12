@@ -56,6 +56,7 @@ def main() -> int:
         append_embeddings_databricks,
         append_local,
         load_kb_rows,
+        read_back_new_rows,
         remote_counts,
     )
 
@@ -77,8 +78,9 @@ def main() -> int:
                   f"(max id {remote['max_id']})")
             print(f"[dry-run] databricks deficiency_embeddings before = "
                   f"{remote['deficiency_embeddings']}")
-            print(f"[dry-run] would assign ids {remote['max_id'] + 1}.."
-                  f"{remote['max_id'] + len(rows)}")
+            print(f"[dry-run] would append {len(rows)} rows above id {remote['max_id']}; "
+                  f"ids are warehouse-assigned (identity column), so the exact range is not "
+                  f"predictable and need not be contiguous")
         print("\n[dry-run] nothing written.")
         return 0
 
@@ -93,16 +95,19 @@ def main() -> int:
     if wants_dbx:
         kb_rep = append_databricks(rows, expect_before=args.expect_before)
         results.append(("databricks deficiency_kb", kb_rep["before"], kb_rep["after"]))
-        print(f"\ndatabricks kb: appended {kb_rep['appended']} rows as ids "
-              f"{kb_rep['first_id']}..{kb_rep['last_id']} in {kb_rep['statements']} statement(s); "
+        print(f"\ndatabricks kb: appended {kb_rep['appended']} rows in "
+              f"{kb_rep['statements']} statement(s) via the {kb_rep['write_mode']} path; "
               f"response_date convention mirrored as {kb_rep['response_date_convention']!r}")
 
-        emb_rep = append_embeddings_databricks(
-            rows, ids=kb_rep["ids"], expect_before=args.expect_before,
-        )
+        # Embeddings are built from the rows that came BACK, not from `rows` -- record_id then
+        # matches its own row's real id regardless of what the warehouse assigned.
+        new_rows = read_back_new_rows(kb_rep["max_id_before"], expect_count=kb_rep["appended"])
+        emb_rep = append_embeddings_databricks(new_rows, expect_before=args.expect_before)
         results.append(("databricks deficiency_embeddings", emb_rep["before"], emb_rep["after"]))
         print(f"databricks embeddings: appended {emb_rep['appended']} rows in "
-              f"{emb_rep['statements']} statement(s)")
+              f"{emb_rep['statements']} statement(s); assigned ids "
+              f"{emb_rep['assigned_id_min']}..{emb_rep['assigned_id_max']} "
+              f"({emb_rep['assigned_id_count']} distinct)")
 
     _print_table("before -> after", results)
     return 0
