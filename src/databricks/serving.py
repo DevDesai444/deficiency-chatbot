@@ -11,8 +11,8 @@ from llm.client import get_client  # D-16 ADDENDUM: route through the guarded si
 _DB_MODELS = {
     "llama-8b": "databricks-meta-llama-3-1-8b-instruct",
     "llama-70b": "databricks-meta-llama-3-3-70b-instruct",
-    "suggestor": "defpredict-suggestor",
-    "evaluator": "defpredict-evaluator",
+    "qwen-80b": "databricks-qwen3-next-80b-a3b-instruct",
+    "qwen-122b": "databricks-qwen35-122b-a10b",
     "nemotron": "defpredict-nemotron",  # D-03/D-17: routable endpoint name (Databricks model= must be endpoint name, not vLLM served-model-name)
 }
 

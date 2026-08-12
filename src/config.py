@@ -21,10 +21,6 @@ class Settings(BaseSettings):
     llm_model: str = "mistral:7b-instruct"
     llm_temperature: float = 0.1
 
-    # fine-tuned endpoints (fall back to base model if empty)
-    suggestor_model: str = ""
-    evaluator_model: str = ""
-
     # embeddings
     embedding_model: str = "BAAI/bge-m3"
 
@@ -94,14 +90,6 @@ class Settings(BaseSettings):
             return "defpredict-nemotron"
         return self.detector_model  # local dev fallback
 
-    @property
-    def suggestor_endpoint(self) -> str:
-        return self.suggestor_model or self.resolved_llm_model
-
-    @property
-    def evaluator_endpoint(self) -> str:
-        return self.evaluator_model or self.resolved_llm_model
-
 
 @lru_cache
 def get_settings() -> Settings:
@@ -122,8 +110,6 @@ DETECTOR_MODELS: dict[str, str] = {
     # Keep the vLLM served-model-name entry so it stays in the allow-list for
     # any direct vLLM API access or legacy references.
     "nemotron-super-49b-v1_5": "Nemotron Super 49B v1.5 (vLLM served-model-name)",
-    "defpredict-suggestor": "DefPredict Suggestor (fine-tuned)",
-    "defpredict-evaluator": "DefPredict Evaluator (fine-tuned)",
 }
 
 
@@ -139,16 +125,13 @@ MODEL_LINEAGE: dict[str, str] = {
     "defpredict-nemotron": "nemotron-on-llama",
     # vLLM served-model-name entry kept for direct vLLM access / legacy references.
     "nemotron-super-49b-v1_5": "nemotron-on-llama",
-    "defpredict-suggestor": "llama",
-    "defpredict-evaluator": "llama",
 }
 
 
 # D-16: On-prem allow-list — single source of truth.
 # client.py imports this; any model added to DETECTOR_MODELS is automatically
 # in the allow-list. The test ON_PREM_ALLOW_LIST >= set(DETECTOR_MODELS) enforces
-# this invariant. Fine-tune model ids are added explicitly to DETECTOR_MODELS
-# (see above), so they flow through automatically.
+# this invariant.
 #
 # Adding a new on-prem model: add to DETECTOR_MODELS (display name) AND
 # ensure it appears in ON_PREM_ALLOW_LIST (via DETECTOR_MODELS or explicit below).
