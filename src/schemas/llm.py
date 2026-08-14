@@ -48,6 +48,13 @@ class VERDICT(BaseModel):
     # empty case through coerce_and_validate → field-level corrective re-prompt (bounded
     # by verifier_max_repair_calls) instead of silently passing an ungrounded verdict.
     grounding_span: str = Field(min_length=1)  # verbatim cited span the verdict rests on
+    # Phase 7 EXTEND (additive, optional): which fleet endpoint produced this verdict. Set by the
+    # orchestrator AFTER a successful parse, never by the model — so the guided-decode/probe target
+    # (tool_schema_for_databricks(VERDICT)) is unchanged and existing callers are unaffected.
+    model: str = Field(
+        default="",
+        description="Which fleet endpoint produced this verdict; set by the orchestrator, not the model.",
+    )
 
     @field_validator("grounding_span")
     @classmethod
