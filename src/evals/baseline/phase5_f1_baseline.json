@@ -1,0 +1,19 @@
+{
+  "source": "phase5-frozen",
+  "provenance": "authored-from-phase5-close-numbers",
+  "end_to_end": {
+    "precision": 0.055556,
+    "recall": 0.1875,
+    "f1": 0.085714,
+    "tp": 6,
+    "fp": 102,
+    "fn": 26
+  },
+  "by_family": {
+    "absence_of_evidence": {"precision": 0.0, "recall": 0.0, "tp": 0, "fp": 0, "fn": 0},
+    "derivation_plausibility": {"precision": 0.0, "recall": 0.0, "tp": 0, "fp": 0, "fn": 0},
+    "cross_reference_integrity": {"precision": 0.0, "recall": 0.0, "tp": 0, "fp": 0, "fn": 0},
+    "regulatory_framing": {"precision": 0.0, "recall": 0.0, "tp": 0, "fp": 0, "fn": 0}
+  },
+  "note": "Phase-7 gate floor: F1 must be >= this; matched TP set must not shrink. recall=6/32=0.1875 and the ~102-fp over-emit are the numbers recorded at Phase-5 close (STATE beta_recall_baseline matched_set of 6 + the sanctioned D-ABS2 over-emit). A real-corpus gate run HARD-FAILS on this authored-* provenance (Gap 3): this file MUST be re-captured by `evals.run score` on the frozen Phase-5 golden report in the MAIN tree before the live gate is trusted (Plan 04 T3). The by_family split is left zeroed pending that recapture -- an authored placeholder must never masquerade as a measured per-family floor."
+}
