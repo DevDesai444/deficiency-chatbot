@@ -222,7 +222,11 @@ Plans:
   2. An **orchestrator** fans out verifiers keyed on `docId:sectionId:ruleId`, **consolidates and dedups**, and emits a **coverage report** so a "no deficiencies found" result states exactly what was reviewed and what could not be located — never an unqualified "compliant."
   3. The verifier is **cross-family / decorrelated** from the candidate source (different model persona than the deterministic-candidate producer, no access to any generator reasoning — only the claim + source + rule), so correlated errors cannot be rubber-stamped; a test asserts the verifier cannot see the producer's chain.
   4. An **agentic interpretive-tail pass** surfaces grounded deficiencies that no deterministic rule expresses, each pinned to a re-openable verbatim quote + cited rule — and on the Phase 0 eval set, adding verification + interpretive-tail iterations **does not lower end-to-end F1** and loses **zero true positives** versus the Phase 5 deterministic output.
-**Plans**: TBD
+**Plans**: 4 plans in 4 waves
+- [ ] 07-01-PLAN.md — Wave 0: tests/verify scaffold + ScriptedFleetClient + labeled-FP fixture + Phase-5 F1 baseline + RED stubs (VERIFY-01/02/03/04)
+- [ ] 07-02-PLAN.md — Verifier atoms: panel.py decorrelation + verifier.py isolated write-disabled call + grounding.py anchor-type re-resolution + consensus.py invariant (VERIFY-01/03)
+- [ ] 07-03-PLAN.md — Orchestrator: dedup_key fan-out + full re-open + consensus + coverage report, downgrade-never-drop proven (VERIFY-01/02/03)
+- [ ] 07-04-PLAN.md — Interpretive tail (Qwen producer) + verify-f1 zero-TP-loss phase gate + MAIN-tree live checkpoint (VERIFY-04)
 
 ### Phase 8: Cost Governor (β)
 **Goal**: Make the uncapped-corpus promise real for the β architecture — a prompt-cache stable prefix, escalating context compaction, and cheap-model triage so verification and the interpretive tail reason over a corpus far larger than the context window and **cost scales with docs that need deep reasoning, not raw corpus size.** Hardens the budget guardrail from Phase 3 under a synthetic large-corpus load test, entirely on self-hosted serving (provider-side prefix caching, not an external `cache_control` API).
@@ -252,5 +256,5 @@ Phase 0 (Eval Harness) is also the **continuous gate**: its recall-by-family met
 | 4. Rulebook Enrichment + Absence Enumeration (β) | 3 / 3 | Complete | 2026-08-06 |
 | 5. Deterministic Structural & Cross-Document Recall (β) | 7 / 7 | Complete | 2026-08-08 |
 | 6. On-Prem Verifier Model + Weak-Model Reliability (β) | 0 / TBD | Not started | - |
-| 7. Multi-Agent Verification + Interpretive Tail (β) | 0 / TBD | Not started | - |
+| 7. Multi-Agent Verification + Interpretive Tail (β) | 0 / 4 | Planned | - |
 | 8. Cost Governor (β) | 0 / TBD | Not started | - |
