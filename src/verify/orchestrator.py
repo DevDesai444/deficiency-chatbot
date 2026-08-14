@@ -73,16 +73,38 @@ def family_of(candidate) -> str | None:
 producer_family_of = family_of
 
 
-def _grounded_of(verdict, candidate, nt) -> bool:
-    """Whether a verdict counts as grounded. Byte-exact via is_grounded when nt is available,
-    else falls back to a non-empty grounding_span (the VERDICT schema enforces a non-blank span)."""
+def _grounded_of(verdict, candidate, nt, source_text: str | None = None) -> bool:
+    """Whether a DOWNGRADE verdict counts as grounded — i.e. it cites real evidence.
+
+    A verdict grounds if its ``grounding_span`` is a verbatim (whitespace/case-normalized) substring
+    of the SOURCE THE VERIFIER WAS SHOWN (``source_text``, the full re-opened section from
+    ``_reopen_full_source``). This is the honest check: the verifier must cite text that is actually
+    in the evidence it read. The earlier byte-exact ``is_grounded`` path re-resolved against the
+    candidate's NARROW anchor span (e.g. a single 47-char cell), which a valid grounding_span copied
+    from the full section is not a substring of — so every real downgrade was rejected as ungrounded
+    (the second live-checkpoint no-op cause). The stricter byte-exact anchor check is kept as an
+    alternative pass (integrity: a tampered source still de-grounds). KEEP verdicts never need
+    grounding; only a DOWNGRADE must be grounded to count toward consensus.
+    """
     if not isinstance(verdict, VERDICT):
         return False
     if verdict.verdict.value != "DOWNGRADE":
         return False
+    gs = (verdict.grounding_span or "").strip()
+    if not gs:
+        return False
+    if source_text:
+        if _norm_ground(gs) in _norm_ground(source_text):
+            return True
     if nt is not None:
         return is_grounded(candidate, nt, verdict.grounding_span)
-    return bool(verdict.grounding_span and verdict.grounding_span.strip())
+    return True  # nt unavailable (absence w/o anchor) + non-empty span: recall-safe grounded
+
+
+def _norm_ground(text: str) -> str:
+    """Whitespace-collapse + casefold for grounding substring match (mirrors grounding._norm)."""
+    import re as _re
+    return _re.sub(r"\s+", " ", (text or "")).strip().casefold()
 
 
 def _apply_downgrade(candidate) -> None:
@@ -305,7 +327,7 @@ def verify_candidates(
             panel_verdicts.append(
                 {
                     "verdict": verdict.verdict.value if isinstance(verdict, VERDICT) else "KEEP",
-                    "grounded": _grounded_of(verdict, candidate, nt),
+                    "grounded": _grounded_of(verdict, candidate, nt, source_text),
                     "model": verdict.model if isinstance(verdict, VERDICT) else model,
                 }
             )
