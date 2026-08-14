@@ -159,9 +159,16 @@ def verify_once(
     routes through the on-prem guard.
     """
     system = verifier_system_prompt(thinking_mode="off", model=model)
-    # Read tools (get_section/read_guideline) + the submit_verdict OUTPUT channel. The evidence is
-    # pre-re-opened by the orchestrator and rendered below, so the model emits a verdict directly.
-    tools = read_only_verifier_tools() + [SUBMIT_VERDICT_TOOL]
+    # ONLY the submit_verdict OUTPUT channel is offered. The evidence is already re-opened in FULL by
+    # the orchestrator (_reopen_full_source/_reopen_full_rule) and rendered below, so the verifier
+    # judges pre-rendered context and emits a verdict in one shot — this IS the write-disabled,
+    # source-re-opened contract (the re-open happens in the orchestrator, VERIFY-01). Offering the
+    # read tools (get_section/read_guideline) here is actively harmful: with no tool loop to service
+    # them, a reasoning model (Qwen3-next) calls get_section instead of submitting a verdict and its
+    # vote is lost as "unreadable => KEEP" — the 3rd consensus vote that never landed. The Phase-6
+    # D-06 probe (verdict-tool only) got 100% conformance from every fleet model.
+    tools = [SUBMIT_VERDICT_TOOL]
+    _ = read_only_verifier_tools  # retained (write-disabled guard + import); not offered single-shot
     messages = [
         {"role": "system", "content": system},
         # ONLY claim + re-opened source + rule. NEVER the producer's chain-of-thought.
