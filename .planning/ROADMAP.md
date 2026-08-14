@@ -225,7 +225,7 @@ Plans:
 **Plans**: 4 plans in 4 waves
 - [x] 07-01-PLAN.md — Wave 0: tests/verify scaffold + ScriptedFleetClient + labeled-FP fixture + Phase-5 F1 baseline + RED stubs (VERIFY-01/02/03/04)
 - [x] 07-02-PLAN.md — Verifier atoms: panel.py decorrelation + verifier.py isolated write-disabled call + grounding.py anchor-type re-resolution + consensus.py invariant (VERIFY-01/03)
-- [ ] 07-03-PLAN.md — Orchestrator: dedup_key fan-out + full re-open + consensus + coverage report, downgrade-never-drop proven (VERIFY-01/02/03)
+- [x] 07-03-PLAN.md — Orchestrator: dedup_key fan-out + full re-open + consensus + coverage report, downgrade-never-drop proven (VERIFY-01/02/03)
 - [ ] 07-04-PLAN.md — Interpretive tail (Qwen producer) + verify-f1 zero-TP-loss phase gate + MAIN-tree live checkpoint (VERIFY-04)
 
 ### Phase 8: Cost Governor (β)
