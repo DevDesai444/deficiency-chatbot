@@ -65,7 +65,16 @@ def consensus(
         decision: Literal["KEEP", "DOWNGRADE"] = "DOWNGRADE" if len(downgraders) == 1 else "KEEP"
         return decision, downgraders
 
-    # Multi-member panel: affirmative GROUNDED majority (strictly more than half).
+    # Multi-member panel threshold. DEFAULT = affirmative GROUNDED MAJORITY (strictly more than
+    # half) — recall-safe (a lone verifier can never demote a real finding from the active set).
+    # VERIFIER_CONSENSUS_MODE=any lowers it to "≥1 grounded downgrade": more FP pruning (weak models
+    # disagree, so a real FP is often caught by only ONE family), at the cost that a single wrong
+    # downgrade demotes a candidate from ACTIVE findings into the coverage list. downgrade-never-drop
+    # still holds (nothing deleted; the zero-TP-loss gate unions the demoted set) — a precision /
+    # recall-visibility tradeoff, NOT a recall-invariant break. Reviewer-owned knob.
+    import os
+    if os.getenv("VERIFIER_CONSENSUS_MODE", "majority").strip().lower() == "any":
+        return ("DOWNGRADE" if downgraders else "KEEP"), downgraders
     if len(downgraders) * 2 > panel_size:
         return "DOWNGRADE", downgraders
     return "KEEP", downgraders
