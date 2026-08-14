@@ -308,7 +308,25 @@ def chat_completion_tools(
                 usage_present=usage is not None,
             )
         except BadRequestError as exc:
-            log.error("llm_bad_request", error=str(exc))
+            # RELIABILITY-01: distinguish a MODEL-OUTPUT failure from a genuine caller error.
+            # Weak models (e.g. Llama 3.3 70B on Databricks) intermittently emit tool calls in
+            # their native "<function=name>{...}</function>" text syntax, which the server's
+            # tool-parser rejects with 400 "Model response did not respect the required format".
+            # That is a recoverable tool-arg failure, NOT a bad request from us: surface it as a
+            # no-tool-call turn so the caller's coerce → field-level re-prompt → parse-fail path
+            # handles it (bounded by the retry cap) instead of aborting the run. Genuine bad
+            # requests (bad schema, auth, unsupported param) still raise.
+            msg = str(exc)
+            if "did not respect the required format" in msg or "Model Output:" in msg:
+                log.warning("llm_tool_format_rejected", error=msg[:300])
+                return ChatTurn(
+                    content="",
+                    finish_reason="tool_parse_error",
+                    tool_calls=[],
+                    raw_message={},
+                    usage_present=False,
+                )
+            log.error("llm_bad_request", error=msg)
             raise
         except RateLimitError as exc:
             if attempt == _MAX_RETRIES - 1:

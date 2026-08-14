@@ -99,6 +99,8 @@ Given **any** directory of submission documents (any format mix of PDF/DOCX, any
 | Content-driven, folder-name-agnostic, no doc cap | Folders can be named anything and nested arbitrarily; corpora are unbounded | — Pending |
 | Cost via caching + compaction + cheap triage + isolation + budgets | Makes the agentic loop economically viable at corpus scale | — Pending |
 | Eval harness gates everything | "Reliable" must be measured (precision/recall), not asserted | — Pending |
+| Verifier runs on served Llama 3.3 70B; Nemotron deferred (β-pivot 2026-08-13) | Nemotron-Super-49B is unservable on aip-amn-dev (custom-entrypoint serving disabled, H100 tiers unenrolled). Recall is deterministic (P5) + verifier is downgrade-never-drop (P7), so verifier model strength is precision-only, never TP loss. On-prem law upheld (self-hosted). Nemotron stays fully wired behind env `VERIFIER_MODEL_NAME` to restore when custom serving lands. | — Active |
+| Interpretive-tail producer = Qwen MoE (cross-family from Llama verifier) | Satisfies Phase 7 decorrelation (verifier ≠ producer family) using the two on-prem families already served | — Active |
 
 ## Evolution
 

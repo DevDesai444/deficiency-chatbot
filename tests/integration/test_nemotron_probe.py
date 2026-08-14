@@ -37,14 +37,16 @@ pytestmark = pytest.mark.integration
 # PROBE NOTE: probe BOTH strings in the pre-wiring probe (D-18 task) and confirm
 # which actually flips the token count — the toggle string is version-dependent.
 # The v1.5 card uses /no_think for OFF; v1 used "detailed thinking off".
-THINKING_ON_SYSTEM = (
-    "You are a regulatory compliance verifier. detailed thinking on\n"
-    "Analyze the candidate deficiency carefully before emitting the VERDICT."
-)
-THINKING_OFF_SYSTEM = (
-    "/no_think\n"
-    "You are a regulatory compliance verifier. Emit the VERDICT directly."
-)
+#
+# β-PIVOT (2026-08-13): these now delegate to the canonical verifier elicitation prompt
+# (src/llm/verifier_prompt.py), which supplies general skeptical-reviewer discipline. The
+# prior minimal strings ("Analyze carefully…") caused weak models to rubber-stamp every
+# candidate KEEP (D-06b blanket-KEEP tripwire). The thinking directive is preserved as the
+# leading line of each mode. The prompt is corpus-agnostic (anti-overfitting law).
+from llm.verifier_prompt import verifier_system_prompt  # noqa: E402
+
+THINKING_ON_SYSTEM = verifier_system_prompt("on")
+THINKING_OFF_SYSTEM = verifier_system_prompt("off")
 
 # Minimal VERDICT tool schema for the round-trip probe.
 # Must match SERVED_MODEL_NAME in deploy_nemotron.py and config.verifier_model.

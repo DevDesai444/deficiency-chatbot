@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     # verifier reliability (D-13: corrective retry cap, mirrors structured_output_max_repair_calls)
     verifier_max_repair_calls: int = 1  # D-13: cap=1, mirrors structured_output_max_repair_calls
 
+    # verifier/reasoning model — the endpoint the β verifier (Phase 7) runs on.
+    # β-PIVOT (2026-08-13): Nemotron-Super-49B cannot be served on aip-amn-dev
+    # (custom-entrypoint serving disabled workspace-wide + H100 tiers unenrolled — see
+    # 06-06-GATE-BLOCKED-STATUS.md). The verifier role therefore runs on the already-served
+    # Llama 3.3 70B endpoint. This is recall-safe: recall is deterministic (Phase 5) and the
+    # verifier is downgrade-never-drop (Phase 7), so verifier model strength affects precision
+    # only, never true-positive loss. Nemotron stays fully wired (DETECTOR_MODELS / lineage /
+    # deploy notebook retained); set VERIFIER_MODEL_NAME=defpredict-nemotron to restore it once
+    # Databricks custom serving is enabled. Any value MUST be in ON_PREM_ALLOW_LIST (D-16 guard).
+    verifier_model_name: str = "databricks-meta-llama-3-3-70b-instruct"
+
     @property
     def is_databricks(self) -> bool:
         return self.environment == "databricks"
@@ -77,17 +88,17 @@ class Settings(BaseSettings):
 
     @property
     def verifier_model(self) -> str:
-        """D-17: Verifier/reasoning role → Nemotron-Super-49B (self-managed vLLM).
+        """D-17 / β-PIVOT: Verifier/reasoning role → `verifier_model_name` endpoint.
 
-        Returns the Databricks ENDPOINT NAME "defpredict-nemotron" — the routable id
-        that must be passed as model= in OpenAI client calls through Databricks serving.
-        (The vLLM internal --served-model-name "nemotron-super-49b-v1_5" is different;
-        it is only used as the vLLM entrypoint arg, not for client routing.)
-        Falls back to detector_model in local dev (non-Databricks) where Nemotron
-        is not served.
+        Returns the Databricks ENDPOINT NAME (routable id passed as model= in OpenAI
+        client calls through Databricks serving). Default is the served Llama 3.3 70B
+        endpoint; override with env VERIFIER_MODEL_NAME (e.g. "defpredict-nemotron"
+        once custom serving is enabled). The resolved value is guarded by the D-16
+        on-prem allow-list in client.get_client. Falls back to detector_model in local
+        dev (non-Databricks) where these endpoints are not served.
         """
         if self.is_databricks:
-            return "defpredict-nemotron"
+            return self.verifier_model_name
         return self.detector_model  # local dev fallback
 
 
@@ -126,6 +137,20 @@ MODEL_LINEAGE: dict[str, str] = {
     # vLLM served-model-name entry kept for direct vLLM access / legacy references.
     "nemotron-super-49b-v1_5": "nemotron-on-llama",
 }
+
+
+# β-PIVOT (2026-08-13): the on-prem VERIFIER FLEET — every served chat endpoint the Phase-6
+# gate validates for the verifier role, and the pool Phase 7 fans out across for DECORRELATED
+# cross-family consensus (Llama vs. Qwen: a correlated error in one family cannot rubber-stamp
+# the other). Two families / three endpoints, all self-hosted (on-prem law holds). Nemotron is
+# deferred (unservable on aip-amn-dev) — add it back here once custom serving is enabled.
+# Every id must be in ON_PREM_ALLOW_LIST + MODEL_LINEAGE (asserted by test_config_verifier).
+# Override the fleet via env VERIFIER_FLEET (comma-separated) for ad-hoc subsets.
+VERIFIER_FLEET: tuple[str, ...] = (
+    "databricks-meta-llama-3-3-70b-instruct",   # llama  (dense 70B)
+    "databricks-qwen35-122b-a10b",              # qwen   (MoE, ~10B active)
+    "databricks-qwen3-next-80b-a3b-instruct",   # qwen   (MoE, ~3B active)
+)
 
 
 # D-16: On-prem allow-list — single source of truth.
