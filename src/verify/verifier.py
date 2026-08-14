@@ -77,6 +77,54 @@ def _assert_no_write_tool(tools: list[dict]) -> None:
             raise AssertionError(f"verifier tool list must be read-only; found write/emit tool: {name!r}")
 
 
+# The verifier's VERDICT OUTPUT channel. The write-disabled invariant forbids mutating the corpus /
+# findings (emit_finding), NOT recording a judgment — so a "submit_verdict" tool is allowed (and the
+# name matches the offline ScriptedFleetClient fixture + passes the write-tool guard, which blocks
+# emit_/write/mutate/submit_finding). This is REQUIRED, not optional: weak open-weights models
+# (Llama/Qwen) do NOT reliably emit a VERDICT via guided-JSON where the endpoint lacks guided
+# support — Llama answers in free text ("VERDICT: DOWNGRADE") with no structured grounding_span, so
+# the consensus gate (which needs a grounded downgrade) never fires. Offering the tool makes both
+# families emit a structured VERDICT incl. grounding_span (proven by the Phase-6 D-06 probe). Without
+# it every real downgrade was discarded as "unreadable => KEEP" (the live-checkpoint no-op bug).
+SUBMIT_VERDICT_TOOL: dict = {
+    "type": "function",
+    "function": {
+        "name": "submit_verdict",
+        "description": "Record the VERDICT (KEEP or DOWNGRADE) on the candidate deficiency, with a "
+        "verbatim grounding_span copied from the provided source.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "verdict": {"type": "string", "enum": ["KEEP", "DOWNGRADE"]},
+                "confidence": {"type": "number"},
+                "rationale": {"type": "string"},
+                "grounding_span": {"type": "string"},
+            },
+            "required": ["verdict", "confidence", "rationale", "grounding_span"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+def _submit_verdict_args(turn) -> str | None:
+    """Return the JSON-args string of the verifier's ``submit_verdict`` tool call, or None.
+
+    None (=> KEEP, unreadable) when the turn errored, carried no tool calls, or the model called a
+    read tool but never submitted a verdict. When exactly one tool call is present we accept it even
+    if the name differs (guided/legacy paths), so a scripted single-call fixture still parses.
+    """
+    if turn.finish_reason in ("tool_parse_error", "error"):
+        return None
+    calls = turn.tool_calls or []
+    for tc in calls:
+        if getattr(getattr(tc, "function", None), "name", None) == "submit_verdict":
+            return tc.function.arguments
+    if len(calls) == 1:  # single-call fixture / guided path with a differently-named call
+        return calls[0].function.arguments
+    return None
+
+
 def render_candidate(candidate, source_text: str, rule_text: str) -> str:
     """Render ONLY claim + re-opened source + rule for the verifier's user message.
 
@@ -111,7 +159,9 @@ def verify_once(
     routes through the on-prem guard.
     """
     system = verifier_system_prompt(thinking_mode="off", model=model)
-    tools = read_only_verifier_tools()
+    # Read tools (get_section/read_guideline) + the submit_verdict OUTPUT channel. The evidence is
+    # pre-re-opened by the orchestrator and rendered below, so the model emits a verdict directly.
+    tools = read_only_verifier_tools() + [SUBMIT_VERDICT_TOOL]
     messages = [
         {"role": "system", "content": system},
         # ONLY claim + re-opened source + rule. NEVER the producer's chain-of-thought.
@@ -126,13 +176,14 @@ def verify_once(
         guided_model_cls=VERDICT,
     )
 
-    # Invariant: an unreadable turn => KEEP (never fabricate a verdict).
-    if turn.finish_reason in ("tool_parse_error", "error") or not turn.tool_calls:
+    # Invariant: an unreadable turn (no submit_verdict) => KEEP (never fabricate a verdict).
+    args_str = _submit_verdict_args(turn)
+    if args_str is None:
         log.info("verifier_unreadable_keep", model=model, finish_reason=turn.finish_reason)
         return "KEEP"
 
     try:
-        raw_args = json.loads(turn.tool_calls[0].function.arguments)
+        raw_args = json.loads(args_str)
     except Exception as exc:  # malformed JSON in the tool args => KEEP
         log.info("verifier_bad_tool_args_keep", model=model, error=str(exc)[:200])
         return "KEEP"
@@ -152,10 +203,11 @@ def verify_once(
             temperature=0.0,
             guided_model_cls=VERDICT,
         )
-        if turn2.finish_reason in ("tool_parse_error", "error") or not turn2.tool_calls:
+        args_str2 = _submit_verdict_args(turn2)
+        if args_str2 is None:
             return "KEEP"
         try:
-            raw_args2 = json.loads(turn2.tool_calls[0].function.arguments)
+            raw_args2 = json.loads(args_str2)
         except Exception:
             return "KEEP"
         verdict, failed2 = coerce_and_validate(raw_args2, VERDICT, retries_remaining=0)
