@@ -106,7 +106,11 @@ def test_downgraded_fp_not_scored_and_downgraded_tp_retained():
 
 
 def test_could_not_locate_stays_active_in_scored_report():
-    """A could-not-locate candidate is NOT a DOWNGRADE -> tier stays 'full' -> stays in report.faults."""
+    """A could-not-locate candidate is NOT a DOWNGRADE -> tier stays 'full' -> stays in report.faults.
+
+    Family-aware gradeability (live-checkpoint fix): a candidate is un-gradeable ONLY when NEITHER
+    the source NOR the rule half re-opens. Both halves are forced to fail here.
+    """
     from config import VERIFIER_FLEET
 
     tp = labeled_tp_candidate()
@@ -115,14 +119,37 @@ def test_could_not_locate_stays_active_in_scored_report():
     fleet = ScriptedFleetClient(
         script={m: [make_verdict_turn("KEEP", "Total is 0.14 percent")] for m in VERIFIER_FLEET}
     )
-    # Force the source half to fail re-open -> could_not_locate, candidate kept ACTIVE.
+    # Force BOTH halves to fail re-open -> could_not_locate("both"), candidate kept ACTIVE.
     verified, coverage = verify_candidates(
-        [tp], fleet_client=fleet, reopen_source=lambda c: None, reopen_rule=lambda c: "rule text"
+        [tp], fleet_client=fleet, reopen_source=lambda c: None, reopen_rule=lambda c: None
     )
 
     assert coverage.could_not_locate
-    assert coverage.could_not_locate[0]["half"] == "source"
+    assert coverage.could_not_locate[0]["half"] == "both"
     assert tp.confidence_tier == "full"  # not downgraded
 
     report = assemble_scored_report(verified, coverage)
     assert tp in report.faults  # active, still scored
+
+
+def test_single_context_candidate_is_gradeable_not_could_not_locate():
+    """REGRESSION (live-checkpoint bug): a candidate with only ONE re-openable half is VERIFIED,
+    not routed to could_not_locate. Structural findings carry a source (cells) but no cited rule;
+    absence findings carry a rule but no source span. Requiring BOTH halves made every real
+    Phase-5 candidate un-gradeable, so the fleet was never consulted (downgraded=0 on live corpus).
+    """
+    from config import VERIFIER_FLEET
+
+    # Structural-shaped: source present, rule absent (a structural aggregate finding cites no rule).
+    fp = labeled_fp_candidate()
+    fleet = ScriptedFleetClient(
+        script={m: [make_verdict_turn("KEEP", "Total 0.14")] for m in VERIFIER_FLEET}
+    )
+    verified, coverage = verify_candidates(
+        [fp],
+        fleet_client=fleet,
+        reopen_source=lambda c: "Table 19 Total 0.14; rows 0.05, 0.04, 0.05.",  # source re-opens
+        reopen_rule=lambda c: None,                                             # rule half absent
+    )
+    assert not coverage.could_not_locate, "single-context candidate must be gradeable, not could_not_locate"
+    assert coverage.reviewed_keep, "the fleet must have been consulted (candidate reviewed, not skipped)"

@@ -92,19 +92,52 @@ def _apply_downgrade(candidate) -> None:
     candidate.confidence_tier = "low"
 
 
+def _resolve_reopen_span(candidate):
+    """Return the SpanID a candidate re-opens its source against, anchor-type-aware, or None.
+
+    Real Phase-5 candidates carry their source under DIFFERENT anchors depending on family, and
+    most do NOT have a ``submission_span_id`` (only direct-quote findings do). Resolving in this
+    order lets the verifier re-open — and therefore actually VERIFY — every family, instead of
+    routing absence/structural candidates to could_not_locate (the live-checkpoint bug):
+
+      1. ``submission_span_id``               — direct-quote / precedent findings;
+      2. ``structural_anchor.claim_span_id``  — table/aggregate findings (the cited cell region);
+      3. ``absence_anchor.claim_span_id``     — an unsupported-narrative-claim absence (mvr/MS-03);
+      4. ``absence_anchor.sub_threshold_hits[0].span_id`` — a pure absence: re-open the CLOSEST
+         retrieval evidence that fell below threshold, so the verifier RE-RUNS the negative
+         (the requirement is genuinely absent iff even the best match doesn't address it) rather
+         than trusting the recorded threshold. Mirrors ``grounding._resolve_absence_span`` + the
+         ``CoverageAbsenceAnchor`` schema intent.
+
+    None only when a candidate carries no re-openable anchor at all (a genuine could_not_locate).
+    """
+    span = getattr(candidate, "submission_span_id", None)
+    if span is not None:
+        return span
+    st = getattr(candidate, "structural_anchor", None)
+    if st is not None and getattr(st, "claim_span_id", None) is not None:
+        return st.claim_span_id
+    anchor = getattr(candidate, "absence_anchor", None)
+    if anchor is not None:
+        if getattr(anchor, "claim_span_id", None) is not None:
+            return anchor.claim_span_id
+        hits = getattr(anchor, "sub_threshold_hits", None) or []
+        if hits:
+            return hits[0].span_id
+    return None
+
+
 def _reopen_full_source(candidate, corpus, ledger) -> str | None:
     """Re-open the FULL submission source for a candidate via get_section (never truncated).
 
-    Uses the candidate's submission span (or an absence anchor's claim span) to read the full
-    surrounding section. Returns the annotated text, or None on any ToolRejected/missing span —
-    which the caller records as a could_not_locate(half="source") and KEEPS the candidate.
+    Resolves the re-open span anchor-type-aware (``_resolve_reopen_span``: submission /
+    structural / absence claim / absence sub-threshold evidence) to read the full surrounding
+    section. Returns the annotated text, or None on any ToolRejected/missing span — which the
+    caller records as a could_not_locate(half="source") and KEEPS the candidate.
     """
     from tools.get_section import get_section
 
-    span = getattr(candidate, "submission_span_id", None)
-    if span is None:
-        anchor = getattr(candidate, "absence_anchor", None)
-        span = getattr(anchor, "claim_span_id", None) if anchor is not None else None
+    span = _resolve_reopen_span(candidate)
     if span is None:
         return None
     # FULL section re-open around the span — NOT a ≤500-char excerpt. max_chars bounds a single
@@ -163,6 +196,30 @@ def _reopen_full_rule(candidate, manifest, ledger) -> str | None:
     return result
 
 
+def _reopen_full_nt(candidate, corpus):
+    """Production ``NormalizedText`` for grounding re-resolution — the doc of the candidate's
+    re-open span. Grounding (``open_span``) needs the doc's NormalizedText to re-resolve a span
+    byte-exact; in production this comes from the corpus cache (the SAME substrate get_section
+    reads). Returns None when the candidate has no re-openable anchor or the doc is not cached
+    (grounding then collapses to False → reviewed-but-not-grounded → KEEP; never drops).
+
+    Without this, the production path left ``nt=None`` and EVERY downgrade was ungrounded, so
+    consensus could never downgrade (the live-checkpoint no-op-verifier bug).
+    """
+    from tools.get_section import _nt_from_cache_entry
+
+    span = _resolve_reopen_span(candidate)
+    if span is None:
+        return None
+    cache = corpus.cached_entry(span.doc_id) if corpus is not None else None
+    if cache is None:
+        return None
+    try:
+        return _nt_from_cache_entry(cache)
+    except Exception:  # noqa: BLE001 - a malformed cache entry just yields no grounding substrate
+        return None
+
+
 def verify_candidates(
     candidates: list,
     fleet_client: Callable,
@@ -203,18 +260,18 @@ def verify_candidates(
         family = family_of(candidate)
         panel = panel_for(family)
 
-        # --- FULL re-open of both halves (VERIFY-02) ---------------------------------------------
-        located = True
+        # --- FULL re-open (VERIFY-02), FAMILY-AWARE gradeability ---------------------------------
+        # Real Phase-5 families carry DIFFERENT halves: a structural aggregate finding has a
+        # source (the cited cells) but NO cited rule; an absence finding has a rule (the required
+        # item) but NO source span. Requiring BOTH halves wrongly routed every real candidate to
+        # could_not_locate (the live-checkpoint bug). A candidate is GRADEABLE if it has AT LEAST
+        # ONE re-opened context (source OR rule); only a candidate with NEITHER is un-gradeable.
         if reopen_source is not None:
             source_text = reopen_source(candidate)
         elif corpus is not None and ledger is not None:
             source_text = _reopen_full_source(candidate, corpus, ledger)
         else:
             source_text = getattr(candidate, "evidence", "") or ""
-        if source_text is None:
-            could_not_locate.append({"dedup_key": dedup_key, "half": "source",
-                                     "reason": "source span could not be re-opened"})
-            located = False
 
         if reopen_rule is not None:
             rule_text = reopen_rule(candidate)
@@ -222,23 +279,29 @@ def verify_candidates(
             rule_text = _reopen_full_rule(candidate, manifest, ledger)
         else:
             rule_text = ""
-        # A rule half is only "could_not_locate" when we actually attempted a live re-open.
-        if rule_text is None:
-            could_not_locate.append({"dedup_key": dedup_key, "half": "rule",
-                                     "reason": "cited rule could not be re-opened"})
-            located = False
 
-        if not located:
-            # Reviewed-but-not-gradeable: KEEP as-is (confidence + tier unchanged), stays ACTIVE.
+        if source_text is None and rule_text is None:
+            # Reviewed-but-not-gradeable: NEITHER half re-opened. KEEP as-is (confidence + tier
+            # unchanged), stays ACTIVE — recall invariant.
+            could_not_locate.append({"dedup_key": dedup_key, "half": "both",
+                                     "reason": "neither source span nor cited rule could be re-opened"})
             verified_faults.append(candidate)
             continue
 
-        nt = reopen_nt(candidate) if reopen_nt is not None else None
+        # Grounding substrate: injected in tests; in production the doc NormalizedText from the
+        # corpus cache. Without this the production path left nt=None and NO downgrade could ever
+        # be grounded — consensus never downgraded (the no-op-verifier bug).
+        if reopen_nt is not None:
+            nt = reopen_nt(candidate)
+        elif corpus is not None:
+            nt = _reopen_full_nt(candidate, corpus)
+        else:
+            nt = None
 
         # --- decorrelated, isolated fan-out ------------------------------------------------------
         panel_verdicts = []
         for model in panel:
-            verdict = verify_once(candidate, source_text, rule_text, model, completion=fleet_client)
+            verdict = verify_once(candidate, source_text or "", rule_text or "", model, completion=fleet_client)
             panel_verdicts.append(
                 {
                     "verdict": verdict.verdict.value if isinstance(verdict, VERDICT) else "KEEP",
