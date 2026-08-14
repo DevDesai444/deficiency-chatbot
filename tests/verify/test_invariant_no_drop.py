@@ -30,14 +30,20 @@ def test_all_downgrade_keeps_every_candidate_object_mutated_not_dropped():
         script={m: [make_verdict_turn("DOWNGRADE", "Total is 0.14 percent")] for m in VERIFIER_FLEET}
     )
 
-    out = orch.verify_candidates([candidate], fleet_client=fleet)
+    before_conf = candidate.confidence
+    verified, coverage = orch.verify_candidates([candidate], fleet_client=fleet)
 
-    # length preserved (never dropped)
-    assert len(out) == 1
+    # length preserved == unique dedup_key count (never dropped)
+    assert len(verified) == 1
     # SAME object, mutated in place: confidence lowered + tier flipped to low
-    assert id(out[0]) == before_id
-    assert out[0].confidence_tier == "low"
-    assert out[0].confidence <= candidate.confidence
+    assert id(verified[0]) == before_id
+    assert verified[0].confidence_tier == "low"
+    assert verified[0].confidence < before_conf
+    # the DOWNGRADEd fault is recorded in the coverage audit trail (visible, not buried), with the
+    # agreeing verifiers — never silently dropped.
+    assert coverage.reviewed_downgrade
+    assert coverage.reviewed_downgrade[0]["dedup_key"] == candidate.dedup_key
+    assert coverage.reviewed_downgrade[0]["agreeing_verifiers"]
 
 
 def test_no_drop_mutation_verbs_in_verify_source():
