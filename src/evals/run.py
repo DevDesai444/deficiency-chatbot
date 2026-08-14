@@ -61,6 +61,7 @@ RETRIEVAL_BASELINE_PATH = Path(__file__).parent / "baseline" / "retrieval_recall
 COVERAGE_BASELINE_PATH = Path(__file__).parent / "baseline" / "coverage_baseline.json"
 ABSENCE_BASELINE_PATH = Path(__file__).parent / "baseline" / "absence_threshold.json"
 BETA_RECALL_BASELINE_PATH = Path(__file__).parent / "baseline" / "beta_recall_baseline.json"
+PHASE5_F1_BASELINE_PATH = Path(__file__).parent / "baseline" / "phase5_f1_baseline.json"
 
 
 def _join_source_text(parsed_doc: dict) -> str:
@@ -1073,6 +1074,197 @@ def cmd_beta_recall_gate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _f1(precision: float, recall: float) -> float:
+    """Harmonic mean with a zero-guard (matches metrics' f1 = 2pr/(p+r))."""
+    return (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+
+
+def _phase5_candidates_for_doc(doc, eval_set) -> tuple:
+    """Regenerate the Phase-5 deterministic candidate list for one non-held-out doc (real corpus).
+
+    Mirrors ``cmd_beta_recall_gate``'s per-doc isolated ingest + deterministic-leg run so the gate
+    reproduces the SAME Phase-5 candidate output the verifier+tail then score. Returns
+    ``(candidates, corpus, manifest, ledger)`` or ``None`` when the local source file is absent
+    (gitignored corpus) so the caller can structured-skip that doc.
+    """
+    import shutil
+    import tempfile
+
+    from ingest.corpus import ingest_corpus
+    from rulebook.absence import enumerate_absences
+    from rulebook.references import detect_reference_anomalies, extract_references
+    from rulebook.structural import detect_structural_inconsistencies
+    from rulebook.precedent_search import detect_precedent_candidates
+    from tools.ledger import RetrievalLedger
+
+    src = Path(doc.path)
+    if not src.exists():
+        return None
+    abs_threshold = json.loads(ABSENCE_BASELINE_PATH.read_text())["threshold"]
+    faiss_present = Path("data/rulebook.faiss").exists()
+
+    td = tempfile.mkdtemp(prefix="verify-f1-corpus-")
+    shutil.copy(src, Path(td) / src.name)
+    corpus = ingest_corpus(Path(td))
+    corpus = _relabel_corpus_doc_id(corpus, doc)
+    ledger = RetrievalLedger()
+    candidates: list = []
+    candidates += enumerate_absences(corpus, corpus.manifest, ledger, threshold=abs_threshold)
+    candidates += detect_structural_inconsistencies(corpus, corpus.manifest, ledger)
+    edb = str(Path(td) / "edges.db")
+    extract_references(corpus, corpus.manifest, db_path=edb)
+    candidates += detect_reference_anomalies(corpus, corpus.manifest, ledger, db_path=edb)
+    if faiss_present:
+        candidates += detect_precedent_candidates(corpus, corpus.manifest, ledger)
+    return candidates, corpus, corpus.manifest, ledger
+
+
+def cmd_verify_f1_gate(args: argparse.Namespace) -> int:
+    """`verify-f1`: end-to-end F1 (verification + tail) vs the frozen Phase-5 baseline (Gap 1/2/3).
+
+    DRIVES the Gap-2 driver (``verify.driver.verify_and_assemble``) — NOT a hand-authored report —
+    to build the scored ``FaultReport`` (KEEP-tier only) + ``CoverageReport`` from the Phase-5
+    candidate output, then grades it against ``src/evals/baseline/phase5_f1_baseline.json``:
+
+      PASS iff end-to-end F1 >= baseline F1 AND no baseline-matched TP id is lost. The zero-TP-loss
+      check reads ``report.faults`` UNION the DOWNGRADEd faults retained in coverage
+      (``downgraded_dedup_keys``) — the matcher keys on presence/evidence-anchor, so a
+      DOWNGRADEd-but-present TP still counts as retained (T-07-11).
+
+    Gap 3 (T-07-17): if the baseline ``provenance`` is ``authored-*`` AND this is a REAL corpus run
+    (the local corpus is present and the driver produced a genuine report), HARD-FAIL (exit 1) with
+    a directive to re-capture the baseline via ``evals.run score`` on the frozen Phase-5 golden
+    report in the MAIN tree — an authored placeholder may only pass the OFFLINE unit test with an
+    explicitly synthetic baseline, never a live run.
+
+    Two paths:
+      - OFFLINE (``--report``): score a pre-captured DRIVER report (``--downgraded`` supplies the
+        retained-for-recall downgraded fault dicts for the zero-TP-loss union). Used by the unit
+        test with an explicit synthetic baseline.
+      - LIVE (default): drive ``verify_and_assemble`` over the real per-doc Phase-5 candidate output.
+
+    Structured-SKIP (exit 0 + printed SKIP) only when the gitignored corpus / captured report is
+    genuinely absent (mirroring ``beta-recall-gate`` WR-03) — never as a way to dodge the authored-*
+    hard-fail on a real run.
+    """
+    from evals.match import score
+    from evals.metrics import _end_to_end
+    from evals.schema import load_eval_set
+    from schemas.faults import Fault, FaultReport
+    from verify.assemble import downgraded_dedup_keys
+    from verify.driver import verify_and_assemble
+
+    baseline = json.loads(Path(args.baseline).read_text())
+    provenance = str(baseline.get("provenance", ""))
+    baseline_e2e = baseline.get("end_to_end", {})
+    baseline_f1 = float(baseline_e2e.get("f1", 0.0))
+
+    eval_set = load_eval_set()
+    doc_id = args.doc_id
+
+    offline_report_path = getattr(args, "report", None)
+    is_real_run = offline_report_path is None
+
+    # --- Gap 3 hard-fail: authored-* baseline on a REAL corpus run --------------------------------
+    # A real run is one that drives the live corpus (no --report override). If the baseline was never
+    # measured (authored-*), we must NOT let it masquerade as a measured floor.
+    if is_real_run and provenance.startswith("authored"):
+        # Only a genuine real run trips this: confirm at least one non-held-out source is present.
+        corpus_present = any(
+            (not d.held_out) and Path(d.path).exists() for d in eval_set.documents
+        )
+        if corpus_present:
+            print(
+                "FAIL: verify-f1 — baseline provenance is authored-*; re-capture via "
+                "'evals.run score' on the frozen Phase-5 golden report in the MAIN tree before "
+                "trusting the live gate (Gap 3)."
+            )
+            return 1
+        # Corpus genuinely absent -> structured-skip (WR-03), never a dodge of the hard-fail above.
+        print("VERIFY-F1-GATE SKIPPED (no local corpus)")
+        return 0
+
+    # --- Build the scored (report, retained-downgraded-faults) surface ----------------------------
+    if offline_report_path is not None:
+        report = FaultReport.model_validate_json(Path(offline_report_path).read_text())
+        downgraded_faults: list = []
+        downgraded_path = getattr(args, "downgraded", None)
+        if downgraded_path:
+            rows = json.loads(Path(downgraded_path).read_text())
+            downgraded_faults = [Fault.model_validate(r) for r in rows]
+        e2e = _end_to_end(report, eval_set, doc_id)
+        precision, recall = e2e["precision"], e2e["recall"]
+        f1 = _f1(precision, recall)
+        # zero-TP-loss union: active report faults + retained DOWNGRADEd faults (presence-keyed).
+        union = list(report.faults) + downgraded_faults
+        retained_matched = score(
+            [f.model_dump() for f in union], eval_set.deficiencies, doc_id
+        ).matched_gt_ids
+    else:
+        # LIVE: drive verify_and_assemble over the real per-doc Phase-5 candidate output.
+        measured_docs = 0
+        active_faults: list = []
+        union_faults: list = []
+        for doc in eval_set.documents:
+            if doc.held_out:
+                continue
+            prepared = _phase5_candidates_for_doc(doc, eval_set)
+            if prepared is None:
+                continue
+            candidates, corpus, manifest, ledger = prepared
+            report_doc, coverage_doc = verify_and_assemble(
+                candidates,
+                corpus,
+                manifest,
+                ledger,
+                enable_tail=not args.no_tail,
+                tail_model=args.tail_model,
+            )
+            measured_docs += 1
+            active_faults += list(report_doc.faults)
+            downgraded_keys = downgraded_dedup_keys(coverage_doc)
+            retained_downgraded = [
+                c for c in candidates if getattr(c, "dedup_key", None) in downgraded_keys
+            ]
+            union_faults += list(report_doc.faults) + retained_downgraded
+        if measured_docs == 0:
+            print("VERIFY-F1-GATE SKIPPED (no local corpus)")
+            return 0
+        report = FaultReport(job_id="verify-f1", faults=active_faults, faults_found=bool(active_faults))
+        e2e = _end_to_end(report, eval_set, doc_id)
+        precision, recall = e2e["precision"], e2e["recall"]
+        f1 = _f1(precision, recall)
+        retained_matched = score(
+            [f.model_dump() for f in union_faults], eval_set.deficiencies, doc_id
+        ).matched_gt_ids
+
+    # --- Grade: F1 floor + zero-TP-loss -----------------------------------------------------------
+    baseline_matched: set[str] = set(baseline.get("matched_set", []))
+    if not baseline_matched:
+        # Fall back to the beta-recall matched set (the frozen Phase-5 TP ids) when the F1 baseline
+        # does not carry its own matched_set.
+        try:
+            beta = json.loads(BETA_RECALL_BASELINE_PATH.read_text())
+            baseline_matched = set(beta.get("matched_set", []))
+        except Exception:  # noqa: BLE001 - a missing beta baseline just yields an empty floor
+            baseline_matched = set()
+
+    lost = sorted(baseline_matched - retained_matched)
+    print(
+        f"verify-f1: precision={precision:.4f} recall={recall:.4f} f1={f1:.4f} "
+        f"(baseline f1 {baseline_f1:.4f}); retained_matched={sorted(retained_matched)} "
+        f"baseline_matched={sorted(baseline_matched)}"
+    )
+    if lost:
+        print(f"FAIL: verify-f1 — lost baseline matched TP ids: {lost}")
+        return 1
+    if f1 + 1e-9 < baseline_f1:
+        print(f"FAIL: verify-f1 — F1 {f1:.4f} below baseline {baseline_f1:.4f}")
+        return 1
+    print("PASS: verify-f1")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m evals.run", description="DefPredict eval harness CI-style CLI."
@@ -1178,6 +1370,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     beta_recall_p.add_argument("--baseline", default=str(BETA_RECALL_BASELINE_PATH))
     beta_recall_p.set_defaults(func=cmd_beta_recall_gate)
+
+    verify_f1_p = subparsers.add_parser(
+        "verify-f1",
+        help="Phase-7 gate: DRIVE verify_and_assemble (Gap 2) and grade end-to-end F1 vs the frozen "
+             "Phase-5 baseline + zero-TP-loss; HARD-FAIL an authored-* baseline on a real run (Gap 3); "
+             "structured-skip only when the gitignored corpus/report is genuinely absent.",
+    )
+    verify_f1_p.add_argument("--baseline", default=str(PHASE5_F1_BASELINE_PATH))
+    verify_f1_p.add_argument("--doc-id", dest="doc_id", default=DEFAULT_DOC_ID)
+    verify_f1_p.add_argument(
+        "--report", default=None,
+        help="OFFLINE: score a pre-captured DRIVER FaultReport JSON instead of a live corpus run.",
+    )
+    verify_f1_p.add_argument(
+        "--downgraded", default=None,
+        help="OFFLINE: JSON list of DOWNGRADEd fault dicts (retained-for-recall zero-TP-loss union).",
+    )
+    verify_f1_p.add_argument(
+        "--no-tail", action="store_true",
+        help="Gap 4 escape hatch: disable the interpretive tail (deterministic-verification-only F1).",
+    )
+    verify_f1_p.add_argument(
+        "--tail-model", dest="tail_model", default=None,
+        help="Override the Qwen-lineage interpretive-tail producer endpoint (allow-list validated).",
+    )
+    verify_f1_p.set_defaults(func=cmd_verify_f1_gate)
 
     return parser
 
