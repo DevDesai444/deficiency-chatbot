@@ -76,10 +76,10 @@ The v1.0 agentic-recall loop is a confirmed NO-GO (`03-19-V3.3-READING.md`: reca
 - [ ] **RECALL-05**: Every deterministic recall check is rulebook/structure/graph-general; a guard test proves no submission-specific constant is embedded (anti-overfitting — the eval corpus is a proxy, never a target)
 
 ### Multi-Agent Verification
-- [ ] **VERIFY-01**: Each candidate is judged by an isolated, write-disabled verifier sub-agent that re-opens the cited source + rule and returns a machine-parsed VERDICT: KEEP | DOWNGRADE (never DROP; unsure resolves to KEEP — the downgrade-never-drop recall invariant, enforced in code) (subsumes GROUND-02)
-- [ ] **VERIFY-02**: An orchestrator fans out verifiers keyed on docId:sectionId:ruleId, consolidates and dedups, and reports coverage so a "no deficiencies found" result states what was reviewed (subsumes AGENT-02, DETECT-05)
-- [ ] **VERIFY-03**: The verifier model is cross-family / decorrelated from the candidate source, so correlated errors cannot be rubber-stamped
-- [ ] **VERIFY-04**: An agentic interpretive-tail pass surfaces grounded deficiencies that no deterministic rule expresses
+- [x] **VERIFY-01**: Each candidate is judged by an isolated, write-disabled verifier sub-agent that re-opens the cited source + rule and returns a machine-parsed VERDICT: KEEP | DOWNGRADE (never DROP; unsure resolves to KEEP — the downgrade-never-drop recall invariant, enforced in code) (subsumes GROUND-02)
+- [x] **VERIFY-02**: An orchestrator fans out verifiers keyed on docId:sectionId:ruleId, consolidates and dedups, and reports coverage so a "no deficiencies found" result states what was reviewed (subsumes AGENT-02, DETECT-05)
+- [x] **VERIFY-03**: The verifier model is cross-family / decorrelated from the candidate source, so correlated errors cannot be rubber-stamped
+- [x] **VERIFY-04**: An agentic interpretive-tail pass surfaces grounded deficiencies that no deterministic rule expresses
 
 ### On-Prem Models
 - [ ] **MODEL-01**: NVIDIA Llama-3.3-Nemotron-Super-49B-v1.5 is served self-hosted on Databricks as the verify/reasoning model alongside Llama 3.3 70B + Qwen MoE; no external LLM API is ever called
@@ -186,10 +186,10 @@ Each v2.0 requirement maps to exactly one β phase. Phase 0 (Eval Harness) also 
 | RELIABILITY-01 | Phase 6 — On-Prem Verifier Model + Weak-Model Reliability | Pending |
 | RELIABILITY-02 | Phase 6 — On-Prem Verifier Model + Weak-Model Reliability | Pending |
 | RELIABILITY-03 | Phase 6 — On-Prem Verifier Model + Weak-Model Reliability | Pending |
-| VERIFY-01 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Pending |
-| VERIFY-02 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Pending |
-| VERIFY-03 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Pending |
-| VERIFY-04 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Pending |
+| VERIFY-01 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Complete |
+| VERIFY-02 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Complete |
+| VERIFY-03 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Complete |
+| VERIFY-04 | Phase 7 — Multi-Agent Verification + Interpretive Tail | Complete |
 | EVAL-01 | Phase 0 — Eval Harness (continuous gate) | Complete |
 | EVAL-02 | Phase 0 — Eval Harness (continuous gate) | Complete |
 | EVAL-03 | Phase 0 — Eval Harness (continuous gate) | Complete |

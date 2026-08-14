@@ -223,7 +223,7 @@ Plans:
   3. The verifier is **cross-family / decorrelated** from the candidate source (different model persona than the deterministic-candidate producer, no access to any generator reasoning — only the claim + source + rule), so correlated errors cannot be rubber-stamped; a test asserts the verifier cannot see the producer's chain.
   4. An **agentic interpretive-tail pass** surfaces grounded deficiencies that no deterministic rule expresses, each pinned to a re-openable verbatim quote + cited rule — and on the Phase 0 eval set, adding verification + interpretive-tail iterations **does not lower end-to-end F1** and loses **zero true positives** versus the Phase 5 deterministic output.
 **Plans**: 4 plans in 4 waves
-- [ ] 07-01-PLAN.md — Wave 0: tests/verify scaffold + ScriptedFleetClient + labeled-FP fixture + Phase-5 F1 baseline + RED stubs (VERIFY-01/02/03/04)
+- [x] 07-01-PLAN.md — Wave 0: tests/verify scaffold + ScriptedFleetClient + labeled-FP fixture + Phase-5 F1 baseline + RED stubs (VERIFY-01/02/03/04)
 - [ ] 07-02-PLAN.md — Verifier atoms: panel.py decorrelation + verifier.py isolated write-disabled call + grounding.py anchor-type re-resolution + consensus.py invariant (VERIFY-01/03)
 - [ ] 07-03-PLAN.md — Orchestrator: dedup_key fan-out + full re-open + consensus + coverage report, downgrade-never-drop proven (VERIFY-01/02/03)
 - [ ] 07-04-PLAN.md — Interpretive tail (Qwen producer) + verify-f1 zero-TP-loss phase gate + MAIN-tree live checkpoint (VERIFY-04)
